@@ -1,2 +1,2 @@
 # OpenFinanceApp
-Finance management app, in C++, Go and React Native
+Finance management app, in C++, Go and Dart (Flutter)
