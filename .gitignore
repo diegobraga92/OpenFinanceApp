@@ -1,0 +1,31 @@
+# Rust
+backend/target/
+backend/**/*.rs.bk
+
+# Node
+node_modules/
+web/node_modules/
+mobile/node_modules/
+web/dist/
+mobile/.expo/
+mobile/dist/
+
+# Docker
+*.env
+!*.env.example
+
+# Terraform
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

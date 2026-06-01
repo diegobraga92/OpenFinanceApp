@@ -42,7 +42,7 @@
 **Goal:** Working “hello world” Rust backend, scaffolded clients, PostgreSQL and RabbitMQ running locally.
 
 - [ ] Repository: monorepo with `backend/`, `web/`, `mobile/`, `api/`, `docker-compose.yml`
-- [ ] Backend (Rust + Tokio + Axum/Actix‑web): `/health` endpoint, PostgreSQL connection pool, structured tracing/logging, graceful shutdown
+- [ ] Backend (Rust + Tokio + Axum): `/health` endpoint, PostgreSQL connection pool, structured tracing/logging, graceful shutdown
 - [ ] Database: initial PostgreSQL schema for accounts, migrations (sqlx or refinery)
 - [ ] RabbitMQ: single broker in Docker Compose (management plugin enabled)
 - [ ] Web (React + TypeScript + Vite): scaffold, call `/health`, display connection status
