@@ -41,18 +41,18 @@
 
 **Goal:** Working “hello world” Rust backend, scaffolded clients, PostgreSQL and RabbitMQ running locally.
 
-- [ ] Repository: monorepo with `backend/`, `web/`, `mobile/`, `api/`, `docker-compose.yml`
-- [ ] Backend (Rust + Tokio + Axum): `/health` endpoint, PostgreSQL connection pool, structured tracing/logging, graceful shutdown
-- [ ] Database: initial PostgreSQL schema for accounts, migrations (sqlx or refinery)
-- [ ] RabbitMQ: single broker in Docker Compose (management plugin enabled)
-- [ ] Web (React + TypeScript + Vite): scaffold, call `/health`, display connection status
-- [ ] Mobile (React Native): scaffold, single screen calling `/health`
-- [ ] API contracts: first OpenAPI spec (`api/openapi/health.yaml`), contract‑first workflow established
-- [ ] Infrastructure: Terraform for RDS Postgres, compute (EKS or simpler)
-- [ ] CI/CD: GitHub Actions workflows (build, test, lint, container build) for each platform
-- [ ] Observability seed: request tracing (OpenTelemetry), Prometheus `/metrics`, basic logging structure
-- [ ] SLO draft: availability target for `/health` (e.g., 99.9%), `docs/slo.md`
-- [ ] ADR: `001-choose-rust-and-framework.md`
+- [x] Repository: monorepo with `backend/`, `web/`, `mobile/`, `api/`, `docker-compose.yml`
+- [x] Backend (Rust + Tokio + Axum): `/health` endpoint, PostgreSQL connection pool, structured tracing/logging, graceful shutdown
+- [x] Database: initial PostgreSQL schema for accounts, migrations (sqlx or refinery)
+- [x] RabbitMQ: single broker in Docker Compose (management plugin enabled)
+- [x] Web (React + TypeScript + Vite): scaffold, call `/health`, display connection status
+- [x] Mobile (React Native): scaffold, single screen calling `/health`
+- [x] API contracts: first OpenAPI spec (`api/openapi/health.yaml`), contract‑first workflow established
+- [x] Infrastructure: Terraform for RDS Postgres, compute (EKS or simpler)
+- [x] CI/CD: GitHub Actions workflows (build, test, lint, container build) for each platform
+- [x] Observability seed: request tracing (OpenTelemetry), Prometheus `/metrics`, basic logging structure
+- [x] SLO draft: availability target for `/health` (e.g., 99.9%), `docs/slo.md`
+- [x] ADR: `001-choose-rust-and-framework.md`
 
 ---
 
