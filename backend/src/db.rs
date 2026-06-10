@@ -5,7 +5,7 @@ use tracing::info;
 pub async fn init_pool(database_url: &str) -> PgPool {
     let pool = PgPoolOptions::new()
         .max_connections(10)
-        .connect_timeout(std::time::Duration::from_secs(10))
+        .acquire_timeout(std::time::Duration::from_secs(10))
         .connect(database_url)
         .await
         .expect("Failed to connect to PostgreSQL");
@@ -24,8 +24,5 @@ pub async fn init_pool(database_url: &str) -> PgPool {
 }
 
 pub async fn check_db_health(pool: &PgPool) -> bool {
-    sqlx::query("SELECT 1")
-        .execute(pool)
-        .await
-        .is_ok()
+    sqlx::query("SELECT 1").execute(pool).await.is_ok()
 }

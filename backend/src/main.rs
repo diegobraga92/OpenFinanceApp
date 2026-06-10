@@ -48,7 +48,10 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state);
 
     // Bind and serve
-    let addr: SocketAddr = config.server_addr().parse().expect("Invalid server address");
+    let addr: SocketAddr = config
+        .server_addr()
+        .parse()
+        .expect("Invalid server address");
     info!("Starting server on {}", addr);
 
     let listener = TcpListener::bind(addr).await?;

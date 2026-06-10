@@ -1,0 +1,7 @@
+[advisories]
+# RUSTSEC-2023-0071: Marvin Attack on RSA (medium)
+# Source: sqlx-mysql -> rsa 0.9.10
+# Safe to ignore because we only use PostgreSQL, not MySQL.
+# The mysql feature is disabled via default-features=false.
+# No fix upgrade is available for the rsa crate.
+ignore = ["RUSTSEC-2023-0071"]

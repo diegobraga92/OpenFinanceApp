@@ -13,8 +13,9 @@ pub fn init_metrics_recorder() -> PrometheusHandle {
 }
 
 pub fn metrics_handler(recorder: PrometheusHandle) -> Router {
-    Router::new()
-        .route("/metrics", get(move || {
+    Router::new().route(
+        "/metrics",
+        get(move || {
             let recorder = recorder.clone();
             async move {
                 axum::response::Response::builder()
@@ -22,7 +23,8 @@ pub fn metrics_handler(recorder: PrometheusHandle) -> Router {
                     .body(axum::body::Body::from(recorder.render()))
                     .unwrap()
             }
-        }))
+        }),
+    )
 }
 
 /// Start a dedicated metrics HTTP server on a separate port (e.g. 3001)

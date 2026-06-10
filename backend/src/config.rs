@@ -17,9 +17,9 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(3000),
-            database_url: env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set"),
-            rabbitmq_url: env::var("RABBITMQ_URL").unwrap_or_else(|_| "amqp://pudim:pudim@localhost:5672".into()),
+            database_url: env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
+            rabbitmq_url: env::var("RABBITMQ_URL")
+                .unwrap_or_else(|_| "amqp://pudim:pudim@localhost:5672".into()),
             otel_endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
                 .unwrap_or_else(|_| "http://localhost:4317".into()),
         }
