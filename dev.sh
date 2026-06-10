@@ -114,6 +114,9 @@ check_mobile() {
 # Dev mode — start services via docker-compose
 # ──────────────────────────────────────────────
 dev_up() {
+    # Trap Ctrl+C / termination to clean up containers
+    trap 'echo -e "\n${YELLOW}Shutting down services...${NC}"; cd "$ROOT_DIR" && docker compose down; ok "Services stopped"; exit 0' INT TERM
+
     step "Starting development services"
     cd "$ROOT_DIR"
     docker compose up --build -d
@@ -122,7 +125,11 @@ dev_up() {
     info "Web UI:       http://localhost:5173"
     info "RabbitMQ UI:  http://localhost:15672  (pudim / pudim)"
     echo ""
-    ok "Services started"
+    ok "Services started. Press Ctrl+C to stop all services."
+    echo ""
+
+    # Show logs in foreground — Ctrl+C will trigger the trap above
+    docker compose logs -f
 }
 
 dev_down() {
@@ -143,7 +150,7 @@ usage() {
     echo "  check-backend   Backend only: fmt, clippy, audit, build"
     echo "  check-web       Web only: lint, typecheck"
     echo "  check-mobile    Mobile only: lint, typecheck"
-    echo "  dev             Start all services (docker compose up -d --build)"
+    echo "  dev             Start all services + show logs (Ctrl+C stops everything)"
     echo "  all             Run checks, then start services"
     echo "  down            Stop all services"
     echo ""
