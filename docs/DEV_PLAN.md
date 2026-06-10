@@ -224,6 +224,96 @@
 
 ---
 
+## Phase 8 – Receipt Scanner & Price Tracking (2–3 weeks)
+
+**Goal:** Capture Brazilian supermarket receipts (photo + optional NFC-e QR), extract line items via local OCR, store per-store price history, and track price changes over time.
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| OCR Engine | Local Tesseract via `leptess` | No external API cost, offline-capable, aligns with self-contained ethos |
+| NFC-e QR | Extract store/date/total as OCR hint only | No dependency on unstable SEFAZ endpoints; simpler pipeline |
+| Price Change Alerts | Query-driven (user-initiated) | Lower complexity; future enhancement path for push alerts |
+
+- [ ] API design: `api/openapi/receipts-v1.yaml` (upload receipt, list receipts, get receipt, price history, stores CRUD)
+- [ ] Database:
+  - [ ] `stores` table: name, CNPJ (optional), address, geolocation
+  - [ ] `receipts` table: store FK, date, total, raw image path, thumbnail path, upload timestamp
+  - [ ] `receipt_items` table: receipt FK, product name, quantity, unit, unit_price, total_price
+  - [ ] `normalized_products` table: canonical product names linked to raw receipt items via fuzzy matching
+  - [ ] `price_history` materialised view: product, store, date, unit_price; efficient for trend queries
+  - [ ] Indexes on (product, date), (store, product, date) for price trend queries
+- [ ] OCR Pipeline:
+  - [ ] Image preprocessing (contrast/deskew/denoise) via `image` crate before Tesseract
+  - [ ] OCR via `leptess` (Rust bindings to Tesseract C API); Portuguese language data (`por`)
+  - [ ] Post-processing: regex extraction of individual line items (quantity × unit_price → total line)
+  - [ ] Automatic detection of Brazilian currency formatting (R$ 12,99)
+  - [ ] Confidence scoring per extracted field; flag low‑confidence items for manual review
+  - [ ] ADR: `008-receipt-ocr-pipeline.md`
+- [ ] NFC-e QR Code Parsing:
+  - [ ] Mobile camera captures QR code; extract URL from QR data
+  - [ ] Parse embedded fields from QR URL query string (store CNPJ, date, total) without calling SEFAZ
+  - [ ] Use extracted fields as hints to validate/confirm OCR output (date match, total match)
+  - [ ] Fall back to pure OCR when QR is missing or unreadable
+- [ ] Item Name Normalisation:
+  - [ ] Fuzzy matching of extracted product names against existing `normalized_products` (via `strsim` Rust crate)
+  - [ ] Auto‑merge when similarity > threshold (e.g., 0.85); suggest merge when 0.60–0.85
+  - [ ] Web UI: merge/split interface for correcting mismatched products
+  - [ ] ADR: `009-item-name-normalization.md`
+- [ ] Backend Endpoints:
+  - [ ] `POST /receipts/upload` — multipart image upload; triggers background OCR, returns receipt ID
+  - [ ] `GET /receipts` — paginated list with filters (store, date range, total range)
+  - [ ] `GET /receipts/{id}` — full receipt with items, images, OCR confidence, store info
+  - [ ] `PATCH /receipt_items/{id}` — manual correction of OCR errors (name, quantity, price)
+  - [ ] `GET /stores` — list/search stores
+  - [ ] `POST /stores` — create/update store
+  - [ ] `GET /price-history` — query parameters: product_id, store_id (optional), date_from, date_to
+  - [ ] `GET /price-history/compare` — compare current vs previous price for a product across stores
+  - [ ] `GET /price-history/inflation` — basket of goods price change over time (user selects items)
+- [ ] Async Background Processing:
+  - [ ] OCR processing triggered as background Tokio task (spawned per upload)
+  - [ ] Processing status tracked in DB (`pending → processing → completed/failed`)
+  - [ ] Failed jobs retried up to 3 times; permanently failed queue for manual review
+  - [ ] Real‑time progress pushed via SSE or polling from mobile/web clients
+- [ ] Mobile (React Native):
+  - [ ] Camera screen for receipt photo capture with guidance overlay (align receipt)
+  - [ ] NFC-e QR scanner screen (using `react-native-camera` or `expo-barcode-scanner`)
+  - [ ] Receipt review/edit screen: OCR results shown inline, tap to correct any field
+  - [ ] Swipe to confirm/save receipt
+  - [ ] Receipt gallery: thumbnail grid, tap to view full detail
+  - [ ] Price history view: line chart of product price over time, per‑store toggle
+  - [ ] Store selector: search by name or nearby (future: geolocation)
+- [ ] Web (React):
+  - [ ] Upload page: drag‑and‑drop image, inline preprocessed preview, OCR result review table
+  - [ ] Receipt gallery: sortable/filterable table; click row to expand with items
+  - [ ] Price trend dashboard:
+    - [ ] Line chart: selected product × selected store(s) over time (Recharts or D3)
+    - [ ] Heatmap: all products × months showing % price change (green down, red up)
+    - [ ] Store comparison table: side‑by‑side price for matching products across stores
+  - [ ] Product normalisation dashboard: merge/split interface, search, confidence histogram
+  - [ ] Manual receipt entry form (for receipts that fail OCR)
+- [ ] Observability:
+  - [ ] Metrics: OCR processing time (P50/P95), OCR confidence distribution histogram, upload volume, normalisation auto‑merge rate
+  - [ ] Logs: trace ID propagated from upload through OCR to database write
+  - [ ] Grafana panel: OCR pipeline health (success rate, latency, queue depth)
+- [ ] Testing:
+  - [ ] OCR accuracy test suite: 20+ annotated Brazilian supermarket receipts (various chains, lighting conditions)
+  - [ ] Integration tests: upload → OCR → store → query pipeline (Testcontainers, test images)
+  - [ ] Property‑based tests: normalisation must not change price sums; fuzzy matching is idempotent
+  - [ ] Unit tests: currency parsing edge cases (R$ 0,01 through R$ 99.999,99)
+- [ ] Security:
+  - [ ] Upload size limit (e.g., 10 MB per image)
+  - [ ] File type validation (JPEG, PNG, HEIC → convert server-side)
+  - [ ] PII scrub: detect and mask credit card numbers or personal data accidentally captured in receipt photos (basic regex, no storage of card data)
+  - [ ] Receipt images encrypted at rest (file-level encryption on disk)
+- [ ] Performance:
+  - [ ] Thumbnail generation on upload for gallery; store separately
+  - [ ] Price history queries: `EXPLAIN ANALYZE` on (product, date) indexes
+  - [ ] OCR processing isolated from API thread pool (separate Tokio runtime or `spawn_blocking`)
+
+---
+
 ## Completion Checklist – Finance App
 
 - [ ] Immutable double‑entry ledger with event sourcing and event publishing to RabbitMQ
@@ -244,3 +334,13 @@
 - [ ] Mobile offline support with sync (optional but recommended)
 - [ ] Cost estimate, capacity plan, and tradeoff summary documented
 - [ ] Portfolio artifacts: architecture diagram, ADRs, runbooks, postmortems, demo video
+- [ ] Receipt upload and OCR pipeline functional (photo → structured line items)
+- [ ] NFC-e QR code extraction working as OCR hint/validation
+- [ ] Item name normalisation with fuzzy matching; manual merge/split UI
+- [ ] Price history per product × per store viewable on web and mobile
+- [ ] Price trend charts (line, heatmap, store comparison) on web dashboard
+- [ ] Mobile camera capture, QR scanner, receipt review/edit flow complete
+- [ ] OCR accuracy benchmarked against annotated Brazilian receipt dataset
+- [ ] All receipt images PII-scrubbed and encrypted at rest
+- [ ] ADR: 008-receipt-ocr-pipeline.md completed
+- [ ] ADR: 009-item-name-normalization.md completed
