@@ -12,6 +12,7 @@ pub fn init_metrics_recorder() -> PrometheusHandle {
     recorder_handle
 }
 
+#[allow(dead_code)]
 pub fn metrics_handler(recorder: PrometheusHandle) -> Router {
     Router::new().route(
         "/metrics",
@@ -29,6 +30,7 @@ pub fn metrics_handler(recorder: PrometheusHandle) -> Router {
 
 /// Start a dedicated metrics HTTP server on a separate port (e.g. 3001)
 /// This keeps the main API port clean from Prometheus scrapes
+#[allow(dead_code)]
 pub async fn start_metrics_server(recorder: PrometheusHandle, port: u16) {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let router = metrics_handler(recorder);

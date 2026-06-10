@@ -7,7 +7,6 @@ mod telemetry;
 
 use axum::{routing::get, Router};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::cors::CorsLayer;

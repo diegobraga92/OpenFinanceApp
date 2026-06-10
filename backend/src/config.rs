@@ -5,6 +5,7 @@ pub struct Config {
     pub server_host: String,
     pub server_port: u16,
     pub database_url: String,
+    #[allow(dead_code)]
     pub rabbitmq_url: String,
     pub otel_endpoint: String,
 }
