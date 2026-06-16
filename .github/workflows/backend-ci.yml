@@ -52,13 +52,16 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v4
+      # Check latest: https://github.com/actions/checkout/releases
+      - uses: actions/checkout@v6
 
+      # Check latest: https://github.com/actions-rust-lang/setup-rust-toolchain/releases
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy, rustfmt
 
       - name: Cache dependencies
+        # Check latest: https://github.com/Swatinem/rust-cache/releases
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend
@@ -90,7 +93,8 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v4
+      # Check latest: https://github.com/actions/checkout/releases
+      - uses: actions/checkout@v6
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked

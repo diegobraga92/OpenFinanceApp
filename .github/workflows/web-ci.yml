@@ -21,9 +21,11 @@ jobs:
         working-directory: web
 
     steps:
-      - uses: actions/checkout@v4
+      # Check latest: https://github.com/actions/checkout/releases
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      # Check latest: https://github.com/actions/setup-node/releases
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
