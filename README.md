@@ -17,7 +17,7 @@ PudimFinance/
 ├── web/               # React + TypeScript + Vite frontend
 ├── mobile/            # React Native + Expo mobile app
 ├── api/
-│   └── openapi/       # OpenAPI 3.1 contract specifications
+│   └── openapi/       # Generated OpenAPI 3.1 spec (from Rust utoipa annotations)
 ├── infra/             # Terraform infrastructure-as-code (AWS)
 ├── .github/
 │   └── workflows/     # CI/CD pipelines (GitHub Actions)
@@ -136,6 +136,26 @@ All significant decisions are documented as Architecture Decision Records (ADRs)
 ```bash
 curl http://localhost:3000/health
 # {"status":"ok","database":"connected","rabbitmq":"disabled","version":"0.1.0"}
+```
+
+### API Documentation (Swagger UI)
+
+The backend serves an interactive API explorer at `/swagger-ui`:
+
+```bash
+open http://localhost:3000/swagger-ui
+```
+
+The raw OpenAPI 3.1 spec is available at `/api-docs/openapi.json`:
+
+```bash
+curl http://localhost:3000/api-docs/openapi.json
+```
+
+To regenerate the committed spec from Rust annotations:
+
+```bash
+cd backend && cargo run --bin gen-openapi > ../api/openapi/openapi.json
 ```
 
 ### Metrics

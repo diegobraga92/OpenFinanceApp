@@ -34,6 +34,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify TypeScript types match OpenAPI spec
+        run: |
+          # Generate fresh types to temp file and compare with committed
+          openapi-typescript ../api/openapi/openapi.json -o /tmp/api-types-fresh.ts
+          diff src/api-types.ts /tmp/api-types-fresh.ts
+
       - name: Lint
         run: npm run lint
 

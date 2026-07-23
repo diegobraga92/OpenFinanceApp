@@ -1,0 +1,123 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PudimFinance API",
+    "description": "Personal finance application API. Immutable double-entry ledger, event sourcing, real-time reporting, receipt scanning and price tracking.",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Returns the health status of the backend and its dependencies\n(PostgreSQL, RabbitMQ). Returns 200 if healthy, 503 if degraded.",
+        "operationId": "health_handler",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service is degraded or unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Exposes Prometheus-formatted metrics for scraping.\nThis endpoint is served on a separate port in production (default 3001).",
+        "operationId": "metrics_handler_doc",
+        "responses": {
+          "200": {
+            "description": "Prometheus metrics in text format",
+            "content": {
+              "text/plain": {}
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthError": {
+        "type": "object",
+        "required": [
+          "status",
+          "database",
+          "rabbitmq",
+          "details"
+        ],
+        "properties": {
+          "database": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          },
+          "rabbitmq": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "database",
+          "rabbitmq",
+          "version"
+        ],
+        "properties": {
+          "database": {
+            "type": "string"
+          },
+          "rabbitmq": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Health check and observability endpoints"
+    }
+  ]
+}

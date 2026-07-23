@@ -1,18 +1,9 @@
+import type { components } from './api-types';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-export interface HealthResponse {
-  status: string;
-  database: string;
-  rabbitmq: string;
-  version: string;
-}
-
-export interface HealthError {
-  status: string;
-  database: string;
-  rabbitmq: string;
-  details: string;
-}
+export type HealthResponse = components['schemas']['HealthResponse'];
+export type HealthError = components['schemas']['HealthError'];
 
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await fetch(`${API_BASE_URL}/health`);

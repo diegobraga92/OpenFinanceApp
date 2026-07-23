@@ -2,21 +2,25 @@ mod config;
 mod db;
 mod health;
 mod metrics;
+mod openapi;
 mod state;
 mod telemetry;
 
 use axum::{routing::get, Router};
+use utoipa::OpenApi;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Config;
 use crate::db::init_pool;
 use crate::health::health_handler;
 use crate::metrics::init_metrics_recorder;
+use crate::openapi::ApiDoc;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -42,6 +46,13 @@ async fn main() -> anyhow::Result<()> {
     // Build router
     let app = Router::new()
         .route("/health", get(health_handler))
+        // Serve OpenAPI spec as JSON
+        .route(
+            "/api-docs/openapi.json",
+            get(|| async { axum::Json(ApiDoc::openapi()) }),
+        )
+        // Serve Swagger UI
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(app_state);

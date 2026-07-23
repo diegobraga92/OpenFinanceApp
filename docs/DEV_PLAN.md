@@ -47,7 +47,7 @@
 - [x] RabbitMQ: single broker in Docker Compose (management plugin enabled)
 - [x] Web (React + TypeScript + Vite): scaffold, call `/health`, display connection status
 - [x] Mobile (React Native): scaffold, single screen calling `/health`
-- [x] API contracts: first OpenAPI spec (`api/openapi/health.yaml`), contract‑first workflow established
+- [x] API contracts: first OpenAPI spec generated from Rust via utoipa (`api/openapi/openapi.json`), code‑first workflow established (see [ADR 002](adr/002-api-contract-strategy.md))
 - [x] Infrastructure: Terraform for RDS Postgres, compute (EKS or simpler)
 - [x] CI/CD: GitHub Actions workflows (build, test, lint, container build) for each platform
 - [x] Observability seed: request tracing (OpenTelemetry), Prometheus `/metrics`, basic logging structure
@@ -60,7 +60,7 @@
 
 **Goal:** Immutable, auditable double‑entry ledger. All state changes captured as events.
 
-- [ ] API design: `api/openapi/transactions-v1.yaml` (POST /transactions, GET /transactions, GET /accounts)
+- [ ] API design: annotate Rust transaction handlers with utoipa macros; generated spec validated in CI
 - [ ] Domain model:
   - [ ] Accounts (assets, liabilities, equity, income, expenses) – chart of accounts
   - [ ] Transactions: every entry is a debit to one account and credit to another
@@ -90,7 +90,7 @@
 
 **Goal:** Rich financial management features and a reconciliation process that mirrors real‑world fintech.
 
-- [ ] APIs: `api/openapi/categories-v1.yaml`, `api/openapi/budgets-v1.yaml`, `api/openapi/reports-v1.yaml`, `api/openapi/reconciliation-v1.yaml`
+- [ ] API design: annotate Rust handlers with utoipa (categories, budgets, reports, reconciliation)
 - [ ] Backend:
   - [ ] Categories: hierarchical tags linked to transactions
   - [ ] Budgets: monthly limits per category, alerts on overrun
@@ -201,7 +201,7 @@
   - [ ] Document policy: `Sunset` headers, advance notice (e.g., 90 days), communication plan
   - [ ] Simulate a v1→v2 migration (even if no actual v2): show how old endpoints return `Deprecation` header and documented sunset date
   - [ ] ADR: `007-api-deprecation-strategy.md`
-- [ ] Generated API clients: TypeScript client from OpenAPI for web; use OpenAPI to generate types for mobile network layer
+- [ ] Generated API clients: TypeScript types from OpenAPI spec (`npm run generate-types` in web and mobile)
 - [ ] Performance: Lighthouse audits for web, bundle analysis, mobile app size optimisation
 
 ---
@@ -236,7 +236,7 @@
 | NFC-e QR | Extract store/date/total as OCR hint only | No dependency on unstable SEFAZ endpoints; simpler pipeline |
 | Price Change Alerts | Query-driven (user-initiated) | Lower complexity; future enhancement path for push alerts |
 
-- [ ] API design: `api/openapi/receipts-v1.yaml` (upload receipt, list receipts, get receipt, price history, stores CRUD)
+- [ ] API design: annotate Rust receipt/price handlers with utoipa
 - [ ] Database:
   - [ ] `stores` table: name, CNPJ (optional), address, geolocation
   - [ ] `receipts` table: store FK, date, total, raw image path, thumbnail path, upload timestamp

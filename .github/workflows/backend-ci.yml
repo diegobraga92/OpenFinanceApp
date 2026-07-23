@@ -72,6 +72,12 @@ jobs:
       - name: Clippy
         run: cargo clippy -- -D warnings
 
+      - name: Generate OpenAPI spec
+        run: cargo run --bin gen-openapi > /tmp/openapi-generated.json
+
+      - name: Compare OpenAPI spec with committed version
+        run: diff ../api/openapi/openapi.json /tmp/openapi-generated.json
+
       - name: Build
         run: cargo build --release
         env:

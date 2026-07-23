@@ -104,6 +104,7 @@ We will use **Rust** with the following framework and library choices:
 - Async model (Tokio) is conceptually similar to Go's goroutines and Node.js event loop
 - Error handling via `anyhow` and `thiserror` is explicit but verbose compared to exceptions
 - Testing infrastructure (test containers, property-based testing) is well-supported but requires setup
+- API contract strategy evolved from hand-written YAML to code-first OpenAPI via utoipa (see [ADR 002](002-api-contract-strategy.md)) — Rust annotations become the single source of truth, OpenAPI spec is a build artifact
 
 ## References
 
@@ -113,3 +114,4 @@ We will use **Rust** with the following framework and library choices:
 - [Lapin Documentation](https://docs.rs/lapin/latest/lapin/)
 - [OpenTelemetry Rust](https://opentelemetry.io/docs/instrumentation/rust/)
 - [Rust Language Reference](https://doc.rust-lang.org/reference/)
+- [ADR 002: API Contract Strategy](002-api-contract-strategy.md)
