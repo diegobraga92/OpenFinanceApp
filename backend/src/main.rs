@@ -7,13 +7,13 @@ mod state;
 mod telemetry;
 
 use axum::{routing::get, Router};
-use utoipa::OpenApi;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
+use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Config;
