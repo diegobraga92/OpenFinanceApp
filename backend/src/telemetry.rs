@@ -1,5 +1,5 @@
-use opentelemetry::KeyValue;
 use opentelemetry::trace::TracerProvider;
+use opentelemetry::KeyValue;
 use opentelemetry_otlp::SpanExporter;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::trace::SdkTracerProvider;
