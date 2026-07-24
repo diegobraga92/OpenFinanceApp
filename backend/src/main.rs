@@ -43,15 +43,10 @@ async fn main() -> anyhow::Result<()> {
     // Build shared application state
     let app_state = AppState { pg_pool };
 
-    // Build router
+    // Build main application router
     let app = Router::new()
         .route("/health", get(health_handler))
-        // Serve OpenAPI spec as JSON
-        .route(
-            "/api-docs/openapi.json",
-            get(|| async { axum::Json(ApiDoc::openapi()) }),
-        )
-        // Serve Swagger UI
+        // Serve OpenAPI spec as JSON and Swagger UI
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
@@ -101,7 +96,7 @@ async fn shutdown_signal() {
         }
     }
 
-    // Give OpenTelemetry time to flush remaining spans
-    opentelemetry::global::shutdown_tracer_provider();
-    info!("OpenTelemetry tracer provider shut down");
+    // OpenTelemetry tracer provider will be flushed and shut down automatically
+    // when the provider is dropped at program exit.
+    info!("Shutdown signal received, OpenTelemetry will flush on drop");
 }

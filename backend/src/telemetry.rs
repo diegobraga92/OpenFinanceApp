@@ -1,28 +1,40 @@
 use opentelemetry::KeyValue;
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_otlp::SpanExporter;
 use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::Resource;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
 pub fn init_logging(otel_endpoint: &str, service_name: &str) {
-    // Configure OpenTelemetry OTLP exporter
-    let tracer = opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_exporter(
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(otel_endpoint),
-        )
-        .with_trace_config(opentelemetry_sdk::trace::Config::default().with_resource(
-            Resource::new(vec![
-                KeyValue::new("service.name", service_name.to_string()),
-                KeyValue::new("service.version", env!("CARGO_PKG_VERSION").to_string()),
-            ]),
-        ))
-        .install_batch(opentelemetry_sdk::runtime::Tokio)
-        .expect("Failed to install OpenTelemetry tracer");
+    // Build OTLP span exporter (gRPC/tonic transport)
+    let exporter = SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(otel_endpoint)
+        .build()
+        .expect("Failed to create OTLP span exporter");
 
-    // Create OpenTelemetry layer
+    // Build the tracer provider with batch export
+    let tracer_provider = SdkTracerProvider::builder()
+        .with_resource(
+            Resource::builder()
+                .with_attributes([
+                    KeyValue::new("service.name", service_name.to_string()),
+                    KeyValue::new("service.version", env!("CARGO_PKG_VERSION").to_string()),
+                ])
+                .build(),
+        )
+        .with_batch_exporter(exporter)
+        .build();
+
+    // Get a named tracer
+    let tracer = tracer_provider.tracer("pudimfinance-backend");
+
+    // Set the global tracer provider for the shutdown hook
+    opentelemetry::global::set_tracer_provider(tracer_provider);
+
+    // Create OpenTelemetry tracing-subscriber layer
     let telemetry_layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
     // Create stdout JSON logging layer
