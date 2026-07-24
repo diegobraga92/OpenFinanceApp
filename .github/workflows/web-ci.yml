@@ -22,12 +22,12 @@ jobs:
 
     steps:
       # Check latest: https://github.com/actions/checkout/releases
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Check latest: https://github.com/actions/setup-node/releases
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 26
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 

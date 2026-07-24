@@ -22,7 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        # Check latest: https://hub.docker.com/_/postgres/tags
+        image: postgres:18.4-alpine
         env:
           POSTGRES_USER: pudim
           POSTGRES_PASSWORD: pudim
@@ -35,7 +36,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       rabbitmq:
-        image: rabbitmq:3-management-alpine
+        # Check latest: https://hub.docker.com/_/rabbitmq/tags
+        image: rabbitmq:4.3.4-management-alpine
         env:
           RABBITMQ_DEFAULT_USER: pudim
           RABBITMQ_DEFAULT_PASS: pudim
@@ -53,7 +55,7 @@ jobs:
 
     steps:
       # Check latest: https://github.com/actions/checkout/releases
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Check latest: https://github.com/actions-rust-lang/setup-rust-toolchain/releases
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -100,7 +102,7 @@ jobs:
 
     steps:
       # Check latest: https://github.com/actions/checkout/releases
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
