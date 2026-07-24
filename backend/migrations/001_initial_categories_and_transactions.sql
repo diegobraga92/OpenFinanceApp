@@ -1,8 +1,6 @@
 -- Create pgcrypto extension for gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Categories table
--- Simple hierarchy: income / expense types, parent-child for subcategories
 CREATE TABLE categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -14,11 +12,8 @@ CREATE TABLE categories (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Index for type-based queries
 CREATE INDEX idx_categories_type ON categories (type);
 
--- Transactions table
--- Simple single-entry: each transaction records money in or out
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     description TEXT NOT NULL,
@@ -31,12 +26,11 @@ CREATE TABLE transactions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for common queries
 CREATE INDEX idx_transactions_date ON transactions (date DESC);
 CREATE INDEX idx_transactions_category ON transactions (category_id);
 CREATE INDEX idx_transactions_type ON transactions (type);
 
--- Seed default categories (income)
+-- Seed default categories
 INSERT INTO categories (id, name, type, icon, color) VALUES
     (gen_random_uuid(), 'Salary', 'income', 'briefcase', '#22c55e'),
     (gen_random_uuid(), 'Freelance', 'income', 'laptop', '#16a34a'),
@@ -44,7 +38,6 @@ INSERT INTO categories (id, name, type, icon, color) VALUES
     (gen_random_uuid(), 'Gifts Received', 'income', 'gift', '#a3e635'),
     (gen_random_uuid(), 'Other Income', 'income', 'plus-circle', '#86efac');
 
--- Seed default categories (expense)
 INSERT INTO categories (id, name, type, icon, color) VALUES
     (gen_random_uuid(), 'Food & Groceries', 'expense', 'shopping-cart', '#ef4444'),
     (gen_random_uuid(), 'Housing', 'expense', 'home', '#dc2626'),
