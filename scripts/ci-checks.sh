@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -62,8 +62,6 @@ check_web() {
     fi
 
     step "Web: lint"
-    npm run lint 2>&1 | grep -v "^> web@" || true
-    # Check exit code properly
     if npm run lint > /dev/null 2>&1; then
         ok "Lint passed"
     else
@@ -73,7 +71,6 @@ check_web() {
     fi
 
     step "Web: typecheck"
-    npm run typecheck 2>&1 | grep -v "^> web@" || true
     if npm run typecheck > /dev/null 2>&1; then
         ok "Typecheck passed"
     else
@@ -111,56 +108,23 @@ check_mobile() {
 }
 
 # ──────────────────────────────────────────────
-# Dev mode — start services via docker-compose
-# ──────────────────────────────────────────────
-dev_up() {
-    # Trap Ctrl+C / termination to clean up containers
-    trap 'echo -e "\n${YELLOW}Shutting down services...${NC}"; cd "$ROOT_DIR" && docker compose down; ok "Services stopped"; exit 0' INT TERM
-
-    step "Starting development services"
-    cd "$ROOT_DIR"
-    docker compose up --build -d
-    echo ""
-    info "Backend API:  http://localhost:3000/health"
-    info "Web UI:       http://localhost:5173"
-    info "RabbitMQ UI:  http://localhost:15672  (pudim / pudim)"
-    echo ""
-    ok "Services started. Press Ctrl+C to stop all services."
-    echo ""
-
-    # Show logs in foreground — Ctrl+C will trigger the trap above
-    docker compose logs -f
-}
-
-dev_down() {
-    step "Stopping development services"
-    cd "$ROOT_DIR"
-    docker compose down
-    ok "Services stopped"
-}
-
-# ──────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────
 usage() {
-    echo "Usage: ./dev.sh <command>"
+    echo "Usage: $(basename "$0") <command>"
     echo ""
     echo "Commands:"
     echo "  check           Run all CI checks (backend + web + mobile)"
     echo "  check-backend   Backend only: fmt, clippy, audit, build"
     echo "  check-web       Web only: lint, typecheck"
     echo "  check-mobile    Mobile only: lint, typecheck"
-    echo "  dev             Start all services + show logs (Ctrl+C stops everything)"
-    echo "  all             Run checks, then start services"
-    echo "  down            Stop all services"
     echo ""
     echo "Examples:"
-    echo "  ./dev.sh check-backend   # Check backend before push"
-    echo "  ./dev.sh dev             # Start coding session"
-    echo "  ./dev.sh all             # Verify and launch"
+    echo "  ./scripts/ci-checks check-backend   # Check backend before push"
+    echo "  ./scripts/ci-checks check           # Full check suite"
 }
 
-case "${1:-dev}" in
+case "${1:-help}" in
     check)
         check_backend
         check_web
@@ -180,21 +144,6 @@ case "${1:-dev}" in
     check-mobile)
         check_mobile
         echo -e "\n${GREEN}✅ Mobile checks passed${NC}"
-        ;;
-    dev)
-        dev_up
-        ;;
-    all)
-        check_backend
-        check_web
-        check_mobile
-        echo -e "\n${GREEN}═════════════════════════════════════${NC}"
-        echo -e "${GREEN}  ✅ All checks passed!${NC}"
-        echo -e "${GREEN}═════════════════════════════════════${NC}"
-        dev_up
-        ;;
-    down)
-        dev_down
         ;;
     help|--help|-h)
         usage
