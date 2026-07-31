@@ -108,14 +108,28 @@ check_mobile() {
 }
 
 # ──────────────────────────────────────────────
+# OpenAPI checks
+# ──────────────────────────────────────────────
+check_openapi() {
+    step "OpenAPI: spec validation"
+    if npx --yes @redocly/cli lint "$ROOT_DIR/api/openapi/openapi.json" > /dev/null 2>&1; then
+        ok "OpenAPI spec is valid"
+    else
+        npx @redocly/cli lint "$ROOT_DIR/api/openapi/openapi.json" 2>&1 | tail -n 30
+        fail "OpenAPI spec validation failed"
+    fi
+}
+
+# ──────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────
 usage() {
     echo "Usage: $(basename "$0") <command>"
     echo ""
     echo "Commands:"
-    echo "  check           Run all CI checks (backend + web + mobile)"
+    echo "  check           Run all CI checks (backend + openapi + web + mobile)"
     echo "  check-backend   Backend only: fmt, clippy, audit, build"
+    echo "  check-openapi   OpenAPI spec only: validation"
     echo "  check-web       Web only: lint, typecheck"
     echo "  check-mobile    Mobile only: lint, typecheck"
     echo ""
@@ -127,6 +141,7 @@ usage() {
 case "${1:-help}" in
     check)
         check_backend
+        check_openapi
         check_web
         check_mobile
         echo -e "\n${GREEN}═════════════════════════════════════${NC}"
@@ -136,6 +151,10 @@ case "${1:-help}" in
     check-backend)
         check_backend
         echo -e "\n${GREEN}✅ Backend checks passed${NC}"
+        ;;
+    check-openapi)
+        check_openapi
+        echo -e "\n${GREEN}✅ OpenAPI checks passed${NC}"
         ;;
     check-web)
         check_web

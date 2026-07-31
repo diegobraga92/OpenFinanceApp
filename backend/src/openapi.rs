@@ -24,5 +24,10 @@ use crate::health;
     tags(
         (name = "Health", description = "Health check and observability endpoints"),
     ),
+    // Public API: no authentication required. Empty security requirement
+    // documents that explicitly (satisfies OpenAPI `security-defined`).
+    security(
+        (),
+    ),
 )]
 pub struct ApiDoc;
