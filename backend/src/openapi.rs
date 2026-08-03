@@ -2,6 +2,10 @@ use utoipa::OpenApi;
 
 use crate::health;
 
+/// Root OpenAPI document for the PudimFinance API.
+///
+/// Aggregates utoipa path/schema annotations from the backend handlers
+/// and is used by both the Swagger UI at runtime and the `gen-openapi` binary.
 #[derive(OpenApi)]
 #[openapi(
     paths(

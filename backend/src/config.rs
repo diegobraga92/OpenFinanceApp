@@ -1,16 +1,26 @@
 use std::env;
 
+/// Application configuration loaded from environment variables at startup.
 #[derive(Clone, Debug)]
 pub struct Config {
+    /// Host address the HTTP server binds to (defaults to `0.0.0.0`).
     pub server_host: String,
+    /// Port the HTTP server listens on (defaults to `3000`).
     pub server_port: u16,
+    /// PostgreSQL connection URL for the main database.
     pub database_url: String,
+    /// RabbitMQ connection URL. Not yet consumed by application code.
     #[allow(dead_code)]
     pub rabbitmq_url: String,
+    /// OpenTelemetry OTLP endpoint for exporting traces (defaults to `http://localhost:4317`).
     pub otel_endpoint: String,
 }
 
 impl Config {
+    /// Builds a [`Config`] from environment variables, applying sensible defaults.
+    ///
+    /// # Panics
+    /// Panics if the required `DATABASE_URL` environment variable is not set.
     pub fn from_env() -> Self {
         Self {
             server_host: env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".into()),
@@ -26,6 +36,7 @@ impl Config {
         }
     }
 
+    /// Returns the socket address string (`host:port`) used to bind the HTTP server.
     pub fn server_addr(&self) -> String {
         format!("{}:{}", self.server_host, self.server_port)
     }

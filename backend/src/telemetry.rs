@@ -7,6 +7,10 @@ use opentelemetry_sdk::Resource;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
+/// Initializes structured JSON logging and OpenTelemetry tracing.
+///
+/// Combines a stdout JSON formatter with an OTLP trace exporter,
+/// filtering verbosity via the `RUST_LOG` environment variable.
 pub fn init_logging(otel_endpoint: &str, service_name: &str) {
     // Build OTLP span exporter (gRPC/tonic transport)
     let exporter = SpanExporter::builder()

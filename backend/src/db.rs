@@ -2,6 +2,10 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use tracing::info;
 
+/// Creates a PostgreSQL connection pool and applies pending migrations.
+///
+/// # Panics
+/// Panics if the database connection cannot be established or migrations fail to run.
 pub async fn init_pool(database_url: &str) -> PgPool {
     let pool = PgPoolOptions::new()
         .max_connections(10)
@@ -23,6 +27,7 @@ pub async fn init_pool(database_url: &str) -> PgPool {
     pool
 }
 
+/// Checks database liveness by executing a trivial `SELECT 1` query.
 pub async fn check_db_health(pool: &PgPool) -> bool {
     sqlx::query("SELECT 1").execute(pool).await.is_ok()
 }

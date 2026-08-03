@@ -6,19 +6,29 @@ use utoipa::ToSchema;
 use crate::db;
 use crate::state::AppState;
 
+/// Successful health check payload returned with HTTP 200.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct HealthResponse {
+    /// Overall service status (e.g., `"ok"`).
     pub status: String,
+    /// Database connection state (e.g., `"connected"`).
     pub database: String,
+    /// RabbitMQ connection state (e.g., `"disabled"`).
     pub rabbitmq: String,
+    /// Backend crate version from `CARGO_PKG_VERSION`.
     pub version: String,
 }
 
+/// Failed health check payload returned with HTTP 503.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct HealthError {
+    /// Overall service status (e.g., `"unhealthy"`).
     pub status: String,
+    /// Database connection state (e.g., `"disconnected"`).
     pub database: String,
+    /// RabbitMQ connection state (e.g., `"unknown"`).
     pub rabbitmq: String,
+    /// Human-readable explanation of the failure.
     pub details: String,
 }
 

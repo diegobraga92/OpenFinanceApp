@@ -1,3 +1,8 @@
+//! PudimFinance backend binary — HTTP API server.
+//!
+//! Serves the REST API, Swagger UI, and health endpoints.
+//! Configuration is loaded from environment variables (see [`config::Config`]).
+
 mod config;
 mod db;
 mod health;
@@ -23,6 +28,8 @@ use crate::metrics::init_metrics_recorder;
 use crate::openapi::ApiDoc;
 use crate::state::AppState;
 
+/// Entry point: loads configuration, initializes telemetry/database,
+/// and serves the HTTP API until a shutdown signal is received.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load .env file
@@ -69,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Waits for either Ctrl+C (SIGINT) or SIGTERM to trigger graceful shutdown.
 async fn shutdown_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
