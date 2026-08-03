@@ -68,6 +68,7 @@
     "schemas": {
       "HealthError": {
         "type": "object",
+        "description": "Failed health check payload returned with HTTP 503.",
         "required": [
           "status",
           "database",
@@ -76,21 +77,26 @@
         ],
         "properties": {
           "database": {
-            "type": "string"
+            "type": "string",
+            "description": "Database connection state (e.g., `\"disconnected\"`)."
           },
           "details": {
-            "type": "string"
+            "type": "string",
+            "description": "Human-readable explanation of the failure."
           },
           "rabbitmq": {
-            "type": "string"
+            "type": "string",
+            "description": "RabbitMQ connection state (e.g., `\"unknown\"`)."
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "description": "Overall service status (e.g., `\"unhealthy\"`)."
           }
         }
       },
       "HealthResponse": {
         "type": "object",
+        "description": "Successful health check payload returned with HTTP 200.",
         "required": [
           "status",
           "database",
@@ -99,16 +105,20 @@
         ],
         "properties": {
           "database": {
-            "type": "string"
+            "type": "string",
+            "description": "Database connection state (e.g., `\"connected\"`)."
           },
           "rabbitmq": {
-            "type": "string"
+            "type": "string",
+            "description": "RabbitMQ connection state (e.g., `\"disabled\"`)."
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "description": "Overall service status (e.g., `\"ok\"`)."
           },
           "version": {
-            "type": "string"
+            "type": "string",
+            "description": "Backend crate version from `CARGO_PKG_VERSION`."
           }
         }
       }
