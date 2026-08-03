@@ -45,7 +45,12 @@ async fn main() -> anyhow::Result<()> {
     let _metrics_recorder = init_metrics_recorder();
 
     // Initialize database pool
-    let pg_pool = init_pool(&config.database_url).await;
+    let pg_pool = init_pool(
+        &config.database_url,
+        config.database_pool_max_connections,
+        config.database_pool_acquire_timeout_secs,
+    )
+    .await;
 
     // Build shared application state
     let app_state = AppState { pg_pool };

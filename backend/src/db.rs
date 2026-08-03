@@ -6,10 +6,14 @@ use tracing::info;
 ///
 /// # Panics
 /// Panics if the database connection cannot be established or migrations fail to run.
-pub async fn init_pool(database_url: &str) -> PgPool {
+pub async fn init_pool(
+    database_url: &str,
+    max_connections: u32,
+    acquire_timeout_secs: u64,
+) -> PgPool {
     let pool = PgPoolOptions::new()
-        .max_connections(10)
-        .acquire_timeout(std::time::Duration::from_secs(10))
+        .max_connections(max_connections)
+        .acquire_timeout(std::time::Duration::from_secs(acquire_timeout_secs))
         .connect(database_url)
         .await
         .expect("Failed to connect to PostgreSQL");

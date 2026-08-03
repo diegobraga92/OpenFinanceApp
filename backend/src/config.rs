@@ -9,6 +9,10 @@ pub struct Config {
     pub server_port: u16,
     /// PostgreSQL connection URL for the main database.
     pub database_url: String,
+    /// Maximum number of connections in the PostgreSQL pool (defaults to 10).
+    pub database_pool_max_connections: u32,
+    /// Number of seconds to wait when acquiring a connection before timing out (defaults to 10).
+    pub database_pool_acquire_timeout_secs: u64,
     /// RabbitMQ connection URL. Not yet consumed by application code.
     #[allow(dead_code)]
     pub rabbitmq_url: String,
@@ -29,6 +33,14 @@ impl Config {
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(3000),
             database_url: env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
+            database_pool_max_connections: env::var("DATABASE_POOL_MAX_CONNECTIONS")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(10),
+            database_pool_acquire_timeout_secs: env::var("DATABASE_POOL_ACQUIRE_TIMEOUT_SECS")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(10),
             rabbitmq_url: env::var("RABBITMQ_URL")
                 .unwrap_or_else(|_| "amqp://pudim:pudim@localhost:5672".into()),
             otel_endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
