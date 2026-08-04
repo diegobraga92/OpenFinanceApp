@@ -1,7 +1,12 @@
+# cargo-audit configuration
+#
+# RUSTSEC-2026-0235 affects `rkyv` 0.7.46, which is listed in Cargo.lock as an
+# *optional* dependency of `rust_decimal`. Our Cargo.toml disables
+# rust_decimal's default features (`default-features = false`), so `rkyv`
+# is not compiled into the build graph. `cargo tree -i rkyv` returns
+# "nothing to print" confirming it is unreachable at build time.
+#
+# Once rust_decimal releases a version that removes the vulnerable rkyv
+# optional dep (or updates it to >= 0.8.17), this ignore should be removed.
 [advisories]
-# RUSTSEC-2023-0071: Marvin Attack on RSA (medium)
-# Source: sqlx-mysql -> rsa 0.9.10
-# Safe to ignore because we only use PostgreSQL, not MySQL.
-# The mysql feature is disabled via default-features=false.
-# No fix upgrade is available for the rsa crate.
-ignore = ["RUSTSEC-2023-0071"]
+ignore = ["RUSTSEC-2026-0235"]

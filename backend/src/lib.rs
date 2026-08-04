@@ -14,8 +14,12 @@ pub mod db;
 pub mod health;
 /// Prometheus metrics collection and serving.
 pub mod metrics;
+/// Data models for the Layer 1 transaction tracker.
+pub mod models;
 /// OpenAPI 3.1 spec generation via utoipa.
 pub mod openapi;
+/// HTTP route handlers for categories, transactions, and summary.
+pub mod routes;
 /// Shared application state for axum handlers.
 pub mod state;
 /// Logging and OpenTelemetry tracing initialization.

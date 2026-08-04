@@ -7,11 +7,13 @@ mod config;
 mod db;
 mod health;
 mod metrics;
+mod models;
 mod openapi;
+mod routes;
 mod state;
 mod telemetry;
 
-use axum::{routing::get, Router};
+use axum::Router;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::signal;
@@ -26,6 +28,7 @@ use crate::db::init_pool;
 use crate::health::health_handler;
 use crate::metrics::init_metrics_recorder;
 use crate::openapi::ApiDoc;
+use crate::routes::api_router;
 use crate::state::AppState;
 
 /// Entry point: loads configuration, initializes telemetry/database,
@@ -57,7 +60,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Build main application router
     let app = Router::new()
-        .route("/health", get(health_handler))
+        .route("/health", axum::routing::get(health_handler))
+        // Layer 1 API routes
+        .merge(api_router())
         // Serve OpenAPI spec as JSON and Swagger UI
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(TraceLayer::new_for_http())
