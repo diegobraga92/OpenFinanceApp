@@ -1,9 +1,9 @@
 # 🏦 PudimFinance
 
-> Personal finance application with an immutable double-entry ledger, event sourcing, and real-time reporting.
-> Built to financial‑grade reliability, security, and performance standards.
+> Personal finance application: Rust (Tokio + Axum) backend, React (Vite) web, React Native (Expo) mobile, PostgreSQL.
+> Built incrementally — a working transaction tracker first, with double-entry ledger, event sourcing, and RabbitMQ added in later layers.
 
-**Tech Stack:** Rust (Tokio + Axum) backend · React (Vite) web · React Native (Expo) mobile · PostgreSQL · RabbitMQ
+**Tech Stack:** Rust (Tokio + Axum) backend · React (Vite) web · React Native (Expo) mobile · PostgreSQL
 
 ---
 
@@ -12,19 +12,18 @@
 ```
 PudimFinance/
 ├── backend/           # Rust + Axum API server
-│   ├── src/           # Source code (routes, database, telemetry)
+│   ├── src/routes/    # Categories, transactions, summary handlers
+│   ├── src/models.rs  # SQLx/utoipa data models
 │   └── migrations/    # PostgreSQL migrations (sqlx)
 ├── web/               # React + TypeScript + Vite frontend
 ├── mobile/            # React Native + Expo mobile app
 ├── api/
 │   └── openapi/       # Generated OpenAPI 3.1 spec (from Rust utoipa annotations)
 ├── infra/             # Terraform infrastructure-as-code (AWS)
-├── .github/
-│   └── workflows/     # CI/CD pipelines (GitHub Actions)
-├── docker-compose.yml # Local development environment
+├── docker-compose.yml # Local development environment (Postgres + Backend + Web)
 └── docs/
     ├── adr/           # Architecture Decision Records
-    ├── DEV_PLAN.md    # Full development plan (all phases)
+    ├── DEV_PLAN.md    # Full development plan (all layers)
     └── slo.md         # Service Level Objectives
 ```
 
@@ -42,13 +41,13 @@ PudimFinance/
 ### Local Development (Docker)
 
 ```bash
-# Start all services (PostgreSQL, RabbitMQ, backend, web)
+# Start all services (PostgreSQL, backend, web)
 docker compose up --build
 
 # Services:
 #   Backend API:  http://localhost:3000/health
+#   Swagger UI:   http://localhost:3000/swagger-ui
 #   Web UI:       http://localhost:5173
-#   RabbitMQ UI:  http://localhost:15672 (pudim / pudim)
 ```
 
 ### Backend (local, without Docker)
@@ -77,43 +76,41 @@ npx expo start
 
 ---
 
-## Architecture
+## API Endpoints (Layer 1)
 
-### Current (Phase 0)
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check (API + database status) |
+| `GET` | `/api/categories` | List categories (filter by `?type=income\|expense`) |
+| `POST` | `/api/categories` | Create category |
+| `GET` | `/api/transactions` | Paginated list with filters (category, type, date range) |
+| `POST` | `/api/transactions` | Create transaction |
+| `GET` | `/api/transactions/{id}` | Get single transaction |
+| `PUT` | `/api/transactions/{id}` | Update transaction |
+| `DELETE` | `/api/transactions/{id}` | Delete transaction |
+| `GET` | `/api/summary` | Current month totals (income, expense, balance), grouped by category |
 
+The full OpenAPI 3.1 spec is available at `http://localhost:3000/api-docs/openapi.json` and served via Swagger UI at `http://localhost:3000/swagger-ui`.
+
+To regenerate the committed spec from Rust annotations:
+
+```bash
+cd backend && cargo run --bin gen-openapi > ../api/openapi/openapi.json
+cd web && npm run generate-types   # regenerate TypeScript types
+cd mobile && npm run generate-types
 ```
-┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Web UI  │────▶│ Backend  │────▶│PostgreSQL│
-│ :5173    │     │ :3000    │     │ :5432    │
-└──────────┘     └────┬─────┘     └──────────┘
-                      │
-┌──────────┐          │    ┌──────────┐
-│  Mobile  │──────────┘    │ RabbitMQ│
-│ (Expo)   │               │ :5672   │
-└──────────┘               └──────────┘
-```
-
-### Planned (Phases 1+)
-
-- **Event sourcing**: Immutable event log → materialised views
-- **Async consumers**: RabbitMQ fanout → reporting/audit services
-- **Read replicas**: Report queries routed to replicas
-- **Real-time reporting**: Event-driven materialised views
 
 ---
 
-## Development Phases
+## Development Roadmap
 
-| Phase | Focus | Status |
+| Layer | Focus | Status |
 |-------|-------|--------|
-| **0** | Project skeleton, infrastructure, CI/CD | ✅ **Complete** |
-| 1 | Core ledger: double-entry accounting + event sourcing | ⏳ In progress |
-| 2 | Budgets, categories, reporting, reconciliation | 📋 Planned |
-| 3 | Observability, performance, database engineering | 📋 Planned |
-| 4 | Security hardening, audit dashboard | 📋 Planned |
-| 5 | Disaster recovery, read replicas, chaos engineering | 📋 Planned |
-| 6 | Mobile/web production polish, API versioning | 📋 Planned |
-| 7 | Cost analysis, capacity planning, portfolio artifacts | 📋 Planned |
+| **Phase 0** | Project skeleton, health endpoint, CI/CD, ADRs | ✅ **Complete** |
+| **Layer 1** | Simple income/expense tracking (categories + transactions) | ✅ **Complete** |
+| **Layer 2** | Budgets, monthly reports, charts on web and mobile | 📋 Planned |
+| **Layer 3** | Double-entry ledger, event sourcing, RabbitMQ, reconciliation | 📋 Planned |
+| **Layer 4** | Observability deep-dive, security, DR, receipt scanner, docs | 📋 Planned |
 
 See [DEV_PLAN.md](docs/DEV_PLAN.md) for the complete roadmap.
 
@@ -126,6 +123,8 @@ All significant decisions are documented as Architecture Decision Records (ADRs)
 | ADR | Title | Status |
 |-----|-------|--------|
 | 001 | [Choose Rust and Web Framework](docs/adr/001-choose-rust-and-framework.md) | ✅ Accepted |
+| 002 | [API Contract Strategy](docs/adr/002-api-contract-strategy.md) | ✅ Accepted |
+| 003 | [Start Simple Single-Entry Before Double-Entry](docs/adr/003-start-simple-single-entry.md) | ✅ Accepted |
 
 ---
 
@@ -136,26 +135,6 @@ All significant decisions are documented as Architecture Decision Records (ADRs)
 ```bash
 curl http://localhost:3000/health
 # {"status":"ok","database":"connected","rabbitmq":"disabled","version":"0.1.0"}
-```
-
-### API Documentation (Swagger UI)
-
-The backend serves an interactive API explorer at `/swagger-ui`:
-
-```bash
-open http://localhost:3000/swagger-ui
-```
-
-The raw OpenAPI 3.1 spec is available at `/api-docs/openapi.json`:
-
-```bash
-curl http://localhost:3000/api-docs/openapi.json
-```
-
-To regenerate the committed spec from Rust annotations:
-
-```bash
-cd backend && cargo run --bin gen-openapi > ../api/openapi/openapi.json
 ```
 
 ### Metrics
@@ -173,29 +152,11 @@ Structured JSON logs with OpenTelemetry trace IDs:
 {"level":"INFO","message":"Server started","target":"backend","span":{"trace_id":"abc123"}}
 ```
 
----
+### CI Checks
 
-## Stakeholder Guide
-
-### For Product Managers
-
-- **Transaction processing**: < 50ms P95 latency, 99.95% availability
-- **Reporting dashboards**: Real-time via RabbitMQ event streaming, < 5s lag
-- **Reconciliation**: Upload bank statements, auto-match transactions, resolve discrepancies
-
-### For Compliance
-
-- **Immutable audit trail**: All transactions recorded as append-only events
-- **Idempotency keys**: Every transaction request logged with client-generated UUID
-- **Full traceability**: Link audit events to original transactions, actor IDs, timestamps
-- **Encryption**: TLS 1.3 in transit, AES-256 at rest (RDS encrypted storage)
-
-### For Operations
-
-- **SLOs**: 99.9% availability for health API (see [docs/slo.md](docs/slo.md))
-- **Observability**: OpenTelemetry traces, Prometheus metrics, structured JSON logs
-- **Runbooks**: Tracked in `docs/runbooks/` for failure scenarios
-- **Infrastructure**: Defined as Terraform code in `infra/`
+```bash
+./scripts/ci-checks.sh check   # Full suite (backend fmt/clippy/audit/build, OpenAPI, web, mobile)
+```
 
 ---
 
