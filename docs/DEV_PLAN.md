@@ -61,11 +61,11 @@
 
 ### Deliverables
 
-- [ ] Migration `001_initial_categories_and_transactions.sql` applied and working
-- [ ] All CRUD endpoints functional, documented in OpenAPI
-- [ ] Web dashboard showing income/expense/balance for current month
-- [ ] Mobile app with basic transaction tracking
-- [ ] ADR `003-start-simple-single-entry.md` (decision record)
+- [x] Migration `001_initial_categories_and_transactions.sql` applied and working
+- [x] All CRUD endpoints functional, documented in OpenAPI
+- [x] Web dashboard showing income/expense/balance for current month
+- [x] Mobile app with basic transaction tracking
+- [x] ADR `003-start-simple-single-entry.md` (decision record)
 
 ---
 
@@ -225,8 +225,8 @@ This layer consolidates the original Phases 3-8. Every feature from the original
 ## Completion Checklist — PudimFinance
 
 - [x] Phase 0: project skeleton, health endpoint, PostgreSQL, CI/CD, OpenAPI, ADRs 001-002
-- [ ] Layer 1: simple income/expense tracking (categories + transactions) on web and mobile
-- [ ] ADR 003: start-simple-single-entry
+- [x] Layer 1: simple income/expense tracking (categories + transactions) on web and mobile
+- [x] ADR 003: start-simple-single-entry
 - [ ] Layer 2: budgets, monthly reports, charts on web and mobile
 - [ ] Layer 3: double-entry ledger, event sourcing, RabbitMQ, reconciliation
 - [ ] ADRs 005-008: ledger, isolation, event publishing, reconciliation

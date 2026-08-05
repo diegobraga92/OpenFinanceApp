@@ -12,7 +12,7 @@ FAIL="${RED}❌${NC}"
 INFO="${CYAN}ℹ️${NC}"
 
 DOCKER_RUN="docker run --rm -v $ROOT_DIR/backend:/app -w /app rust:slim-bookworm"
-DEPS_CMD="apt-get update -qq && apt-get install -y -qq pkg-config libssl-dev > /dev/null 2>&1"
+DEPS_CMD="apt-get update -qq && apt-get install -y -qq pkg-config libssl-dev curl > /dev/null 2>&1"
 
 step()   { echo -e "\n${CYAN}═══ $1 ═══${NC}"; }
 ok()     { echo -e "  ${PASS} $1"; }
@@ -38,7 +38,7 @@ check_backend() {
 
     step "Backend: cargo audit"
     $DOCKER_RUN \
-        bash -c "cargo install cargo-audit --locked > /dev/null 2>&1; cargo audit" \
+        bash -c "$DEPS_CMD && cargo install cargo-audit --locked > /dev/null 2>&1 && cargo audit" \
         && ok "Security audit passed" \
         || fail "Security audit found vulnerabilities"
 

@@ -4,6 +4,88 @@
  */
 
 export interface paths {
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists categories, optionally filtered by type.
+         * @description Returns `400` if an invalid `type` filter is provided.
+         */
+        get: operations["list_categories"];
+        put?: never;
+        /**
+         * Creates a new category.
+         * @description Returns `400` if the payload is invalid (missing name, invalid type,
+         *     non-existent parent category).
+         */
+        post: operations["create_category"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Returns income, expense, and balance totals for a given month,
+         *     with a per-category breakdown.
+         */
+        get: operations["get_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists transactions, with optional filters (category, type, date range) and pagination. */
+        get: operations["list_transactions"];
+        put?: never;
+        /** Creates a new transaction. */
+        post: operations["create_transaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/transactions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a single transaction by ID. */
+        get: operations["get_transaction"];
+        /** Updates an existing transaction. */
+        put: operations["update_transaction"];
+        post?: never;
+        /** Deletes a transaction by ID. */
+        delete: operations["delete_transaction"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -48,17 +130,276 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A transaction category (income or expense), optionally nested via `parent_id`. */
+        Category: {
+            /** @description Hex color code (e.g., `#ef4444`). */
+            color?: string | null;
+            /**
+             * Format: date-time
+             * @description Row creation timestamp.
+             */
+            created_at: string;
+            /** @description Icon identifier used by the web/mobile UIs. */
+            icon?: string | null;
+            /**
+             * Format: uuid
+             * @description Unique category identifier.
+             */
+            id: string;
+            /** @description Display name (e.g., "Food & Groceries"). */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Optional parent category for subcategories.
+             */
+            parent_id?: string | null;
+            /** @description `income` or `expense`. */
+            type: string;
+            /**
+             * Format: date-time
+             * @description Last row update timestamp.
+             */
+            updated_at: string;
+        };
+        /** @description Query parameters for filtering the category list. */
+        CategoryListParams: {
+            /** @description Filter by `income` or `expense`. */
+            type?: string | null;
+        };
+        /** @description Per-category totals for the summary endpoint. */
+        CategorySummary: {
+            /**
+             * Format: uuid
+             * @description Category UUID (null for transactions without a category).
+             */
+            category_id?: string | null;
+            /** @description Category display name. */
+            category_name?: string | null;
+            /** @description Hex color code for the category. */
+            color?: string | null;
+            /** @description Icon identifier for the category. */
+            icon?: string | null;
+            /** @description Total amount for this category. */
+            total: string;
+        };
+        /** @description Payload for creating a new category. */
+        CreateCategoryRequest: {
+            /** @description Hex color code (e.g., `#ef4444`). */
+            color?: string | null;
+            /** @description Icon identifier used by the web/mobile UIs. */
+            icon?: string | null;
+            /** @description Display name (e.g., "Food & Groceries"). */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Optional parent category for subcategories.
+             */
+            parent_id?: string | null;
+            /**
+             * @description `income` or `expense`.
+             * @example expense
+             */
+            type: string;
+        };
+        /** @description Payload for creating a new transaction. */
+        CreateTransactionRequest: {
+            /**
+             * @description Monetary amount — must be > 0.
+             * @example 150.00
+             */
+            amount: string;
+            /**
+             * Format: uuid
+             * @description Category this transaction belongs to.
+             */
+            category_id?: string | null;
+            /**
+             * Format: date
+             * @description Calendar date of the transaction (ISO 8601 `YYYY-MM-DD`).
+             * @example 2026-04-08
+             */
+            date: string;
+            /** @description Human-readable description (e.g., "Lunch at Restaurante X"). */
+            description: string;
+            /** @description Optional free-form notes. */
+            notes?: string | null;
+            /**
+             * @description `income` or `expense`.
+             * @example expense
+             */
+            type: string;
+        };
+        /** @description Failed health check payload returned with HTTP 503. */
         HealthError: {
+            /** @description Database connection state (e.g., `"disconnected"`). */
             database: string;
+            /** @description Human-readable explanation of the failure. */
             details: string;
+            /** @description RabbitMQ connection state (e.g., `"unknown"`). */
             rabbitmq: string;
+            /** @description Overall service status (e.g., `"unhealthy"`). */
             status: string;
         };
+        /** @description Successful health check payload returned with HTTP 200. */
         HealthResponse: {
+            /** @description Database connection state (e.g., `"connected"`). */
             database: string;
+            /** @description RabbitMQ connection state (e.g., `"disabled"`). */
             rabbitmq: string;
+            /** @description Overall service status (e.g., `"ok"`). */
             status: string;
+            /** @description Backend crate version from `CARGO_PKG_VERSION`. */
             version: string;
+        };
+        /** @description Query parameters for the summary endpoint. */
+        SummaryParams: {
+            /**
+             * Format: int32
+             * @description Month to summarise, 1-12 (defaults to current month).
+             */
+            month?: number | null;
+            /**
+             * Format: int32
+             * @description Year to summarise (defaults to current year).
+             */
+            year?: number | null;
+        };
+        /** @description Monthly summary response: income, expense, balance, and category breakdown. */
+        SummaryResponse: {
+            /** @description Balance = income − expense. */
+            balance: string;
+            /** @description Per-category breakdown for the month. */
+            by_category: components["schemas"]["CategorySummary"][];
+            /** @description Total expenses for the selected month (positive value). */
+            expense_total: string;
+            /** @description Total income for the selected month (positive value). */
+            income_total: string;
+            /**
+             * Format: int32
+             * @description Month used for the query (1-12).
+             */
+            month: number;
+            /**
+             * Format: int32
+             * @description Year used for the query.
+             */
+            year: number;
+        };
+        /** @description A single income or expense transaction. */
+        Transaction: {
+            /** @description Monetary amount — always positive; `type` determines direction. */
+            amount: string;
+            /**
+             * Format: uuid
+             * @description Category this transaction belongs to (nullable if category deleted).
+             */
+            category_id?: string | null;
+            /**
+             * Format: date-time
+             * @description Row creation timestamp.
+             */
+            created_at: string;
+            /**
+             * Format: date
+             * @description Calendar date of the transaction.
+             */
+            date: string;
+            /** @description Human-readable description (e.g., "Lunch at Restaurante X"). */
+            description: string;
+            /**
+             * Format: uuid
+             * @description Unique transaction identifier.
+             */
+            id: string;
+            /** @description Optional free-form notes. */
+            notes?: string | null;
+            /** @description `income` or `expense`. */
+            type: string;
+            /**
+             * Format: date-time
+             * @description Last row update timestamp.
+             */
+            updated_at: string;
+        };
+        /** @description Query parameters for listing transactions. */
+        TransactionListParams: {
+            /**
+             * Format: uuid
+             * @description Filter by category UUID.
+             */
+            category_id?: string | null;
+            /**
+             * Format: date
+             * @description Filter by end date (inclusive, ISO `YYYY-MM-DD`).
+             */
+            end_date: string;
+            /**
+             * Format: int32
+             * @description Page offset (0-based).
+             * @default 0
+             */
+            page: number;
+            /**
+             * Format: int32
+             * @description Maximum number of rows to return (default 50, max 200).
+             * @default 50
+             */
+            page_size: number;
+            /**
+             * Format: date
+             * @description Filter by start date (inclusive, ISO `YYYY-MM-DD`).
+             */
+            start_date: string;
+            /** @description Filter by `income` or `expense`. */
+            type?: string | null;
+        };
+        /** @description Response wrapper for paginated transaction lists. */
+        TransactionListResponse: {
+            /** @description Returned items for this page. */
+            items: components["schemas"]["Transaction"][];
+            /**
+             * Format: int32
+             * @description Current page offset.
+             */
+            page: number;
+            /**
+             * Format: int32
+             * @description Page size used for this request.
+             */
+            page_size: number;
+            /**
+             * Format: int64
+             * @description Total row count matching the filters (regardless of pagination).
+             */
+            total: number;
+        };
+        /** @description Payload for updating an existing transaction. */
+        UpdateTransactionRequest: {
+            /**
+             * @description Monetary amount — must be > 0.
+             * @example 150.00
+             */
+            amount: string;
+            /**
+             * Format: uuid
+             * @description Category this transaction belongs to.
+             */
+            category_id?: string | null;
+            /**
+             * Format: date
+             * @description Calendar date of the transaction (ISO 8601 `YYYY-MM-DD`).
+             * @example 2026-04-08
+             */
+            date: string;
+            /** @description Human-readable description (e.g., "Lunch at Restaurante X"). */
+            description: string;
+            /** @description Optional free-form notes. */
+            notes?: string | null;
+            /**
+             * @description `income` or `expense`.
+             * @example expense
+             */
+            type: string;
         };
     };
     responses: never;
@@ -69,6 +410,269 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_categories: {
+        parameters: {
+            query?: {
+                /** @description Filter by 'income' or 'expense' */
+                type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"][];
+                };
+            };
+            /** @description Invalid type filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_category: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Category created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            /** @description Invalid category payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_summary: {
+        parameters: {
+            query?: {
+                /** @description Year to summarise (default: current) */
+                year?: number;
+                /** @description Month 1-12 (default: current) */
+                month?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryResponse"];
+                };
+            };
+            /** @description Invalid month parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_transactions: {
+        parameters: {
+            query?: {
+                /** @description Page size (default 50, max 200) */
+                page_size?: number;
+                /** @description Page offset (default 0) */
+                page?: number;
+                /** @description Filter by category UUID */
+                category_id?: string;
+                /** @description Filter by 'income' or 'expense' */
+                type?: string;
+                /** @description Filter by start date (inclusive) */
+                start_date?: string;
+                /** @description Filter by end date (inclusive) */
+                end_date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of transactions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionListResponse"];
+                };
+            };
+            /** @description Invalid filter parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_transaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTransactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Transaction created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transaction"];
+                };
+            };
+            /** @description Invalid transaction payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_transaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Transaction UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transaction found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transaction"];
+                };
+            };
+            /** @description Transaction not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_transaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Transaction UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTransactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Transaction updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transaction"];
+                };
+            };
+            /** @description Invalid transaction payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Transaction not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_transaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Transaction UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transaction deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Transaction not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     health_handler: {
         parameters: {
             query?: never;
