@@ -26,17 +26,32 @@
 
 ---
 
-## Planned SLOs (Phases 1+)
+## Layer 4 SLOs (current architecture)
 
-These targets are documented now for future implementation:
-
-| API | Availability | P50 Latency | P99 Latency | Freshness |
-|-----|-------------|-------------|-------------|-----------|
-| `POST /transactions` | 99.95% | < 30ms | < 100ms | — |
-| `GET /transactions` | 99.9% | < 50ms | < 200ms | — |
-| `GET /accounts` | 99.9% | < 20ms | < 100ms | — |
-| Report queries | 99.5% | < 500ms | < 2s | — |
-| Real-time dashboards | 99.0% | < 1s | < 5s | < 5s lag |
+| API | Availability | P50 Latency | P95 Latency | P99 Latency |
+|-----|-------------|-------------|-------------|-------------|
+| `GET /health` | 99.9% | < 5ms | < 10ms | < 50ms |
+| `GET /metrics` | 99.9% | < 5ms | < 10ms | < 50ms |
+| `GET /api/categories` | 99.9% | < 10ms | < 50ms | < 200ms |
+| `POST /api/categories` | 99.95% | < 20ms | < 50ms | < 100ms |
+| `GET /api/transactions` | 99.9% | < 50ms | < 150ms | < 300ms |
+| `POST /api/transactions` | 99.95% | < 30ms | < 100ms | < 200ms |
+| `PUT /api/transactions/{id}` | 99.95% | < 30ms | < 100ms | < 200ms |
+| `DELETE /api/transactions/{id}` | 99.95% | < 30ms | < 100ms | < 200ms |
+| `GET /api/summary` | 99.9% | < 50ms | < 150ms | < 300ms |
+| `GET /api/budgets` | 99.9% | < 30ms | < 100ms | < 200ms |
+| `POST /api/budgets` | 99.95% | < 30ms | < 100ms | < 200ms |
+| `GET /api/budgets/summary` | 99.9% | < 50ms | < 150ms | < 300ms |
+| `GET /api/reports/monthly` | 99.5% | < 100ms | < 300ms | < 1s |
+| `GET /api/reports/category-breakdown` | 99.5% | < 100ms | < 300ms | < 1s |
+| `GET /api/reports/trends` | 99.5% | < 100ms | < 300ms | < 1s |
+| `POST /api/ledger/transactions` | 99.95% | < 50ms | < 150ms | < 300ms |
+| `GET /api/ledger/accounts` | 99.9% | < 10ms | < 50ms | < 100ms |
+| `GET /api/ledger/transactions` | 99.9% | < 50ms | < 150ms | < 300ms |
+| `POST /api/migrate/single-to-double` | 99.0% | < 1s | < 5s | < 10s |
+| `POST /api/reconciliation` | 99.0% | < 500ms | < 2s | < 5s |
+| `GET /api/audit/events` (admin) | 99.5% | < 100ms | < 300ms | < 1s |
+| `POST /api/receipts/*` (future) | 99.0% | < 1s | < 3s | < 5s |
 
 ---
 

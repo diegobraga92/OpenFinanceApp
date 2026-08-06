@@ -4,6 +4,7 @@ use tracing::info;
 use utoipa::ToSchema;
 
 use crate::db;
+use crate::metrics;
 use crate::state::AppState;
 
 /// Successful health check payload returned with HTTP 200.
@@ -48,6 +49,7 @@ pub async fn health_handler(
 ) -> Result<Json<HealthResponse>, (axum::http::StatusCode, Json<HealthError>)> {
     let db_healthy = db::check_db_health(&state.pg_pool).await;
     let rabbitmq_healthy = state.event_publisher.is_healthy().await;
+    metrics::set_rabbitmq_connected(rabbitmq_healthy);
 
     if !db_healthy {
         info!("Health check failed: database unreachable");

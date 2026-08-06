@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use crate::events::EventPublisher;
 use crate::ledger::{validate_balance, AccountMap};
+use crate::metrics;
 use crate::models::{
     CreateLedgerTransactionRequest, CreateLedgerTransactionResponse, LedgerEntry,
     LedgerTransaction, MigrationResponse, ReconciliationItem, ReconciliationUploadRequest,
@@ -333,6 +334,8 @@ pub async fn create_ledger_transaction(
             Json(json!({ "error": "Failed to commit transaction" })),
         )
     })?;
+
+    metrics::inc_ledger_transactions();
 
     // Publish event to RabbitMQ (non-blocking: failure is logged, not returned)
     let publisher = state.event_publisher.clone();

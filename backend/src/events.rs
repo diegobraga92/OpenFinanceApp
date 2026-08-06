@@ -12,6 +12,8 @@ use lapin::{BasicProperties, ConnectionProperties, ExchangeKind};
 use serde::Serialize;
 use tracing::{error, info, warn};
 
+use crate::metrics;
+
 /// Exchange name for ledger transaction events.
 pub const LEDGER_EXCHANGE: &str = "finance.ledger.transactions";
 
@@ -139,6 +141,7 @@ impl EventPublisher {
                             .await;
                         match publish_result {
                             Ok(_) => {
+                                metrics::set_rabbitmq_connected(true);
                                 info!(
                                     "Published TransactionRecorded event for tx {}",
                                     event.transaction_id
@@ -146,18 +149,22 @@ impl EventPublisher {
                                 Ok(())
                             }
                             Err(e) => {
+                                metrics::inc_ledger_event_publish_failures();
+                                metrics::set_rabbitmq_connected(false);
                                 error!("Failed to publish event to RabbitMQ: {}", e);
                                 Ok(()) // recoverable — events are stored in DB
                             }
                         }
                     }
                     Err(e) => {
+                        metrics::set_rabbitmq_connected(false);
                         warn!("Failed to create channel, skipping publish: {}", e);
                         Ok(())
                     }
                 }
             }
             Err(e) => {
+                metrics::set_rabbitmq_connected(false);
                 warn!("RabbitMQ connection unavailable, skipping publish: {}", e);
                 Ok(())
             }

@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     telemetry::init_logging(&config.otel_endpoint, "pudimfinance-backend");
 
     // Initialize metrics recorder
-    let _metrics_recorder = init_metrics_recorder();
+    let metrics_recorder = init_metrics_recorder();
 
     // Initialize database pool
     let pg_pool = init_pool(
@@ -67,8 +67,22 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Build main application router
+    let recorder = metrics_recorder.clone();
     let app = Router::new()
         .route("/health", axum::routing::get(health_handler))
+        // Prometheus metrics (served on the main port for scraping convenience)
+        .route(
+            "/metrics",
+            axum::routing::get(move || {
+                let recorder = recorder.clone();
+                async move {
+                    axum::response::Response::builder()
+                        .header("Content-Type", "text/plain; charset=utf-8")
+                        .body(axum::body::Body::from(recorder.render()))
+                        .unwrap()
+                }
+            }),
+        )
         // Layer 1 API routes
         .merge(api_router())
         // Serve OpenAPI spec as JSON and Swagger UI
