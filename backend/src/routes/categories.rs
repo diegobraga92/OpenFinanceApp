@@ -1,4 +1,4 @@
-//! Category CRUD endpoints.
+//! Category CRUD endpoints
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
