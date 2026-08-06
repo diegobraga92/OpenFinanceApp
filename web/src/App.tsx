@@ -12,10 +12,11 @@ import { TransactionForm } from './components/TransactionForm';
 import { CategoryManager } from './components/CategoryManager';
 import { TransactionTable } from './components/TransactionTable';
 import { BudgetManager } from './components/BudgetManager';
+import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation' | 'receipts';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -148,6 +149,12 @@ export default function App() {
               Reconciliation
             </button>
             <button
+              style={{ ...styles.navButton, ...(tab === 'receipts' ? styles.navButtonActive : {}) }}
+              onClick={() => setTab('receipts')}
+            >
+              Receipts
+            </button>
+            <button
               style={{ ...styles.navButton, ...(tab === 'categories' ? styles.navButtonActive : {}) }}
               onClick={() => setTab('categories')}
             >
@@ -257,6 +264,8 @@ export default function App() {
           <ReportsDashboard formatMoney={formatMoney} />
         ) : tab === 'reconciliation' ? (
           <ReconciliationUpload formatMoney={formatMoney} />
+        ) : tab === 'receipts' ? (
+          <ReceiptScanner formatMoney={formatMoney} />
         ) : tab === 'transactions' ? (
           <div>
             <div style={styles.pageHeader}>

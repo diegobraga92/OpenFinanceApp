@@ -120,6 +120,35 @@ pub async fn auth_middleware(State(state): State<AppState>, req: Request, next: 
     }
 }
 
+/// Deprecation middleware: attaches `Sunset`, `Deprecation`, and `Link`
+/// headers to legacy (v1) endpoints that have a v2 successor.
+///
+/// Per ADR 009, deprecated endpoints remain functional but advertise their
+/// successor and retirement date so clients can migrate gracefully.
+pub async fn deprecation_middleware(req: Request, next: Next) -> Response {
+    let path = req.uri().path().to_string();
+    let mut response = next.run(req).await;
+
+    // Only mark the v1 ledger transactions path as deprecated in this simulation.
+    if path == "/api/ledger/transactions" {
+        response.headers_mut().insert(
+            "Sunset",
+            axum::http::HeaderValue::from_static("Sun, 01 Jan 2027 00:00:00 GMT"),
+        );
+        response
+            .headers_mut()
+            .insert("Deprecation", axum::http::HeaderValue::from_static("true"));
+        response.headers_mut().insert(
+            "Link",
+            axum::http::HeaderValue::from_static(
+                "</api/v2/ledger/transactions>; rel=\"successor-version\"",
+            ),
+        );
+    }
+
+    response
+}
+
 /// Rate limiting middleware: enforces per-IP limits on write endpoints.
 ///
 /// Applies a fixed-window limit keyed by the request's remote IP. If the

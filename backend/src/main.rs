@@ -99,6 +99,10 @@ async fn main() -> anyhow::Result<()> {
             app_state.clone(),
             middleware::rate_limit_middleware,
         ))
+        // Deprecation headers (ADR 009) — marks legacy v1 endpoints with Sunset/Link
+        .layer(axum::middleware::from_fn(
+            middleware::deprecation_middleware,
+        ))
         // Serve OpenAPI spec as JSON and Swagger UI
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(TraceLayer::new_for_http())
