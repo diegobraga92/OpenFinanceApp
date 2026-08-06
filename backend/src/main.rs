@@ -10,8 +10,10 @@ mod events;
 mod health;
 mod ledger;
 mod metrics;
+mod middleware;
 mod models;
 mod openapi;
+mod receipt_scanner;
 mod routes;
 mod state;
 mod telemetry;
@@ -66,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
         pg_pool,
         event_publisher,
         jwt_secret: config.jwt_secret.clone(),
+        rate_limiter: middleware::RateLimiterState::new(),
     };
 
     // Build main application router
@@ -85,8 +88,17 @@ async fn main() -> anyhow::Result<()> {
                 }
             }),
         )
-        // Layer 1 API routes
+        // Layer 1 API routes (protected by JWT auth middleware)
         .merge(api_router())
+        .route_layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            middleware::auth_middleware,
+        ))
+        // Rate limiting (runs before auth so /api/auth/login is limited)
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            middleware::rate_limit_middleware,
+        ))
         // Serve OpenAPI spec as JSON and Swagger UI
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(TraceLayer::new_for_http())

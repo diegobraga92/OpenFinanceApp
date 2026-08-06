@@ -15,6 +15,23 @@
     }
   ],
   "paths": {
+    "/api/audit/events": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Lists audit events with optional filters (admin-only).",
+        "operationId": "list_audit_events",
+        "responses": {
+          "200": {
+            "description": "List of audit events"
+          },
+          "403": {
+            "description": "Admin access required"
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -441,6 +458,113 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/receipts": {
+      "get": {
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "Lists saved receipts (paginated).",
+        "operationId": "list_receipts",
+        "responses": {
+          "200": {
+            "description": "List of receipts"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "Saves a reviewed receipt (and upserts its store), creating normalized products.",
+        "operationId": "save_receipt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveReceiptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Receipt saved"
+          },
+          "400": {
+            "description": "Invalid receipt payload"
+          }
+        }
+      }
+    },
+    "/api/receipts/price-history": {
+      "get": {
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "Returns price history for a normalized product.",
+        "operationId": "price_history",
+        "responses": {
+          "200": {
+            "description": "Price history"
+          }
+        }
+      }
+    },
+    "/api/receipts/product/merge": {
+      "post": {
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "Merges two normalized products (all items reassigned to target; source deleted).",
+        "operationId": "merge_products",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeProductsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Products merged"
+          },
+          "400": {
+            "description": "Invalid product IDs"
+          }
+        }
+      }
+    },
+    "/api/receipts/scan": {
+      "post": {
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "Scans a raw NFC-e QR code and returns the parsed receipt preview.",
+        "operationId": "scan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Parsed receipt preview"
+          },
+          "400": {
+            "description": "Invalid QR data"
           }
         }
       }
@@ -1762,6 +1886,26 @@
           }
         }
       },
+      "MergeProductsRequest": {
+        "type": "object",
+        "description": "Request: merge two normalized products.",
+        "required": [
+          "target_id",
+          "source_id"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Product to merge into target (will be deleted)."
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Product to keep."
+          }
+        }
+      },
       "MigrationResponse": {
         "type": "object",
         "description": "Response for the migration endpoint.",
@@ -1842,6 +1986,40 @@
               "$ref": "#/components/schemas/MonthlyReportItem"
             },
             "description": "One entry per month in the requested range (chronological order)."
+          }
+        }
+      },
+      "ReceiptItemInput": {
+        "type": "object",
+        "description": "Line item for saving a receipt.",
+        "required": [
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Item description (also becomes a normalized product)."
+          },
+          "quantity": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Quantity purchased (default 1)."
+          },
+          "total_price": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Total price for the line."
+          },
+          "unit_price": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Unit price."
           }
         }
       },
@@ -1997,6 +2175,58 @@
           "password": {
             "type": "string",
             "description": "Plaintext password (hashed with Argon2id)."
+          }
+        }
+      },
+      "SaveReceiptRequest": {
+        "type": "object",
+        "description": "Request: save a fully parsed/reviewed receipt.",
+        "required": [
+          "store_name",
+          "date",
+          "total",
+          "items"
+        ],
+        "properties": {
+          "cnpj": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Store CNPJ (optional)."
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Receipt date."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptItemInput"
+            },
+            "description": "Line items (at least one)."
+          },
+          "store_name": {
+            "type": "string",
+            "description": "Store name (or from scan)."
+          },
+          "total": {
+            "type": "string",
+            "description": "Total amount."
+          }
+        }
+      },
+      "ScanRequest": {
+        "type": "object",
+        "description": "Request: scan a raw NFC-e QR code.",
+        "required": [
+          "qr_data"
+        ],
+        "properties": {
+          "qr_data": {
+            "type": "string",
+            "description": "Raw QR code content (URL or `p=` payload)."
           }
         }
       },
@@ -2379,6 +2609,14 @@
     {
       "name": "Auth",
       "description": "User registration, login, token refresh, and profile"
+    },
+    {
+      "name": "Audit",
+      "description": "Admin-only audit event search"
+    },
+    {
+      "name": "Receipts",
+      "description": "Receipt scanning (NFC-e QR), price history, and product normalization"
     }
   ],
   "x-generator": "Auto-generated by backend/src/bin/gen-openapi.rs from utoipa annotations in backend/src/openapi.rs"

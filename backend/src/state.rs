@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 
 use crate::events::EventPublisher;
+use crate::middleware::RateLimiterState;
 
 /// Shared application state injected into axum handlers via [`axum::extract::State`].
 #[derive(Clone)]
@@ -11,4 +12,6 @@ pub struct AppState {
     pub event_publisher: EventPublisher,
     /// JWT secret used to sign access/refresh tokens.
     pub jwt_secret: String,
+    /// Shared in-memory rate limiter state.
+    pub rate_limiter: RateLimiterState,
 }

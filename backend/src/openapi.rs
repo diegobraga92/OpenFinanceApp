@@ -11,10 +11,12 @@ use crate::models::{
     SummaryResponse, Transaction, TransactionListParams, TransactionListResponse, TrendPoint,
     TrendsResponse, UpdateTransactionRequest,
 };
+use crate::routes::audit;
 use crate::routes::auth::{self, LoginRequest, RefreshRequest, RegisterRequest};
 use crate::routes::budgets;
 use crate::routes::categories::{self, CategoryListParams};
 use crate::routes::ledger;
+use crate::routes::receipts;
 use crate::routes::reports;
 use crate::routes::summary::{self, SummaryParams};
 use crate::routes::transactions;
@@ -52,6 +54,12 @@ use crate::routes::transactions;
         auth::login,
         auth::refresh,
         auth::me,
+        audit::list_audit_events,
+        receipts::scan,
+        receipts::save_receipt,
+        receipts::list_receipts,
+        receipts::price_history,
+        receipts::merge_products,
     ),
     components(schemas(
         health::HealthResponse,
@@ -112,6 +120,8 @@ use crate::routes::transactions;
         (name = "Reports", description = "Monthly reports, category breakdowns, and trends"),
         (name = "Ledger", description = "Double-entry ledger, event sourcing, and reconciliation"),
         (name = "Auth", description = "User registration, login, token refresh, and profile"),
+        (name = "Audit", description = "Admin-only audit event search"),
+        (name = "Receipts", description = "Receipt scanning (NFC-e QR), price history, and product normalization"),
     ),
     // Public API: no authentication required. Empty security requirement
     // documents that explicitly (satisfies OpenAPI `security-defined`).

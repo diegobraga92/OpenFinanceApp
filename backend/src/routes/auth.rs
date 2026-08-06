@@ -1,5 +1,7 @@
 //! Authentication endpoints: register, login, refresh, and me.
 
+#![allow(clippy::result_large_err)]
+
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::{Json, Router};

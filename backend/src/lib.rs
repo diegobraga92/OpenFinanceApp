@@ -20,10 +20,14 @@ pub mod health;
 pub mod ledger;
 /// Prometheus metrics collection and serving.
 pub mod metrics;
+/// Auth middleware and RBAC helpers.
+pub mod middleware;
 /// Data models across all layers.
 pub mod models;
 /// OpenAPI 3.1 spec generation via utoipa.
 pub mod openapi;
+/// NFC-e QR code parsing for receipt scanning.
+pub mod receipt_scanner;
 /// HTTP route handlers for categories, transactions, summary, budgets, reports, and ledger.
 pub mod routes;
 /// Shared application state for axum handlers.
