@@ -47,6 +47,16 @@ check_backend() {
         bash -c "$DEPS_CMD && cargo build" \
         && ok "Build passed" \
         || fail "Build failed"
+
+    step "Backend: Trivy container scan (HIGH/CRITICAL)"
+    if command -v trivy > /dev/null 2>&1; then
+        trivy image --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed \
+            pudimfinance/backend:latest \
+            && ok "Trivy scan passed" \
+            || fail "Trivy found HIGH/CRITICAL CVEs"
+    else
+        skip "trivy not installed — skipping container scan"
+    fi
 }
 
 # ──────────────────────────────────────────────

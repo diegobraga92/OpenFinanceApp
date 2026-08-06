@@ -11,12 +11,13 @@ import {
 import { TransactionForm } from './components/TransactionForm';
 import { CategoryManager } from './components/CategoryManager';
 import { TransactionTable } from './components/TransactionTable';
+import { AuditDashboard } from './components/AuditDashboard';
 import { BudgetManager } from './components/BudgetManager';
 import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation' | 'receipts';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -110,6 +111,9 @@ export default function App() {
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  // Auth token for admin-only features (populated when a login flow saves it).
+  const authToken = localStorage.getItem('pudim_token') || '';
+
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -153,6 +157,12 @@ export default function App() {
               onClick={() => setTab('receipts')}
             >
               Receipts
+            </button>
+            <button
+              style={{ ...styles.navButton, ...(tab === 'audit' ? styles.navButtonActive : {}) }}
+              onClick={() => setTab('audit')}
+            >
+              Audit
             </button>
             <button
               style={{ ...styles.navButton, ...(tab === 'categories' ? styles.navButtonActive : {}) }}
@@ -266,6 +276,8 @@ export default function App() {
           <ReconciliationUpload formatMoney={formatMoney} />
         ) : tab === 'receipts' ? (
           <ReceiptScanner formatMoney={formatMoney} />
+        ) : tab === 'audit' ? (
+          <AuditDashboard token={authToken} />
         ) : tab === 'transactions' ? (
           <div>
             <div style={styles.pageHeader}>

@@ -281,6 +281,31 @@ export async function fetchMe(token: string): Promise<{ id: string; email: strin
   });
 }
 
+// --- Audit ---
+
+export interface AuditEvent {
+  id: number;
+  aggregate_id: string;
+  aggregate_type: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  occurred_at: string;
+}
+
+export async function fetchAuditEvents(
+  token: string,
+  params?: { event_type?: string; page?: number; page_size?: number },
+): Promise<{ items: AuditEvent[]; page: number; page_size: number }> {
+  const qs = new URLSearchParams();
+  if (params?.event_type) qs.set('event_type', params.event_type);
+  if (params?.page !== undefined) qs.set('page', String(params.page));
+  if (params?.page_size !== undefined) qs.set('page_size', String(params.page_size));
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return request<{ items: AuditEvent[]; page: number; page_size: number }>(`/api/audit/events${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 // --- Receipts ---
 
 export async function scanReceipt(qrData: string): Promise<Record<string, unknown>> {

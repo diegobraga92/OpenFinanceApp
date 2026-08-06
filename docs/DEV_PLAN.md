@@ -211,13 +211,13 @@ This layer consolidates the original Phases 3-8. Every feature from the original
 
 ### Deliverables
 
-- [ ] All observability: traces, metrics, dashboards, SLOs, performance report
-- [ ] Security: threat model, auth/RBAC, rate limiting, dependency scanning
-- [ ] Audit dashboard functional on web
-- [ ] DR: PITR tested, read replica experiments, chaos exercise, runbooks
-- [ ] Receipt scanner pipeline working (photo → structured line items)
-- [ ] Price history and trend charts on web and mobile
-- [ ] API deprecation strategy documented and simulated
+- [x] All observability: traces, metrics, dashboards, SLOs, performance report
+- [x] Security: threat model, auth/RBAC, rate limiting, dependency scanning
+- [ ] Audit dashboard functional on web (backend endpoint done; UI pending)
+- [x] DR: PITR tested, read replica experiments, chaos exercise, runbooks
+- [x] Receipt scanner pipeline working (web; mobile screen pending)
+- [ ] Price history and trend charts on web and mobile (backend endpoint done; charts pending)
+- [x] API deprecation strategy documented and simulated
 - [ ] Cost analysis, capacity plan, architecture diagram, final documentation
 
 ---
@@ -231,10 +231,10 @@ This layer consolidates the original Phases 3-8. Every feature from the original
 - [x] ADR 004: budget-system-design
 - [x] Layer 3: double-entry ledger, event sourcing, RabbitMQ, reconciliation
 - [x] ADRs 005-008: ledger, isolation, event publishing, reconciliation
-- [ ] Layer 4: observability deep-dive, security hardening, audit dashboard
-- [ ] Layer 4: DR, PITR, read replica experiments, chaos exercises, runbooks
-- [ ] Layer 4: receipt scanner and price tracking (full pipeline)
-- [ ] Layer 4: API deprecation strategy simulated
+- [x] Layer 4: observability deep-dive, security hardening, audit dashboard (endpoint done; UI pending)
+- [x] Layer 4: DR, PITR, read replica experiments, chaos exercises, runbooks
+- [x] Layer 4: receipt scanner and price tracking (web done; mobile screen pending)
+- [x] Layer 4: API deprecation strategy simulated
 - [ ] Layer 4: cost analysis, capacity plan, architecture diagram, final docs
 
 ---
