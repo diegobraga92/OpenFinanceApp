@@ -15,6 +15,169 @@
     }
   ],
   "paths": {
+    "/api/budgets": {
+      "get": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Lists budgets for a given month/year, joined with category display info.",
+        "operationId": "list_budgets",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Year (default: current)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "Month 1-12 (default: current)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of budgets for the period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid month parameter"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Creates or updates a budget (upsert on (category_id, month, year)).",
+        "operationId": "create_budget",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBudgetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Budget updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetWithCategory"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Budget created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetWithCategory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid budget payload"
+          }
+        }
+      }
+    },
+    "/api/budgets/summary": {
+      "get": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Returns budget vs actual spending for a given month/year.",
+        "operationId": "budget_summary",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Year (default: current)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "Month 1-12 (default: current)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Budget vs actual summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid month parameter"
+          }
+        }
+      }
+    },
+    "/api/budgets/{id}": {
+      "delete": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Deletes a budget by ID.",
+        "operationId": "delete_budget",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Budget UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Budget deleted"
+          },
+          "404": {
+            "description": "Budget not found"
+          }
+        }
+      }
+    },
     "/api/categories": {
       "get": {
         "tags": [
@@ -83,6 +246,154 @@
           },
           "400": {
             "description": "Invalid category payload"
+          }
+        }
+      }
+    },
+    "/api/reports/category-breakdown": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Category spending breakdown for a date range.",
+        "operationId": "category_breakdown",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "Start date (ISO). Default: first day of current month",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "End date (ISO). Default: today",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category spending breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryBreakdownResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid date range"
+          }
+        }
+      }
+    },
+    "/api/reports/monthly": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Monthly income/expense summary over a date range.",
+        "operationId": "monthly_report",
+        "parameters": [
+          {
+            "name": "start_year",
+            "in": "query",
+            "description": "Start year (default: 6 months ago)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "start_month",
+            "in": "query",
+            "description": "Start month 1-12",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "end_year",
+            "in": "query",
+            "description": "End year (default: current)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "end_month",
+            "in": "query",
+            "description": "End month 1-12",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly income/expense summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters"
+          }
+        }
+      }
+    },
+    "/api/reports/trends": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Monthly trends (income, expense, net) over the last N months.",
+        "operationId": "trends",
+        "parameters": [
+          {
+            "name": "months",
+            "in": "query",
+            "description": "Number of months (default 6, max 12)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly trends",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrendsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid months parameter"
           }
         }
       }
@@ -412,6 +723,205 @@
   },
   "components": {
     "schemas": {
+      "Budget": {
+        "type": "object",
+        "description": "A monthly budget limit for a category.",
+        "required": [
+          "id",
+          "category_id",
+          "month",
+          "year",
+          "amount_limit",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "amount_limit": {
+            "type": "string",
+            "description": "Maximum spend limit for the month."
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Category this budget applies to."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Row creation timestamp."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique budget identifier."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month (1-12)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last row update timestamp."
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year."
+          }
+        }
+      },
+      "BudgetListResponse": {
+        "type": "object",
+        "description": "Response for a paginated/period budget list.",
+        "required": [
+          "items",
+          "month",
+          "year"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetWithCategory"
+            },
+            "description": "Budgets for the selected period."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month used for the query."
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year used for the query."
+          }
+        }
+      },
+      "BudgetSummaryItem": {
+        "type": "object",
+        "description": "Budget vs actual spending for a single budget.",
+        "required": [
+          "budget",
+          "actual_spent",
+          "percentage",
+          "remaining"
+        ],
+        "properties": {
+          "actual_spent": {
+            "type": "string",
+            "description": "Actual spending for the category in the month (from transactions)."
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetWithCategory",
+            "description": "The budget itself (with category info)."
+          },
+          "percentage": {
+            "type": "string",
+            "description": "Percentage of the limit used (0-100+, can exceed 100)."
+          },
+          "remaining": {
+            "type": "string",
+            "description": "Remaining amount = condition. negative => over budget."
+          }
+        }
+      },
+      "BudgetSummaryResponse": {
+        "type": "object",
+        "description": "Response for the budget summary endpoint.",
+        "required": [
+          "items",
+          "total_budgeted",
+          "total_spent",
+          "month",
+          "year"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetSummaryItem"
+            },
+            "description": "Per-budget spend vs limit."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month used for the query."
+          },
+          "total_budgeted": {
+            "type": "string",
+            "description": "Sum of all budget limits for the period."
+          },
+          "total_spent": {
+            "type": "string",
+            "description": "Sum of all actual spending for budgeted categories."
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year used for the query."
+          }
+        }
+      },
+      "BudgetWithCategory": {
+        "type": "object",
+        "description": "Budget joined with its category display info.",
+        "required": [
+          "id",
+          "category_id",
+          "category_name",
+          "month",
+          "year",
+          "amount_limit"
+        ],
+        "properties": {
+          "amount_limit": {
+            "type": "string",
+            "description": "Maximum spend limit for the month."
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Category id this budget applies to."
+          },
+          "category_name": {
+            "type": "string",
+            "description": "Category name."
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category hex color."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category icon identifier."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique budget identifier."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month (1-12)."
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year."
+          }
+        }
+      },
       "Category": {
         "type": "object",
         "description": "A transaction category (income or expense), optionally nested via `parent_id`.",
@@ -470,6 +980,87 @@
           }
         }
       },
+      "CategoryBreakdownItem": {
+        "type": "object",
+        "description": "A single category's aggregated totals for the category-breakdown report.",
+        "required": [
+          "total",
+          "percentage",
+          "transaction_count"
+        ],
+        "properties": {
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Category UUID (null when uncategorised)."
+          },
+          "category_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category name."
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hex color."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Icon identifier."
+          },
+          "percentage": {
+            "type": "string",
+            "description": "Percentage of all expenses for the period."
+          },
+          "total": {
+            "type": "string",
+            "description": "Total amount for the category."
+          },
+          "transaction_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of transactions in this category."
+          }
+        }
+      },
+      "CategoryBreakdownResponse": {
+        "type": "object",
+        "description": "Response for the category-breakdown report.",
+        "required": [
+          "categories",
+          "start_date",
+          "end_date"
+        ],
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryBreakdownItem"
+            },
+            "description": "Per-category totals, sorted by total descending."
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date range used (ISO dates)."
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date range used (ISO dates)."
+          }
+        }
+      },
       "CategoryListParams": {
         "type": "object",
         "description": "Query parameters for filtering the category list.",
@@ -522,6 +1113,40 @@
           "total": {
             "type": "string",
             "description": "Total amount for this category."
+          }
+        }
+      },
+      "CreateBudgetRequest": {
+        "type": "object",
+        "description": "Payload for creating or updating a budget (upsert).",
+        "required": [
+          "category_id",
+          "month",
+          "year",
+          "amount_limit"
+        ],
+        "properties": {
+          "amount_limit": {
+            "type": "string",
+            "description": "Maximum spend limit — must be > 0.",
+            "example": "500.00"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Category this budget applies to (expense categories only)."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month (1-12).",
+            "maximum": 12,
+            "minimum": 1
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year."
           }
         }
       },
@@ -666,6 +1291,57 @@
           "version": {
             "type": "string",
             "description": "Backend crate version from `CARGO_PKG_VERSION`."
+          }
+        }
+      },
+      "MonthlyReportItem": {
+        "type": "object",
+        "description": "A single month's income/expense totals for the monthly report.",
+        "required": [
+          "year",
+          "month",
+          "income_total",
+          "expense_total",
+          "balance"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string",
+            "description": "Balance = income − expense."
+          },
+          "expense_total": {
+            "type": "string",
+            "description": "Total expenses for the month."
+          },
+          "income_total": {
+            "type": "string",
+            "description": "Total income for the month."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month (1-12)."
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year."
+          }
+        }
+      },
+      "MonthlyReportResponse": {
+        "type": "object",
+        "description": "Response for the monthly report.",
+        "required": [
+          "months"
+        ],
+        "properties": {
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonthlyReportItem"
+            },
+            "description": "One entry per month in the requested range (chronological order)."
           }
         }
       },
@@ -884,6 +1560,62 @@
           }
         }
       },
+      "TrendPoint": {
+        "type": "object",
+        "description": "A single point in the trends report.",
+        "required": [
+          "month_label",
+          "year",
+          "month",
+          "income_total",
+          "expense_total",
+          "net"
+        ],
+        "properties": {
+          "expense_total": {
+            "type": "string",
+            "description": "Expenses for the month."
+          },
+          "income_total": {
+            "type": "string",
+            "description": "Income for the month."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month (1-12)."
+          },
+          "month_label": {
+            "type": "string",
+            "description": "Human-friendly label (e.g., \"2026-04\")."
+          },
+          "net": {
+            "type": "string",
+            "description": "Net (income − expense) for the month."
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year."
+          }
+        }
+      },
+      "TrendsResponse": {
+        "type": "object",
+        "description": "Response for the trends report.",
+        "required": [
+          "trends"
+        ],
+        "properties": {
+          "trends": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrendPoint"
+            },
+            "description": "Monthly points, chronological order."
+          }
+        }
+      },
       "UpdateTransactionRequest": {
         "type": "object",
         "description": "Payload for updating an existing transaction.",
@@ -952,6 +1684,14 @@
     {
       "name": "Summary",
       "description": "Monthly income/expense/balance summaries"
+    },
+    {
+      "name": "Budgets",
+      "description": "Monthly budget limits and budget vs actual tracking"
+    },
+    {
+      "name": "Reports",
+      "description": "Monthly reports, category breakdowns, and trends"
     }
   ],
   "x-generator": "Auto-generated by backend/src/bin/gen-openapi.rs from utoipa annotations in backend/src/openapi.rs"

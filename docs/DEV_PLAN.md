@@ -95,10 +95,10 @@
 
 ### Deliverables
 
-- [ ] Budget CRUD functional on web and mobile
-- [ ] Monthly reports with charts on web
-- [ ] Budget vs actual tracking with visual indicators
-- [ ] ADR `004-budget-system-design.md` (if significant decisions made)
+- [x] Budget CRUD functional on web and mobile
+- [x] Monthly reports with charts on web
+- [x] Budget vs actual tracking with visual indicators
+- [x] ADR `004-budget-system-design.md` (if significant decisions made)
 
 ---
 
@@ -227,7 +227,8 @@ This layer consolidates the original Phases 3-8. Every feature from the original
 - [x] Phase 0: project skeleton, health endpoint, PostgreSQL, CI/CD, OpenAPI, ADRs 001-002
 - [x] Layer 1: simple income/expense tracking (categories + transactions) on web and mobile
 - [x] ADR 003: start-simple-single-entry
-- [ ] Layer 2: budgets, monthly reports, charts on web and mobile
+- [x] Layer 2: budgets, monthly reports, charts on web and mobile
+- [x] ADR 004: budget-system-design
 - [ ] Layer 3: double-entry ledger, event sourcing, RabbitMQ, reconciliation
 - [ ] ADRs 005-008: ledger, isolation, event publishing, reconciliation
 - [ ] Layer 4: observability deep-dive, security hardening, audit dashboard

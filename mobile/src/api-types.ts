@@ -4,6 +4,58 @@
  */
 
 export interface paths {
+    "/api/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists budgets for a given month/year, joined with category display info. */
+        get: operations["list_budgets"];
+        put?: never;
+        /** Creates or updates a budget (upsert on (category_id, month, year)). */
+        post: operations["create_budget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/budgets/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns budget vs actual spending for a given month/year. */
+        get: operations["budget_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/budgets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes a budget by ID. */
+        delete: operations["delete_budget"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/categories": {
         parameters: {
             query?: never;
@@ -23,6 +75,57 @@ export interface paths {
          *     non-existent parent category).
          */
         post: operations["create_category"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/category-breakdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Category spending breakdown for a date range. */
+        get: operations["category_breakdown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly income/expense summary over a date range. */
+        get: operations["monthly_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/trends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly trends (income, expense, net) over the last N months. */
+        get: operations["trends"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -130,6 +233,117 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A monthly budget limit for a category. */
+        Budget: {
+            /** @description Maximum spend limit for the month. */
+            amount_limit: string;
+            /**
+             * Format: uuid
+             * @description Category this budget applies to.
+             */
+            category_id: string;
+            /**
+             * Format: date-time
+             * @description Row creation timestamp.
+             */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description Unique budget identifier.
+             */
+            id: string;
+            /**
+             * Format: int32
+             * @description Month (1-12).
+             */
+            month: number;
+            /**
+             * Format: date-time
+             * @description Last row update timestamp.
+             */
+            updated_at: string;
+            /**
+             * Format: int32
+             * @description Year.
+             */
+            year: number;
+        };
+        /** @description Response for a paginated/period budget list. */
+        BudgetListResponse: {
+            /** @description Budgets for the selected period. */
+            items: components["schemas"]["BudgetWithCategory"][];
+            /**
+             * Format: int32
+             * @description Month used for the query.
+             */
+            month: number;
+            /**
+             * Format: int32
+             * @description Year used for the query.
+             */
+            year: number;
+        };
+        /** @description Budget vs actual spending for a single budget. */
+        BudgetSummaryItem: {
+            /** @description Actual spending for the category in the month (from transactions). */
+            actual_spent: string;
+            /** @description The budget itself (with category info). */
+            budget: components["schemas"]["BudgetWithCategory"];
+            /** @description Percentage of the limit used (0-100+, can exceed 100). */
+            percentage: string;
+            /** @description Remaining amount = condition. negative => over budget. */
+            remaining: string;
+        };
+        /** @description Response for the budget summary endpoint. */
+        BudgetSummaryResponse: {
+            /** @description Per-budget spend vs limit. */
+            items: components["schemas"]["BudgetSummaryItem"][];
+            /**
+             * Format: int32
+             * @description Month used for the query.
+             */
+            month: number;
+            /** @description Sum of all budget limits for the period. */
+            total_budgeted: string;
+            /** @description Sum of all actual spending for budgeted categories. */
+            total_spent: string;
+            /**
+             * Format: int32
+             * @description Year used for the query.
+             */
+            year: number;
+        };
+        /** @description Budget joined with its category display info. */
+        BudgetWithCategory: {
+            /** @description Maximum spend limit for the month. */
+            amount_limit: string;
+            /**
+             * Format: uuid
+             * @description Category id this budget applies to.
+             */
+            category_id: string;
+            /** @description Category name. */
+            category_name: string;
+            /** @description Category hex color. */
+            color?: string | null;
+            /** @description Category icon identifier. */
+            icon?: string | null;
+            /**
+             * Format: uuid
+             * @description Unique budget identifier.
+             */
+            id: string;
+            /**
+             * Format: int32
+             * @description Month (1-12).
+             */
+            month: number;
+            /**
+             * Format: int32
+             * @description Year.
+             */
+            year: number;
+        };
         /** @description A transaction category (income or expense), optionally nested via `parent_id`. */
         Category: {
             /** @description Hex color code (e.g., `#ef4444`). */
@@ -161,6 +375,44 @@ export interface components {
              */
             updated_at: string;
         };
+        /** @description A single category's aggregated totals for the category-breakdown report. */
+        CategoryBreakdownItem: {
+            /**
+             * Format: uuid
+             * @description Category UUID (null when uncategorised).
+             */
+            category_id?: string | null;
+            /** @description Category name. */
+            category_name?: string | null;
+            /** @description Hex color. */
+            color?: string | null;
+            /** @description Icon identifier. */
+            icon?: string | null;
+            /** @description Percentage of all expenses for the period. */
+            percentage: string;
+            /** @description Total amount for the category. */
+            total: string;
+            /**
+             * Format: int64
+             * @description Number of transactions in this category.
+             */
+            transaction_count: number;
+        };
+        /** @description Response for the category-breakdown report. */
+        CategoryBreakdownResponse: {
+            /** @description Per-category totals, sorted by total descending. */
+            categories: components["schemas"]["CategoryBreakdownItem"][];
+            /**
+             * Format: date
+             * @description Date range used (ISO dates).
+             */
+            end_date: string;
+            /**
+             * Format: date
+             * @description Date range used (ISO dates).
+             */
+            start_date: string;
+        };
         /** @description Query parameters for filtering the category list. */
         CategoryListParams: {
             /** @description Filter by `income` or `expense`. */
@@ -181,6 +433,29 @@ export interface components {
             icon?: string | null;
             /** @description Total amount for this category. */
             total: string;
+        };
+        /** @description Payload for creating or updating a budget (upsert). */
+        CreateBudgetRequest: {
+            /**
+             * @description Maximum spend limit — must be > 0.
+             * @example 500.00
+             */
+            amount_limit: string;
+            /**
+             * Format: uuid
+             * @description Category this budget applies to (expense categories only).
+             */
+            category_id: string;
+            /**
+             * Format: int32
+             * @description Month (1-12).
+             */
+            month: number;
+            /**
+             * Format: int32
+             * @description Year.
+             */
+            year: number;
         };
         /** @description Payload for creating a new category. */
         CreateCategoryRequest: {
@@ -250,6 +525,30 @@ export interface components {
             status: string;
             /** @description Backend crate version from `CARGO_PKG_VERSION`. */
             version: string;
+        };
+        /** @description A single month's income/expense totals for the monthly report. */
+        MonthlyReportItem: {
+            /** @description Balance = income − expense. */
+            balance: string;
+            /** @description Total expenses for the month. */
+            expense_total: string;
+            /** @description Total income for the month. */
+            income_total: string;
+            /**
+             * Format: int32
+             * @description Month (1-12).
+             */
+            month: number;
+            /**
+             * Format: int32
+             * @description Year.
+             */
+            year: number;
+        };
+        /** @description Response for the monthly report. */
+        MonthlyReportResponse: {
+            /** @description One entry per month in the requested range (chronological order). */
+            months: components["schemas"]["MonthlyReportItem"][];
         };
         /** @description Query parameters for the summary endpoint. */
         SummaryParams: {
@@ -373,6 +672,32 @@ export interface components {
              */
             total: number;
         };
+        /** @description A single point in the trends report. */
+        TrendPoint: {
+            /** @description Expenses for the month. */
+            expense_total: string;
+            /** @description Income for the month. */
+            income_total: string;
+            /**
+             * Format: int32
+             * @description Month (1-12).
+             */
+            month: number;
+            /** @description Human-friendly label (e.g., "2026-04"). */
+            month_label: string;
+            /** @description Net (income − expense) for the month. */
+            net: string;
+            /**
+             * Format: int32
+             * @description Year.
+             */
+            year: number;
+        };
+        /** @description Response for the trends report. */
+        TrendsResponse: {
+            /** @description Monthly points, chronological order. */
+            trends: components["schemas"]["TrendPoint"][];
+        };
         /** @description Payload for updating an existing transaction. */
         UpdateTransactionRequest: {
             /**
@@ -410,6 +735,138 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_budgets: {
+        parameters: {
+            query?: {
+                /** @description Year (default: current) */
+                year?: number;
+                /** @description Month 1-12 (default: current) */
+                month?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of budgets for the period */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetListResponse"];
+                };
+            };
+            /** @description Invalid month parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBudgetRequest"];
+            };
+        };
+        responses: {
+            /** @description Budget updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetWithCategory"];
+                };
+            };
+            /** @description Budget created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetWithCategory"];
+                };
+            };
+            /** @description Invalid budget payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    budget_summary: {
+        parameters: {
+            query?: {
+                /** @description Year (default: current) */
+                year?: number;
+                /** @description Month 1-12 (default: current) */
+                month?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Budget vs actual summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetSummaryResponse"];
+                };
+            };
+            /** @description Invalid month parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Budget UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Budget deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Budget not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_categories: {
         parameters: {
             query?: {
@@ -463,6 +920,104 @@ export interface operations {
                 };
             };
             /** @description Invalid category payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    category_breakdown: {
+        parameters: {
+            query?: {
+                /** @description Start date (ISO). Default: first day of current month */
+                start_date?: string;
+                /** @description End date (ISO). Default: today */
+                end_date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Category spending breakdown */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryBreakdownResponse"];
+                };
+            };
+            /** @description Invalid date range */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    monthly_report: {
+        parameters: {
+            query?: {
+                /** @description Start year (default: 6 months ago) */
+                start_year?: number;
+                /** @description Start month 1-12 */
+                start_month?: number;
+                /** @description End year (default: current) */
+                end_year?: number;
+                /** @description End month 1-12 */
+                end_month?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly income/expense summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyReportResponse"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    trends: {
+        parameters: {
+            query?: {
+                /** @description Number of months (default 6, max 12) */
+                months?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly trends */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrendsResponse"];
+                };
+            };
+            /** @description Invalid months parameter */
             400: {
                 headers: {
                     [name: string]: unknown;

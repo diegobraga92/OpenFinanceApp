@@ -185,3 +185,196 @@ pub struct SummaryResponse {
     /// Month used for the query (1-12).
     pub month: u32,
 }
+
+// ---------------------------------------------------------------------------
+// Layer 2: Budgets
+// ---------------------------------------------------------------------------
+
+/// A monthly budget limit for a category.
+#[derive(Debug, Serialize, FromRow, ToSchema)]
+pub struct Budget {
+    /// Unique budget identifier.
+    pub id: Uuid,
+    /// Category this budget applies to.
+    pub category_id: Uuid,
+    /// Month (1-12).
+    pub month: i32,
+    /// Year.
+    pub year: i32,
+    /// Maximum spend limit for the month.
+    #[schema(value_type = String)]
+    pub amount_limit: Decimal,
+    /// Row creation timestamp.
+    pub created_at: DateTime<Utc>,
+    /// Last row update timestamp.
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Budget joined with its category display info.
+#[derive(Debug, Serialize, FromRow, ToSchema)]
+pub struct BudgetWithCategory {
+    /// Unique budget identifier.
+    pub id: Uuid,
+    /// Category id this budget applies to.
+    pub category_id: Uuid,
+    /// Category name.
+    pub category_name: String,
+    /// Category icon identifier.
+    pub icon: Option<String>,
+    /// Category hex color.
+    pub color: Option<String>,
+    /// Month (1-12).
+    pub month: i32,
+    /// Year.
+    pub year: i32,
+    /// Maximum spend limit for the month.
+    #[schema(value_type = String)]
+    pub amount_limit: Decimal,
+}
+
+/// Payload for creating or updating a budget (upsert).
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateBudgetRequest {
+    /// Category this budget applies to (expense categories only).
+    pub category_id: Uuid,
+    /// Month (1-12).
+    #[schema(minimum = 1, maximum = 12)]
+    pub month: i32,
+    /// Year.
+    pub year: i32,
+    /// Maximum spend limit — must be > 0.
+    #[schema(value_type = String, example = "500.00")]
+    pub amount_limit: Decimal,
+}
+
+/// Response for a paginated/period budget list.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BudgetListResponse {
+    /// Budgets for the selected period.
+    pub items: Vec<BudgetWithCategory>,
+    /// Month used for the query.
+    pub month: i32,
+    /// Year used for the query.
+    pub year: i32,
+}
+
+/// Budget vs actual spending for a single budget.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BudgetSummaryItem {
+    /// The budget itself (with category info).
+    pub budget: BudgetWithCategory,
+    /// Actual spending for the category in the month (from transactions).
+    #[schema(value_type = String)]
+    pub actual_spent: Decimal,
+    /// Percentage of the limit used (0-100+, can exceed 100).
+    #[schema(value_type = String)]
+    pub percentage: Decimal,
+    /// Remaining amount = condition. negative => over budget.
+    #[schema(value_type = String)]
+    pub remaining: Decimal,
+}
+
+/// Response for the budget summary endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BudgetSummaryResponse {
+    /// Per-budget spend vs limit.
+    pub items: Vec<BudgetSummaryItem>,
+    /// Sum of all budget limits for the period.
+    #[schema(value_type = String)]
+    pub total_budgeted: Decimal,
+    /// Sum of all actual spending for budgeted categories.
+    #[schema(value_type = String)]
+    pub total_spent: Decimal,
+    /// Month used for the query.
+    pub month: i32,
+    /// Year used for the query.
+    pub year: i32,
+}
+
+// ---------------------------------------------------------------------------
+// Layer 2: Reports
+// ---------------------------------------------------------------------------
+
+/// A single month's income/expense totals for the monthly report.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MonthlyReportItem {
+    /// Year.
+    pub year: i32,
+    /// Month (1-12).
+    pub month: i32,
+    /// Total income for the month.
+    #[schema(value_type = String)]
+    pub income_total: Decimal,
+    /// Total expenses for the month.
+    #[schema(value_type = String)]
+    pub expense_total: Decimal,
+    /// Balance = income − expense.
+    #[schema(value_type = String)]
+    pub balance: Decimal,
+}
+
+/// Response for the monthly report.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MonthlyReportResponse {
+    /// One entry per month in the requested range (chronological order).
+    pub months: Vec<MonthlyReportItem>,
+}
+
+/// A single category's aggregated totals for the category-breakdown report.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CategoryBreakdownItem {
+    /// Category UUID (null when uncategorised).
+    pub category_id: Option<Uuid>,
+    /// Category name.
+    pub category_name: Option<String>,
+    /// Hex color.
+    pub color: Option<String>,
+    /// Icon identifier.
+    pub icon: Option<String>,
+    /// Total amount for the category.
+    #[schema(value_type = String)]
+    pub total: Decimal,
+    /// Percentage of all expenses for the period.
+    #[schema(value_type = String)]
+    pub percentage: Decimal,
+    /// Number of transactions in this category.
+    pub transaction_count: i64,
+}
+
+/// Response for the category-breakdown report.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CategoryBreakdownResponse {
+    /// Per-category totals, sorted by total descending.
+    pub categories: Vec<CategoryBreakdownItem>,
+    /// Date range used (ISO dates).
+    pub start_date: NaiveDate,
+    /// Date range used (ISO dates).
+    pub end_date: NaiveDate,
+}
+
+/// A single point in the trends report.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TrendPoint {
+    /// Human-friendly label (e.g., "2026-04").
+    pub month_label: String,
+    /// Year.
+    pub year: i32,
+    /// Month (1-12).
+    pub month: i32,
+    /// Income for the month.
+    #[schema(value_type = String)]
+    pub income_total: Decimal,
+    /// Expenses for the month.
+    #[schema(value_type = String)]
+    pub expense_total: Decimal,
+    /// Net (income − expense) for the month.
+    #[schema(value_type = String)]
+    pub net: Decimal,
+}
+
+/// Response for the trends report.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TrendsResponse {
+    /// Monthly points, chronological order.
+    pub trends: Vec<TrendPoint>,
+}

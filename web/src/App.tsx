@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
-import { Category, fetchCategories, fetchSummary, fetchTransactions, SummaryResponse, Transaction } from './api';
+import {
+  Category,
+  fetchBudgetSummary,
+  fetchCategories,
+  fetchSummary,
+  fetchTransactions,
+  SummaryResponse,
+  Transaction,
+} from './api';
 import { TransactionForm } from './components/TransactionForm';
 import { CategoryManager } from './components/CategoryManager';
 import { TransactionTable } from './components/TransactionTable';
+import { BudgetManager } from './components/BudgetManager';
+import { ReportsDashboard } from './components/ReportsDashboard';
 
-type Tab = 'dashboard' | 'transactions' | 'categories';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -15,6 +25,7 @@ export default function App() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [budgetAlert, setBudgetAlert] = useState<string | null>(null);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -57,9 +68,29 @@ export default function App() {
     }
   }, [loadCategories, loadTransactions]);
 
+  // Check for budget alerts on dashboard load
+  const checkBudgetAlerts = useCallback(async () => {
+    try {
+      const now = new Date();
+      const { items } = await fetchBudgetSummary(now.getFullYear(), now.getMonth() + 1);
+      const over = items.find((i) => parseFloat(i.percentage) >= 80);
+      if (over) {
+        const pct = Math.round(parseFloat(over.percentage));
+        setBudgetAlert(
+          `⚠️ You've spent ${pct}% of your ${over.budget.category_name} budget this month`
+        );
+      } else {
+        setBudgetAlert(null);
+      }
+    } catch {
+      // Budget alerts are non-critical; ignore errors
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    checkBudgetAlerts();
+  }, [loadData, checkBudgetAlerts]);
 
   const handleTransactionCreated = async () => {
     setShowForm(false);
@@ -98,6 +129,18 @@ export default function App() {
               Transactions
             </button>
             <button
+              style={{ ...styles.navButton, ...(tab === 'budgets' ? styles.navButtonActive : {}) }}
+              onClick={() => setTab('budgets')}
+            >
+              Budgets
+            </button>
+            <button
+              style={{ ...styles.navButton, ...(tab === 'reports' ? styles.navButtonActive : {}) }}
+              onClick={() => setTab('reports')}
+            >
+              Reports
+            </button>
+            <button
               style={{ ...styles.navButton, ...(tab === 'categories' ? styles.navButtonActive : {}) }}
               onClick={() => setTab('categories')}
             >
@@ -112,6 +155,13 @@ export default function App() {
           <div style={styles.errorBanner}>
             <p>{error}</p>
             <button onClick={loadData} style={styles.retryButton}>Retry</button>
+          </div>
+        )}
+
+        {budgetAlert && (
+          <div style={styles.budgetAlertBanner}>
+            <p style={styles.budgetAlertText}>{budgetAlert}</p>
+            <button style={styles.budgetAlertDismiss} onClick={() => setBudgetAlert(null)}>✕</button>
           </div>
         )}
 
@@ -194,6 +244,10 @@ export default function App() {
               )}
             </div>
           </div>
+        ) : tab === 'budgets' ? (
+          <BudgetManager categories={categories} formatMoney={formatMoney} />
+        ) : tab === 'reports' ? (
+          <ReportsDashboard formatMoney={formatMoney} />
         ) : tab === 'transactions' ? (
           <div>
             <div style={styles.pageHeader}>
@@ -242,7 +296,7 @@ export default function App() {
       </main>
 
       <footer style={styles.footer}>
-        <p>PudimFinance • Layer 1: Simple Transaction Tracker</p>
+        <p>PudimFinance • Layer 2: Budgets, Reports & Insights</p>
       </footer>
     </div>
   );
@@ -310,6 +364,29 @@ const styles: Record<string, CSSProperties> = {
     color: '#64748b',
     fontSize: '0.875rem',
     borderTop: '1px solid #1e293b',
+  },
+  budgetAlertBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#451a03',
+    border: '1px solid #b45309',
+    color: '#fbbf24',
+    padding: '0.75rem 1rem',
+    borderRadius: '0.5rem',
+    marginBottom: '1.5rem',
+  },
+  budgetAlertText: {
+    margin: 0,
+    fontSize: '0.875rem',
+  },
+  budgetAlertDismiss: {
+    background: 'transparent',
+    border: 'none',
+    color: '#fbbf24',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    padding: '0 0.25rem',
   },
   errorBanner: {
     display: 'flex',

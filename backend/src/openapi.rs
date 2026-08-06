@@ -2,10 +2,15 @@ use utoipa::OpenApi;
 
 use crate::health;
 use crate::models::{
-    Category, CategorySummary, CreateCategoryRequest, CreateTransactionRequest, SummaryResponse,
-    Transaction, TransactionListParams, TransactionListResponse, UpdateTransactionRequest,
+    Budget, BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse, BudgetWithCategory,
+    Category, CategoryBreakdownItem, CategoryBreakdownResponse, CategorySummary,
+    CreateBudgetRequest, CreateCategoryRequest, CreateTransactionRequest, MonthlyReportItem,
+    MonthlyReportResponse, SummaryResponse, Transaction, TransactionListParams,
+    TransactionListResponse, TrendPoint, TrendsResponse, UpdateTransactionRequest,
 };
+use crate::routes::budgets;
 use crate::routes::categories::{self, CategoryListParams};
+use crate::routes::reports;
 use crate::routes::summary::{self, SummaryParams};
 use crate::routes::transactions;
 
@@ -26,6 +31,13 @@ use crate::routes::transactions;
         transactions::update_transaction,
         transactions::delete_transaction,
         summary::get_summary,
+        budgets::list_budgets,
+        budgets::create_budget,
+        budgets::budget_summary,
+        budgets::delete_budget,
+        reports::monthly_report,
+        reports::category_breakdown,
+        reports::trends,
     ),
     components(schemas(
         health::HealthResponse,
@@ -41,6 +53,18 @@ use crate::routes::transactions;
         SummaryResponse,
         CategorySummary,
         SummaryParams,
+        Budget,
+        CreateBudgetRequest,
+        BudgetListResponse,
+        BudgetWithCategory,
+        BudgetSummaryItem,
+        BudgetSummaryResponse,
+        MonthlyReportItem,
+        MonthlyReportResponse,
+        CategoryBreakdownItem,
+        CategoryBreakdownResponse,
+        TrendPoint,
+        TrendsResponse,
     )),
     info(
         title = "PudimFinance API",
@@ -56,6 +80,8 @@ use crate::routes::transactions;
         (name = "Categories", description = "Transaction category management"),
         (name = "Transactions", description = "Income and expense tracking"),
         (name = "Summary", description = "Monthly income/expense/balance summaries"),
+        (name = "Budgets", description = "Monthly budget limits and budget vs actual tracking"),
+        (name = "Reports", description = "Monthly reports, category breakdowns, and trends"),
     ),
     // Public API: no authentication required. Empty security requirement
     // documents that explicitly (satisfies OpenAPI `security-defined`).

@@ -9,6 +9,7 @@ mobile/node_modules/
 web/dist/
 mobile/.expo/
 mobile/dist/
+*.tsbuildinfo
 
 # Docker
 *.env
