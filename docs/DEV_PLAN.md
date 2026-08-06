@@ -133,13 +133,13 @@
 
 ### Deliverables
 
-- [ ] Migration 003 applies cleanly, existing data preserved
-- [ ] Double-entry transaction creation (debits = credits enforced)
-- [ ] Idempotency key enforcement (ADR 002 design)
-- [ ] RabbitMQ event publishing for new transactions
-- [ ] Reconciliation process functional
-- [ ] Event sourcing: `TransactionRecorded` events, state reconstructed from events
-- [ ] ADRs: `005-ledger-design-and-event-sourcing.md`, `006-isolation-level-choice.md`, `007-event-publishing-via-rabbitmq.md`, `008-reconciliation-design.md`
+- [x] Migration 003 applies cleanly, existing data preserved
+- [x] Double-entry transaction creation (debits = credits enforced)
+- [x] Idempotency key enforcement (ADR 002 design)
+- [x] RabbitMQ event publishing for new transactions
+- [x] Reconciliation process functional
+- [x] Event sourcing: `TransactionRecorded` events, state reconstructed from events
+- [x] ADRs: `005-ledger-design-and-event-sourcing.md`, `006-isolation-level-choice.md`, `007-event-publishing-via-rabbitmq.md`, `008-reconciliation-design.md`
 
 ---
 
@@ -229,8 +229,8 @@ This layer consolidates the original Phases 3-8. Every feature from the original
 - [x] ADR 003: start-simple-single-entry
 - [x] Layer 2: budgets, monthly reports, charts on web and mobile
 - [x] ADR 004: budget-system-design
-- [ ] Layer 3: double-entry ledger, event sourcing, RabbitMQ, reconciliation
-- [ ] ADRs 005-008: ledger, isolation, event publishing, reconciliation
+- [x] Layer 3: double-entry ledger, event sourcing, RabbitMQ, reconciliation
+- [x] ADRs 005-008: ledger, isolation, event publishing, reconciliation
 - [ ] Layer 4: observability deep-dive, security hardening, audit dashboard
 - [ ] Layer 4: DR, PITR, read replica experiments, chaos exercises, runbooks
 - [ ] Layer 4: receipt scanner and price tracking (full pipeline)

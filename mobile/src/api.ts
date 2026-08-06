@@ -22,6 +22,16 @@ export type CategoryBreakdownItem = components['schemas']['CategoryBreakdownItem
 export type CategoryBreakdownResponse = components['schemas']['CategoryBreakdownResponse'];
 export type TrendPoint = components['schemas']['TrendPoint'];
 export type TrendsResponse = components['schemas']['TrendsResponse'];
+export type Account = components['schemas']['Account'];
+export type CreateLedgerTransactionRequest = components['schemas']['CreateLedgerTransactionRequest'];
+export type CreateLedgerTransactionResponse = components['schemas']['CreateLedgerTransactionResponse'];
+export type LedgerEntry = components['schemas']['LedgerEntry'];
+export type LedgerTransaction = components['schemas']['LedgerTransaction'];
+export type MigrationResponse = components['schemas']['MigrationResponse'];
+export type ReconciliationItem = components['schemas']['ReconciliationItem'];
+export type ReconciliationUploadRequest = components['schemas']['ReconciliationUploadRequest'];
+export type ReconciliationUploadResponse = components['schemas']['ReconciliationUploadResponse'];
+export type StatementLine = components['schemas']['StatementLine'];
 
 async function request<T>(path: string, options?: {
   method?: string;
@@ -190,4 +200,36 @@ export async function fetchTrends(months?: number): Promise<TrendsResponse> {
   if (months !== undefined) qs.set('months', String(months));
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<TrendsResponse>(`/api/reports/trends${query}`);
+}
+
+export async function fetchAccounts(): Promise<Account[]> {
+  return request<Account[]>('/api/ledger/accounts');
+}
+
+export async function createLedgerTransaction(
+  payload: CreateLedgerTransactionRequest,
+): Promise<CreateLedgerTransactionResponse> {
+  return request<CreateLedgerTransactionResponse>('/api/ledger/transactions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchLedgerTransactions(): Promise<LedgerTransaction[]> {
+  return request<LedgerTransaction[]>('/api/ledger/transactions');
+}
+
+export async function migrateSingleToDouble(): Promise<MigrationResponse> {
+  return request<MigrationResponse>('/api/migrate/single-to-double', {
+    method: 'POST',
+  });
+}
+
+export async function uploadReconciliation(
+  payload: ReconciliationUploadRequest,
+): Promise<ReconciliationUploadResponse> {
+  return request<ReconciliationUploadResponse>('/api/reconciliation', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

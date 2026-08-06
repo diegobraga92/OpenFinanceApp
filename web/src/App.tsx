@@ -12,9 +12,10 @@ import { TransactionForm } from './components/TransactionForm';
 import { CategoryManager } from './components/CategoryManager';
 import { TransactionTable } from './components/TransactionTable';
 import { BudgetManager } from './components/BudgetManager';
+import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -141,6 +142,12 @@ export default function App() {
               Reports
             </button>
             <button
+              style={{ ...styles.navButton, ...(tab === 'reconciliation' ? styles.navButtonActive : {}) }}
+              onClick={() => setTab('reconciliation')}
+            >
+              Reconciliation
+            </button>
+            <button
               style={{ ...styles.navButton, ...(tab === 'categories' ? styles.navButtonActive : {}) }}
               onClick={() => setTab('categories')}
             >
@@ -248,6 +255,8 @@ export default function App() {
           <BudgetManager categories={categories} formatMoney={formatMoney} />
         ) : tab === 'reports' ? (
           <ReportsDashboard formatMoney={formatMoney} />
+        ) : tab === 'reconciliation' ? (
+          <ReconciliationUpload formatMoney={formatMoney} />
         ) : tab === 'transactions' ? (
           <div>
             <div style={styles.pageHeader}>

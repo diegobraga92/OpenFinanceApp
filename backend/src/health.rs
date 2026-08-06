@@ -47,6 +47,7 @@ pub async fn health_handler(
     axum::extract::State(state): axum::extract::State<AppState>,
 ) -> Result<Json<HealthResponse>, (axum::http::StatusCode, Json<HealthError>)> {
     let db_healthy = db::check_db_health(&state.pg_pool).await;
+    let rabbitmq_healthy = state.event_publisher.is_healthy().await;
 
     if !db_healthy {
         info!("Health check failed: database unreachable");
@@ -55,16 +56,25 @@ pub async fn health_handler(
             Json(HealthError {
                 status: "unhealthy".into(),
                 database: "disconnected".into(),
-                rabbitmq: "unknown".into(),
+                rabbitmq: if rabbitmq_healthy {
+                    "connected".into()
+                } else {
+                    "unavailable".into()
+                },
                 details: "PostgreSQL connection failed".into(),
             }),
         ));
     }
 
+    // RabbitMQ is optional — report its state without failing the health check.
     Ok(Json(HealthResponse {
         status: "ok".into(),
         database: "connected".into(),
-        rabbitmq: "disabled".into(), // Phase 1 will enable full RabbitMQ health checks
+        rabbitmq: if rabbitmq_healthy {
+            "connected".into()
+        } else {
+            "connecting".into()
+        },
         version: env!("CARGO_PKG_VERSION").into(),
     }))
 }

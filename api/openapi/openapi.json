@@ -250,6 +250,134 @@
         }
       }
     },
+    "/api/ledger/accounts": {
+      "get": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Lists all accounts in the chart of accounts.",
+        "operationId": "list_accounts",
+        "responses": {
+          "200": {
+            "description": "List of accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Account"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ledger/transactions": {
+      "get": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Lists ledger transactions (grouped by transaction_id) with their entries.",
+        "operationId": "list_ledger_transactions",
+        "responses": {
+          "200": {
+            "description": "List of ledger transactions"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Creates a new double-entry ledger transaction.",
+        "operationId": "create_ledger_transaction",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLedgerTransactionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Ledger transaction created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateLedgerTransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ledger transaction payload"
+          },
+          "409": {
+            "description": "Idempotency key already used"
+          }
+        }
+      }
+    },
+    "/api/migrate/single-to-double": {
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Migrates all simple transactions to double-entry ledger pairs.",
+        "operationId": "migrate_single_to_double",
+        "responses": {
+          "200": {
+            "description": "Migration completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reconciliation": {
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Reconciles uploaded statement lines against existing transactions.",
+        "operationId": "reconcile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconciliationUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload"
+          }
+        }
+      }
+    },
     "/api/reports/category-breakdown": {
       "get": {
         "tags": [
@@ -723,6 +851,44 @@
   },
   "components": {
     "schemas": {
+      "Account": {
+        "type": "object",
+        "description": "A chart-of-accounts account.",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Row creation timestamp."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique account identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "Account display name (e.g., \"Cash\")."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Optional parent account."
+          },
+          "type": {
+            "type": "string",
+            "description": "`asset`, `liability`, `equity`, `income`, or `expense`."
+          }
+        }
+      },
       "Budget": {
         "type": "object",
         "description": "A monthly budget limit for a category.",
@@ -1191,6 +1357,61 @@
           }
         }
       },
+      "CreateLedgerTransactionRequest": {
+        "type": "object",
+        "description": "Payload for creating a ledger transaction (double-entry).",
+        "required": [
+          "description",
+          "date",
+          "entries"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Calendar date of the transaction.",
+            "example": "2026-08-06"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description (e.g., \"Groceries at Supermarket X\")."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryRequest"
+            },
+            "description": "At least two entries; debits must equal credits."
+          },
+          "idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional idempotency key (unique per client request)."
+          }
+        }
+      },
+      "CreateLedgerTransactionResponse": {
+        "type": "object",
+        "description": "Response for creating a ledger transaction.",
+        "required": [
+          "transaction",
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status to return (201 or 200 for idempotent replay).",
+            "minimum": 0
+          },
+          "transaction": {
+            "$ref": "#/components/schemas/LedgerTransaction",
+            "description": "The created ledger transaction."
+          }
+        }
+      },
       "CreateTransactionRequest": {
         "type": "object",
         "description": "Payload for creating a new transaction.",
@@ -1294,6 +1515,166 @@
           }
         }
       },
+      "LedgerEntry": {
+        "type": "object",
+        "description": "A single ledger entry.",
+        "required": [
+          "id",
+          "transaction_id",
+          "account_id",
+          "debit_amount",
+          "credit_amount",
+          "recorded_at"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Account ID this entry posts to."
+          },
+          "account_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Account display name (nullable, populated on list queries)."
+          },
+          "credit_amount": {
+            "type": "string",
+            "description": "Credit amount (always >= 0)."
+          },
+          "debit_amount": {
+            "type": "string",
+            "description": "Debit amount (always >= 0)."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional description."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique entry identifier."
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Recorded timestamp."
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Transaction ID this entry belongs to."
+          }
+        }
+      },
+      "LedgerEntryRequest": {
+        "type": "object",
+        "description": "A single debit/credit entry in a ledger transaction.",
+        "required": [
+          "account_id",
+          "debit_amount",
+          "credit_amount"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Account this entry posts to."
+          },
+          "credit_amount": {
+            "type": "string",
+            "description": "Credit amount (positive; must be zero on debit entries).",
+            "example": "0.00"
+          },
+          "debit_amount": {
+            "type": "string",
+            "description": "Debit amount (positive; must be zero on credit entries).",
+            "example": "150.00"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional per-entry description."
+          }
+        }
+      },
+      "LedgerTransaction": {
+        "type": "object",
+        "description": "A full ledger transaction with its entries.",
+        "required": [
+          "transaction_id",
+          "description",
+          "date",
+          "entries",
+          "recorded_at"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Calendar date."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntry"
+            },
+            "description": "All ledger entries (must balance: debits = credits)."
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Recorded timestamp."
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique transaction ID linking all entries."
+          }
+        }
+      },
+      "MigrationResponse": {
+        "type": "object",
+        "description": "Response for the migration endpoint.",
+        "required": [
+          "total_processed",
+          "migrated",
+          "already_migrated",
+          "failed"
+        ],
+        "properties": {
+          "already_migrated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number already migrated (skipped)."
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number that failed during migration."
+          },
+          "migrated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number successfully migrated to double-entry."
+          },
+          "total_processed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of simple transactions examined."
+          }
+        }
+      },
       "MonthlyReportItem": {
         "type": "object",
         "description": "A single month's income/expense totals for the monthly report.",
@@ -1342,6 +1723,147 @@
               "$ref": "#/components/schemas/MonthlyReportItem"
             },
             "description": "One entry per month in the requested range (chronological order)."
+          }
+        }
+      },
+      "ReconciliationItem": {
+        "type": "object",
+        "description": "A reconciliation item result (matched or unmatched).",
+        "required": [
+          "id",
+          "reconciliation_id",
+          "statement_date",
+          "statement_description",
+          "statement_amount",
+          "match_status"
+        ],
+        "properties": {
+          "confidence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Match confidence (0-100)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique item identifier."
+          },
+          "match_status": {
+            "type": "string",
+            "description": "`matched` or `unmatched`."
+          },
+          "matched_transaction_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Transaction ID if matched, otherwise NULL."
+          },
+          "reconciliation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Reconciliation ID this item belongs to."
+          },
+          "statement_amount": {
+            "type": "string",
+            "description": "Signed statement amount."
+          },
+          "statement_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Statement date."
+          },
+          "statement_description": {
+            "type": "string",
+            "description": "Statement description."
+          }
+        }
+      },
+      "ReconciliationUploadRequest": {
+        "type": "object",
+        "description": "Payload containing all CSV statement lines for reconciliation.",
+        "required": [
+          "statement_name",
+          "lines"
+        ],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatementLine"
+            },
+            "description": "Statement lines parsed from the uploaded CSV."
+          },
+          "statement_name": {
+            "type": "string",
+            "description": "Name to identify this statement/reconciliation."
+          }
+        }
+      },
+      "ReconciliationUploadResponse": {
+        "type": "object",
+        "description": "Response from a reconciliation upload.",
+        "required": [
+          "reconciliation_id",
+          "total_rows",
+          "matched_rows",
+          "unmatched_rows",
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationItem"
+            },
+            "description": "Per-row match results."
+          },
+          "matched_rows": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Rows matched to existing transactions."
+          },
+          "reconciliation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The reconciliation summary."
+          },
+          "total_rows": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total statement rows processed."
+          },
+          "unmatched_rows": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Rows that don't match any existing transaction."
+          }
+        }
+      },
+      "StatementLine": {
+        "type": "object",
+        "description": "A single line item from an uploaded bank statement.",
+        "required": [
+          "date",
+          "description",
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "string",
+            "description": "Signed amount (negative for expense/debit, positive for income/credit)."
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Transaction date (ISO `YYYY-MM-DD`)."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description from the bank statement."
           }
         }
       },
@@ -1692,6 +2214,10 @@
     {
       "name": "Reports",
       "description": "Monthly reports, category breakdowns, and trends"
+    },
+    {
+      "name": "Ledger",
+      "description": "Double-entry ledger, event sourcing, and reconciliation"
     }
   ],
   "x-generator": "Auto-generated by backend/src/bin/gen-openapi.rs from utoipa annotations in backend/src/openapi.rs"

@@ -2,14 +2,18 @@ use utoipa::OpenApi;
 
 use crate::health;
 use crate::models::{
-    Budget, BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse, BudgetWithCategory,
-    Category, CategoryBreakdownItem, CategoryBreakdownResponse, CategorySummary,
-    CreateBudgetRequest, CreateCategoryRequest, CreateTransactionRequest, MonthlyReportItem,
-    MonthlyReportResponse, SummaryResponse, Transaction, TransactionListParams,
-    TransactionListResponse, TrendPoint, TrendsResponse, UpdateTransactionRequest,
+    Account, Budget, BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse,
+    BudgetWithCategory, Category, CategoryBreakdownItem, CategoryBreakdownResponse,
+    CategorySummary, CreateBudgetRequest, CreateCategoryRequest, CreateLedgerTransactionRequest,
+    CreateLedgerTransactionResponse, CreateTransactionRequest, LedgerEntry, LedgerEntryRequest,
+    LedgerTransaction, MigrationResponse, MonthlyReportItem, MonthlyReportResponse,
+    ReconciliationItem, ReconciliationUploadRequest, ReconciliationUploadResponse, StatementLine,
+    SummaryResponse, Transaction, TransactionListParams, TransactionListResponse, TrendPoint,
+    TrendsResponse, UpdateTransactionRequest,
 };
 use crate::routes::budgets;
 use crate::routes::categories::{self, CategoryListParams};
+use crate::routes::ledger;
 use crate::routes::reports;
 use crate::routes::summary::{self, SummaryParams};
 use crate::routes::transactions;
@@ -38,10 +42,26 @@ use crate::routes::transactions;
         reports::monthly_report,
         reports::category_breakdown,
         reports::trends,
+        ledger::create_ledger_transaction,
+        ledger::list_ledger_transactions,
+        ledger::list_accounts,
+        ledger::migrate_single_to_double,
+        ledger::reconcile,
     ),
     components(schemas(
         health::HealthResponse,
         health::HealthError,
+        Account,
+        CreateLedgerTransactionRequest,
+        CreateLedgerTransactionResponse,
+        LedgerEntry,
+        LedgerEntryRequest,
+        LedgerTransaction,
+        MigrationResponse,
+        ReconciliationItem,
+        ReconciliationUploadRequest,
+        ReconciliationUploadResponse,
+        StatementLine,
         Category,
         CreateCategoryRequest,
         CategoryListParams,
@@ -82,6 +102,7 @@ use crate::routes::transactions;
         (name = "Summary", description = "Monthly income/expense/balance summaries"),
         (name = "Budgets", description = "Monthly budget limits and budget vs actual tracking"),
         (name = "Reports", description = "Monthly reports, category breakdowns, and trends"),
+        (name = "Ledger", description = "Double-entry ledger, event sourcing, and reconciliation"),
     ),
     // Public API: no authentication required. Empty security requirement
     // documents that explicitly (satisfies OpenAPI `security-defined`).

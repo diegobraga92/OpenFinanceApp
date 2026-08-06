@@ -378,3 +378,174 @@ pub struct TrendsResponse {
     /// Monthly points, chronological order.
     pub trends: Vec<TrendPoint>,
 }
+
+// ---------------------------------------------------------------------------
+// Layer 3: Double-entry ledger
+// ---------------------------------------------------------------------------
+
+/// A chart-of-accounts account.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct Account {
+    /// Unique account identifier.
+    pub id: Uuid,
+    /// Account display name (e.g., "Cash").
+    pub name: String,
+    /// `asset`, `liability`, `equity`, `income`, or `expense`.
+    pub r#type: String,
+    /// Optional parent account.
+    pub parent_id: Option<Uuid>,
+    /// Row creation timestamp.
+    pub created_at: DateTime<Utc>,
+}
+
+/// Payload for creating a ledger transaction (double-entry).
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateLedgerTransactionRequest {
+    /// Human-readable description (e.g., "Groceries at Supermarket X").
+    pub description: String,
+    /// Calendar date of the transaction.
+    #[schema(value_type = String, format = Date, example = "2026-08-06")]
+    pub date: NaiveDate,
+    /// At least two entries; debits must equal credits.
+    pub entries: Vec<LedgerEntryRequest>,
+    /// Optional idempotency key (unique per client request).
+    pub idempotency_key: Option<String>,
+}
+
+/// A single debit/credit entry in a ledger transaction.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct LedgerEntryRequest {
+    /// Account this entry posts to.
+    pub account_id: Uuid,
+    /// Debit amount (positive; must be zero on credit entries).
+    #[schema(value_type = String, example = "150.00")]
+    pub debit_amount: Decimal,
+    /// Credit amount (positive; must be zero on debit entries).
+    #[schema(value_type = String, example = "0.00")]
+    pub credit_amount: Decimal,
+    /// Optional per-entry description.
+    pub description: Option<String>,
+}
+
+/// A full ledger transaction with its entries.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LedgerTransaction {
+    /// Unique transaction ID linking all entries.
+    pub transaction_id: Uuid,
+    /// Human-readable description.
+    pub description: String,
+    /// Calendar date.
+    pub date: NaiveDate,
+    /// All ledger entries (must balance: debits = credits).
+    pub entries: Vec<LedgerEntry>,
+    /// Recorded timestamp.
+    pub recorded_at: DateTime<Utc>,
+}
+
+/// A single ledger entry.
+#[derive(Debug, Clone, Serialize, FromRow, ToSchema)]
+pub struct LedgerEntry {
+    /// Unique entry identifier.
+    pub id: Uuid,
+    /// Transaction ID this entry belongs to.
+    pub transaction_id: Uuid,
+    /// Account ID this entry posts to.
+    pub account_id: Uuid,
+    /// Account display name (nullable, populated on list queries).
+    pub account_name: Option<String>,
+    /// Debit amount (always >= 0).
+    #[schema(value_type = String)]
+    pub debit_amount: Decimal,
+    /// Credit amount (always >= 0).
+    #[schema(value_type = String)]
+    pub credit_amount: Decimal,
+    /// Optional description.
+    pub description: Option<String>,
+    /// Recorded timestamp.
+    pub recorded_at: DateTime<Utc>,
+}
+
+/// Response for creating a ledger transaction.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CreateLedgerTransactionResponse {
+    /// The created ledger transaction.
+    pub transaction: LedgerTransaction,
+    /// HTTP status to return (201 or 200 for idempotent replay).
+    pub status: u16,
+}
+
+/// Response for the migration endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MigrationResponse {
+    /// Number of simple transactions examined.
+    pub total_processed: i64,
+    /// Number successfully migrated to double-entry.
+    pub migrated: i64,
+    /// Number already migrated (skipped).
+    pub already_migrated: i64,
+    /// Number that failed during migration.
+    pub failed: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Layer 3: Reconciliation
+// ---------------------------------------------------------------------------
+
+/// A single line item from an uploaded bank statement.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct StatementLine {
+    /// Transaction date (ISO `YYYY-MM-DD`).
+    #[schema(value_type = String, format = Date)]
+    pub date: NaiveDate,
+    /// Description from the bank statement.
+    pub description: String,
+    /// Signed amount (negative for expense/debit, positive for income/credit).
+    #[schema(value_type = String)]
+    pub amount: Decimal,
+}
+
+/// Payload containing all CSV statement lines for reconciliation.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ReconciliationUploadRequest {
+    /// Name to identify this statement/reconciliation.
+    pub statement_name: String,
+    /// Statement lines parsed from the uploaded CSV.
+    pub lines: Vec<StatementLine>,
+}
+
+/// A reconciliation item result (matched or unmatched).
+#[derive(Debug, Serialize, FromRow, ToSchema)]
+pub struct ReconciliationItem {
+    /// Unique item identifier.
+    pub id: Uuid,
+    /// Reconciliation ID this item belongs to.
+    pub reconciliation_id: Uuid,
+    /// Statement date.
+    pub statement_date: NaiveDate,
+    /// Statement description.
+    pub statement_description: String,
+    /// Signed statement amount.
+    #[schema(value_type = String)]
+    pub statement_amount: Decimal,
+    /// `matched` or `unmatched`.
+    pub match_status: String,
+    /// Transaction ID if matched, otherwise NULL.
+    pub matched_transaction_id: Option<Uuid>,
+    /// Match confidence (0-100).
+    pub confidence: Option<Decimal>,
+}
+
+/// Response from a reconciliation upload.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReconciliationUploadResponse {
+    /// The reconciliation summary.
+    pub reconciliation_id: Uuid,
+    /// Total statement rows processed.
+    pub total_rows: i64,
+    /// Rows matched to existing transactions.
+    pub matched_rows: i64,
+    /// Rows that don't match any existing transaction.
+    pub unmatched_rows: i64,
+    /// Per-row match results.
+    pub items: Vec<ReconciliationItem>,
+}

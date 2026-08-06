@@ -18,6 +18,7 @@ import {
   BudgetSummaryResponse,
   Category,
   CategoryBreakdownResponse,
+  ReconciliationUploadResponse,
   Transaction,
   SummaryResponse,
   createBudget,
@@ -33,9 +34,10 @@ import {
   fetchTransactions,
   MonthlyReportResponse,
   updateTransaction,
+  uploadReconciliation,
 } from './src/api';
 
-type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'categories';
+type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -99,6 +101,13 @@ export default function App() {
   const [newCatType, setNewCatType] = useState<'income' | 'expense'>('expense');
   const [newCatIcon, setNewCatIcon] = useState('shopping-cart');
   const [newCatColor, setNewCatColor] = useState('#6366f1');
+
+  // Reconciliation states
+  const [reconStatementName, setReconStatementName] = useState('Bank Statement');
+  const [reconCsv, setReconCsv] = useState('');
+  const [reconResult, setReconResult] = useState<ReconciliationUploadResponse | null>(null);
+  const [reconLoading, setReconLoading] = useState(false);
+  const [reconError, setReconError] = useState<string | null>(null);
 
   // Toggle drawer
   useEffect(() => {
@@ -335,6 +344,48 @@ export default function App() {
         },
       },
     ]);
+  };
+
+  // Reconciliation helper
+  const handleReconSubmit = async () => {
+    setReconError(null);
+    setReconResult(null);
+    if (!reconCsv.trim()) {
+      setReconError('CSV data is required');
+      return;
+    }
+    setReconLoading(true);
+    try {
+      // Minimal client-side CSV parse
+      const rows = reconCsv
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !l.startsWith('#'))
+        .map((line) => {
+          const parts = line.split(',');
+          return {
+            date: (parts[0] || '').trim(),
+            description: (parts[1] || '').trim(),
+            amount: (parts[2] || '').trim(),
+          };
+        })
+        .filter((r) => r.date && r.description && r.amount);
+
+      if (rows.length === 0) {
+        setReconError('CSV is empty or malformed. Expected date,description,amount');
+        return;
+      }
+
+      const res = await uploadReconciliation({
+        statement_name: reconStatementName.trim() || 'Bank Statement',
+        lines: rows,
+      });
+      setReconResult(res);
+    } catch (err) {
+      setReconError(err instanceof Error ? err.message : 'Failed to upload reconciliation');
+    } finally {
+      setReconLoading(false);
+    }
   };
 
   // Category helpers
@@ -703,6 +754,107 @@ export default function App() {
     );
   };
 
+  const renderReconciliation = () => (
+    <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>Reconciliation</Text>
+      </View>
+
+      <View style={styles.formCard}>
+        <Text style={styles.formTitle}>Upload Bank Statement CSV</Text>
+        <Text style={styles.reconHint}>Format: date,description,amount</Text>
+
+        <Text style={styles.label}>Statement Name</Text>
+        <TextInput
+          style={styles.input}
+          value={reconStatementName}
+          onChangeText={setReconStatementName}
+          placeholder="e.g. Nubank August 2026"
+          placeholderTextColor="#64748b"
+        />
+
+        <Text style={styles.label}>CSV Data</Text>
+        <TextInput
+          style={styles.reconCsvInput}
+          value={reconCsv}
+          onChangeText={setReconCsv}
+          placeholder={"2026-08-01,Supermarket,150.00\n2026-08-02,Salary,2500.00"}
+          placeholderTextColor="#64748b"
+          multiline
+          numberOfLines={6}
+          autoCapitalize="none"
+        />
+
+        {reconError && (
+          <View style={styles.reconErrorBox}>
+            <Text style={styles.reconErrorText}>{reconError}</Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={[styles.submitButton, reconLoading && styles.submitButtonDisabled]}
+          onPress={handleReconSubmit}
+          disabled={reconLoading}
+        >
+          {reconLoading ? (
+            <ActivityIndicator color="#0f172a" />
+          ) : (
+            <Text style={styles.submitButtonText}>Upload & Reconcile</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {reconResult && (
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Results</Text>
+          <View style={styles.reconSummaryRow}>
+            <View style={styles.reconSummaryItem}>
+              <Text style={styles.reconSummaryLabel}>Total</Text>
+              <Text style={styles.reconSummaryValue}>{reconResult.total_rows}</Text>
+            </View>
+            <View style={styles.reconSummaryItem}>
+              <Text style={[styles.reconSummaryLabel, { color: '#22c55e' }]}>Matched</Text>
+              <Text style={[styles.reconSummaryValue, { color: '#22c55e' }]}>{reconResult.matched_rows}</Text>
+            </View>
+            <View style={styles.reconSummaryItem}>
+              <Text style={[styles.reconSummaryLabel, { color: '#ef4444' }]}>Unmatched</Text>
+              <Text style={[styles.reconSummaryValue, { color: '#ef4444' }]}>{reconResult.unmatched_rows}</Text>
+            </View>
+          </View>
+
+          {(reconResult.items ?? []).map((item) => (
+            <View key={item.id} style={styles.reconRow}>
+              <View style={styles.reconRowLeft}>
+                <Text style={styles.reconDate}>{item.statement_date}</Text>
+                <Text style={styles.reconDescription}>{item.statement_description}</Text>
+              </View>
+              <View style={styles.reconRowRight}>
+                <Text style={styles.reconAmount}>{formatMoney(item.statement_amount)}</Text>
+                <View
+                  style={[
+                    styles.reconStatusBadge,
+                    {
+                      backgroundColor: item.match_status === 'matched' ? '#14532d' : '#450a0a',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.reconStatusText,
+                      { color: item.match_status === 'matched' ? '#22c55e' : '#ef4444' },
+                    ]}
+                  >
+                    {item.match_status}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </ScrollView>
+  );
+
   const renderCategories = () => (
     <ScrollView style={styles.content}>
       <View style={styles.pageHeader}>
@@ -992,6 +1144,7 @@ export default function App() {
           {screen === 'budgets' && renderBudgets()}
           {screen === 'reports' && renderReports()}
           {screen === 'categories' && renderCategories()}
+          {screen === 'reconciliation' && renderReconciliation()}
           {showAddForm && renderAddForm()}
 
           {screen !== 'transactions' && !showAddForm && (
@@ -1218,6 +1371,14 @@ export default function App() {
             >
               <Text style={[styles.drawerItemText, screen === 'reports' && styles.drawerItemTextActive]}>
                 📈 Reports
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.drawerItem, screen === 'reconciliation' && styles.drawerItemActive]}
+              onPress={() => navigate('reconciliation')}
+            >
+              <Text style={[styles.drawerItemText, screen === 'reconciliation' && styles.drawerItemTextActive]}>
+                🔄 Reconciliation
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1843,6 +2004,95 @@ const styles = StyleSheet.create({
   readOnlyText: {
     color: '#e2e8f0',
     fontSize: 16,
+  },
+  reconHint: {
+    color: '#64748b',
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  reconCsvInput: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 8,
+    padding: 12,
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontFamily: 'monospace',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  reconErrorBox: {
+    backgroundColor: '#450a0a',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 12,
+  },
+  reconErrorText: {
+    color: '#fca5a5',
+    fontSize: 13,
+  },
+  reconSummaryRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  reconSummaryItem: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+  },
+  reconSummaryLabel: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  reconSummaryValue: {
+    color: '#e2e8f0',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  reconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+    gap: 8,
+  },
+  reconRowLeft: {
+    flex: 1,
+  },
+  reconDate: {
+    color: '#64748b',
+    fontSize: 11,
+  },
+  reconDescription: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  reconRowRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  reconAmount: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  reconStatusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  reconStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   modalOverlay: {
     flex: 1,

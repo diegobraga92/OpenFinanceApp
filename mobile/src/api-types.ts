@@ -81,6 +81,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ledger/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists all accounts in the chart of accounts. */
+        get: operations["list_accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ledger/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists ledger transactions (grouped by transaction_id) with their entries. */
+        get: operations["list_ledger_transactions"];
+        put?: never;
+        /** Creates a new double-entry ledger transaction. */
+        post: operations["create_ledger_transaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/migrate/single-to-double": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Migrates all simple transactions to double-entry ledger pairs. */
+        post: operations["migrate_single_to_double"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reconciles uploaded statement lines against existing transactions. */
+        post: operations["reconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports/category-breakdown": {
         parameters: {
             query?: never;
@@ -233,6 +302,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A chart-of-accounts account. */
+        Account: {
+            /**
+             * Format: date-time
+             * @description Row creation timestamp.
+             */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description Unique account identifier.
+             */
+            id: string;
+            /** @description Account display name (e.g., "Cash"). */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Optional parent account.
+             */
+            parent_id?: string | null;
+            /** @description `asset`, `liability`, `equity`, `income`, or `expense`. */
+            type: string;
+        };
         /** @description A monthly budget limit for a category. */
         Budget: {
             /** @description Maximum spend limit for the month. */
@@ -476,6 +567,31 @@ export interface components {
              */
             type: string;
         };
+        /** @description Payload for creating a ledger transaction (double-entry). */
+        CreateLedgerTransactionRequest: {
+            /**
+             * Format: date
+             * @description Calendar date of the transaction.
+             * @example 2026-08-06
+             */
+            date: string;
+            /** @description Human-readable description (e.g., "Groceries at Supermarket X"). */
+            description: string;
+            /** @description At least two entries; debits must equal credits. */
+            entries: components["schemas"]["LedgerEntryRequest"][];
+            /** @description Optional idempotency key (unique per client request). */
+            idempotency_key?: string | null;
+        };
+        /** @description Response for creating a ledger transaction. */
+        CreateLedgerTransactionResponse: {
+            /**
+             * Format: int32
+             * @description HTTP status to return (201 or 200 for idempotent replay).
+             */
+            status: number;
+            /** @description The created ledger transaction. */
+            transaction: components["schemas"]["LedgerTransaction"];
+        };
         /** @description Payload for creating a new transaction. */
         CreateTransactionRequest: {
             /**
@@ -526,6 +642,102 @@ export interface components {
             /** @description Backend crate version from `CARGO_PKG_VERSION`. */
             version: string;
         };
+        /** @description A single ledger entry. */
+        LedgerEntry: {
+            /**
+             * Format: uuid
+             * @description Account ID this entry posts to.
+             */
+            account_id: string;
+            /** @description Account display name (nullable, populated on list queries). */
+            account_name?: string | null;
+            /** @description Credit amount (always >= 0). */
+            credit_amount: string;
+            /** @description Debit amount (always >= 0). */
+            debit_amount: string;
+            /** @description Optional description. */
+            description?: string | null;
+            /**
+             * Format: uuid
+             * @description Unique entry identifier.
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description Recorded timestamp.
+             */
+            recorded_at: string;
+            /**
+             * Format: uuid
+             * @description Transaction ID this entry belongs to.
+             */
+            transaction_id: string;
+        };
+        /** @description A single debit/credit entry in a ledger transaction. */
+        LedgerEntryRequest: {
+            /**
+             * Format: uuid
+             * @description Account this entry posts to.
+             */
+            account_id: string;
+            /**
+             * @description Credit amount (positive; must be zero on debit entries).
+             * @example 0.00
+             */
+            credit_amount: string;
+            /**
+             * @description Debit amount (positive; must be zero on credit entries).
+             * @example 150.00
+             */
+            debit_amount: string;
+            /** @description Optional per-entry description. */
+            description?: string | null;
+        };
+        /** @description A full ledger transaction with its entries. */
+        LedgerTransaction: {
+            /**
+             * Format: date
+             * @description Calendar date.
+             */
+            date: string;
+            /** @description Human-readable description. */
+            description: string;
+            /** @description All ledger entries (must balance: debits = credits). */
+            entries: components["schemas"]["LedgerEntry"][];
+            /**
+             * Format: date-time
+             * @description Recorded timestamp.
+             */
+            recorded_at: string;
+            /**
+             * Format: uuid
+             * @description Unique transaction ID linking all entries.
+             */
+            transaction_id: string;
+        };
+        /** @description Response for the migration endpoint. */
+        MigrationResponse: {
+            /**
+             * Format: int64
+             * @description Number already migrated (skipped).
+             */
+            already_migrated: number;
+            /**
+             * Format: int64
+             * @description Number that failed during migration.
+             */
+            failed: number;
+            /**
+             * Format: int64
+             * @description Number successfully migrated to double-entry.
+             */
+            migrated: number;
+            /**
+             * Format: int64
+             * @description Number of simple transactions examined.
+             */
+            total_processed: number;
+        };
         /** @description A single month's income/expense totals for the monthly report. */
         MonthlyReportItem: {
             /** @description Balance = income − expense. */
@@ -549,6 +761,81 @@ export interface components {
         MonthlyReportResponse: {
             /** @description One entry per month in the requested range (chronological order). */
             months: components["schemas"]["MonthlyReportItem"][];
+        };
+        /** @description A reconciliation item result (matched or unmatched). */
+        ReconciliationItem: {
+            /** @description Match confidence (0-100). */
+            confidence?: string | null;
+            /**
+             * Format: uuid
+             * @description Unique item identifier.
+             */
+            id: string;
+            /** @description `matched` or `unmatched`. */
+            match_status: string;
+            /**
+             * Format: uuid
+             * @description Transaction ID if matched, otherwise NULL.
+             */
+            matched_transaction_id?: string | null;
+            /**
+             * Format: uuid
+             * @description Reconciliation ID this item belongs to.
+             */
+            reconciliation_id: string;
+            /** @description Signed statement amount. */
+            statement_amount: string;
+            /**
+             * Format: date
+             * @description Statement date.
+             */
+            statement_date: string;
+            /** @description Statement description. */
+            statement_description: string;
+        };
+        /** @description Payload containing all CSV statement lines for reconciliation. */
+        ReconciliationUploadRequest: {
+            /** @description Statement lines parsed from the uploaded CSV. */
+            lines: components["schemas"]["StatementLine"][];
+            /** @description Name to identify this statement/reconciliation. */
+            statement_name: string;
+        };
+        /** @description Response from a reconciliation upload. */
+        ReconciliationUploadResponse: {
+            /** @description Per-row match results. */
+            items: components["schemas"]["ReconciliationItem"][];
+            /**
+             * Format: int64
+             * @description Rows matched to existing transactions.
+             */
+            matched_rows: number;
+            /**
+             * Format: uuid
+             * @description The reconciliation summary.
+             */
+            reconciliation_id: string;
+            /**
+             * Format: int64
+             * @description Total statement rows processed.
+             */
+            total_rows: number;
+            /**
+             * Format: int64
+             * @description Rows that don't match any existing transaction.
+             */
+            unmatched_rows: number;
+        };
+        /** @description A single line item from an uploaded bank statement. */
+        StatementLine: {
+            /** @description Signed amount (negative for expense/debit, positive for income/credit). */
+            amount: string;
+            /**
+             * Format: date
+             * @description Transaction date (ISO `YYYY-MM-DD`).
+             */
+            date: string;
+            /** @description Description from the bank statement. */
+            description: string;
         };
         /** @description Query parameters for the summary endpoint. */
         SummaryParams: {
@@ -920,6 +1207,133 @@ export interface operations {
                 };
             };
             /** @description Invalid category payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_accounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"][];
+                };
+            };
+        };
+    };
+    list_ledger_transactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of ledger transactions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_ledger_transaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLedgerTransactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Ledger transaction created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateLedgerTransactionResponse"];
+                };
+            };
+            /** @description Invalid ledger transaction payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Idempotency key already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    migrate_single_to_double: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Migration completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MigrationResponse"];
+                };
+            };
+        };
+    };
+    reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconciliationUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Reconciliation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationUploadResponse"];
+                };
+            };
+            /** @description Invalid upload */
             400: {
                 headers: {
                     [name: string]: unknown;

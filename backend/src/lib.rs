@@ -10,15 +10,19 @@
 pub mod config;
 /// PostgreSQL connection pool and migration helpers.
 pub mod db;
+/// RabbitMQ event publishing for the ledger.
+pub mod events;
 /// Health check endpoint and response types.
 pub mod health;
+/// Double-entry ledger logic (balance validation, account mapping).
+pub mod ledger;
 /// Prometheus metrics collection and serving.
 pub mod metrics;
-/// Data models for the Layer 1 transaction tracker.
+/// Data models across all layers.
 pub mod models;
 /// OpenAPI 3.1 spec generation via utoipa.
 pub mod openapi;
-/// HTTP route handlers for categories, transactions, and summary.
+/// HTTP route handlers for categories, transactions, summary, budgets, reports, and ledger.
 pub mod routes;
 /// Shared application state for axum handlers.
 pub mod state;

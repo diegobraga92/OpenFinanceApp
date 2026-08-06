@@ -4,6 +4,7 @@
 
 pub mod budgets;
 pub mod categories;
+pub mod ledger;
 pub mod reports;
 pub mod summary;
 pub mod transactions;
@@ -20,4 +21,5 @@ pub fn api_router() -> Router<AppState> {
         .merge(summary::router())
         .merge(budgets::router())
         .merge(reports::router())
+        .merge(ledger::router())
 }

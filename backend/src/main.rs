@@ -5,7 +5,9 @@
 
 mod config;
 mod db;
+mod events;
 mod health;
+mod ledger;
 mod metrics;
 mod models;
 mod openapi;
@@ -55,8 +57,14 @@ async fn main() -> anyhow::Result<()> {
     )
     .await;
 
+    // Initialize RabbitMQ event publisher (non-blocking recovery)
+    let event_publisher = events::EventPublisher::new(&config.rabbitmq_url);
+
     // Build shared application state
-    let app_state = AppState { pg_pool };
+    let app_state = AppState {
+        pg_pool,
+        event_publisher,
+    };
 
     // Build main application router
     let app = Router::new()
