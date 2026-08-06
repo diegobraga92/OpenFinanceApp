@@ -1989,6 +1989,28 @@
           }
         }
       },
+      "PriceHistoryParams": {
+        "type": "object",
+        "description": "Query params for price history.",
+        "required": [
+          "product_id"
+        ],
+        "properties": {
+          "months": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Months of history (default 6)."
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Normalized product ID."
+          }
+        }
+      },
       "ReceiptItemInput": {
         "type": "object",
         "description": "Line item for saving a receipt.",

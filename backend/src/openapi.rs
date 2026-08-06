@@ -16,7 +16,10 @@ use crate::routes::auth::{self, LoginRequest, RefreshRequest, RegisterRequest};
 use crate::routes::budgets;
 use crate::routes::categories::{self, CategoryListParams};
 use crate::routes::ledger;
-use crate::routes::receipts;
+use crate::routes::receipts::{
+    self, MergeProductsRequest, PriceHistoryParams, ReceiptItemInput, SaveReceiptRequest,
+    ScanRequest,
+};
 use crate::routes::reports;
 use crate::routes::summary::{self, SummaryParams};
 use crate::routes::transactions;
@@ -67,6 +70,11 @@ use crate::routes::transactions;
         RegisterRequest,
         LoginRequest,
         RefreshRequest,
+        ScanRequest,
+        SaveReceiptRequest,
+        ReceiptItemInput,
+        MergeProductsRequest,
+        PriceHistoryParams,
         Account,
         CreateLedgerTransactionRequest,
         CreateLedgerTransactionResponse,

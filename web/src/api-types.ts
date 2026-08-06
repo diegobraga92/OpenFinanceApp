@@ -218,6 +218,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists saved receipts (paginated). */
+        get: operations["list_receipts"];
+        put?: never;
+        /** Saves a reviewed receipt (and upserts its store), creating normalized products. */
+        post: operations["save_receipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/receipts/price-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns price history for a normalized product. */
+        get: operations["price_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/receipts/product/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merges two normalized products (all items reassigned to target; source deleted). */
+        post: operations["merge_products"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/receipts/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scans a raw NFC-e QR code and returns the parsed receipt preview. */
+        post: operations["scan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reconciliation": {
         parameters: {
             query?: never;
@@ -807,6 +876,19 @@ export interface components {
             /** @description Plaintext password. */
             password: string;
         };
+        /** @description Request: merge two normalized products. */
+        MergeProductsRequest: {
+            /**
+             * Format: uuid
+             * @description Product to merge into target (will be deleted).
+             */
+            source_id: string;
+            /**
+             * Format: uuid
+             * @description Product to keep.
+             */
+            target_id: string;
+        };
         /** @description Response for the migration endpoint. */
         MigrationResponse: {
             /**
@@ -853,6 +935,30 @@ export interface components {
         MonthlyReportResponse: {
             /** @description One entry per month in the requested range (chronological order). */
             months: components["schemas"]["MonthlyReportItem"][];
+        };
+        /** @description Query params for price history. */
+        PriceHistoryParams: {
+            /**
+             * Format: int32
+             * @description Months of history (default 6).
+             */
+            months?: number | null;
+            /**
+             * Format: uuid
+             * @description Normalized product ID.
+             */
+            product_id: string;
+        };
+        /** @description Line item for saving a receipt. */
+        ReceiptItemInput: {
+            /** @description Item description (also becomes a normalized product). */
+            description: string;
+            /** @description Quantity purchased (default 1). */
+            quantity?: string | null;
+            /** @description Total price for the line. */
+            total_price?: string | null;
+            /** @description Unit price. */
+            unit_price?: string | null;
         };
         /** @description A reconciliation item result (matched or unmatched). */
         ReconciliationItem: {
@@ -930,6 +1036,27 @@ export interface components {
             email: string;
             /** @description Plaintext password (hashed with Argon2id). */
             password: string;
+        };
+        /** @description Request: save a fully parsed/reviewed receipt. */
+        SaveReceiptRequest: {
+            /** @description Store CNPJ (optional). */
+            cnpj?: string | null;
+            /**
+             * Format: date
+             * @description Receipt date.
+             */
+            date: string;
+            /** @description Line items (at least one). */
+            items: components["schemas"]["ReceiptItemInput"][];
+            /** @description Store name (or from scan). */
+            store_name: string;
+            /** @description Total amount. */
+            total: string;
+        };
+        /** @description Request: scan a raw NFC-e QR code. */
+        ScanRequest: {
+            /** @description Raw QR code content (URL or `p=` payload). */
+            qr_data: string;
         };
         /** @description A single line item from an uploaded bank statement. */
         StatementLine: {
@@ -1558,6 +1685,129 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MigrationResponse"];
                 };
+            };
+        };
+    };
+    list_receipts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of receipts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    save_receipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description Receipt saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid receipt payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    price_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Price history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    merge_products: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeProductsRequest"];
+            };
+        };
+        responses: {
+            /** @description Products merged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid product IDs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Parsed receipt preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid QR data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

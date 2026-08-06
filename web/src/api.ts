@@ -36,6 +36,10 @@ export type StatementLine = components['schemas']['StatementLine'];
 export type RegisterRequest = components['schemas']['RegisterRequest'];
 export type LoginRequest = components['schemas']['LoginRequest'];
 export type RefreshRequest = components['schemas']['RefreshRequest'];
+export type ScanRequest = components['schemas']['ScanRequest'];
+export type SaveReceiptRequest = components['schemas']['SaveReceiptRequest'];
+export type ReceiptItemInput = components['schemas']['ReceiptItemInput'];
+export type MergeProductsRequest = components['schemas']['MergeProductsRequest'];
 
 interface RequestOptions {
   method?: string;
@@ -274,6 +278,39 @@ export async function refreshToken(payload: RefreshRequest): Promise<AuthRespons
 export async function fetchMe(token: string): Promise<{ id: string; email: string; role: string }> {
   return request<{ id: string; email: string; role: string }>('/api/auth/me', {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// --- Receipts ---
+
+export async function scanReceipt(qrData: string): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>('/api/receipts/scan', {
+    method: 'POST',
+    body: JSON.stringify({ qr_data: qrData } satisfies ScanRequest),
+  });
+}
+
+export async function saveReceipt(payload: SaveReceiptRequest): Promise<{ id: string; store_id: string }> {
+  return request<{ id: string; store_id: string }>('/api/receipts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchReceipts(page = 0, pageSize = 50): Promise<{ items: unknown[]; page: number; page_size: number }> {
+  const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  return request<{ items: unknown[]; page: number; page_size: number }>(`/api/receipts?${qs.toString()}`);
+}
+
+export async function fetchPriceHistory(productId: string, months = 6): Promise<{ product_id: string; points: unknown[] }> {
+  const qs = new URLSearchParams({ product_id: productId, months: String(months) });
+  return request<{ product_id: string; points: unknown[] }>(`/api/receipts/price-history?${qs.toString()}`);
+}
+
+export async function mergeProducts(payload: MergeProductsRequest): Promise<{ target_id: string; source_id: string; status: string }> {
+  return request<{ target_id: string; source_id: string; status: string }>('/api/receipts/product/merge', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 
