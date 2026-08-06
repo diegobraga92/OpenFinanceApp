@@ -33,6 +33,9 @@ export type ReconciliationItem = components['schemas']['ReconciliationItem'];
 export type ReconciliationUploadRequest = components['schemas']['ReconciliationUploadRequest'];
 export type ReconciliationUploadResponse = components['schemas']['ReconciliationUploadResponse'];
 export type StatementLine = components['schemas']['StatementLine'];
+export type RegisterRequest = components['schemas']['RegisterRequest'];
+export type LoginRequest = components['schemas']['LoginRequest'];
+export type RefreshRequest = components['schemas']['RefreshRequest'];
 
 interface RequestOptions {
   method?: string;
@@ -234,6 +237,43 @@ export async function uploadReconciliation(
   return request<ReconciliationUploadResponse>('/api/reconciliation', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+// --- Auth ---
+
+export interface AuthResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  user: { id: string; email: string; role: string };
+}
+
+export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function loginUser(payload: LoginRequest): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function refreshToken(payload: RefreshRequest): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchMe(token: string): Promise<{ id: string; email: string; role: string }> {
+  return request<{ id: string; email: string; role: string }>('/api/auth/me', {
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 

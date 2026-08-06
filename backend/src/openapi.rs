@@ -11,6 +11,7 @@ use crate::models::{
     SummaryResponse, Transaction, TransactionListParams, TransactionListResponse, TrendPoint,
     TrendsResponse, UpdateTransactionRequest,
 };
+use crate::routes::auth::{self, LoginRequest, RefreshRequest, RegisterRequest};
 use crate::routes::budgets;
 use crate::routes::categories::{self, CategoryListParams};
 use crate::routes::ledger;
@@ -47,10 +48,17 @@ use crate::routes::transactions;
         ledger::list_accounts,
         ledger::migrate_single_to_double,
         ledger::reconcile,
+        auth::register,
+        auth::login,
+        auth::refresh,
+        auth::me,
     ),
     components(schemas(
         health::HealthResponse,
         health::HealthError,
+        RegisterRequest,
+        LoginRequest,
+        RefreshRequest,
         Account,
         CreateLedgerTransactionRequest,
         CreateLedgerTransactionResponse,
@@ -103,6 +111,7 @@ use crate::routes::transactions;
         (name = "Budgets", description = "Monthly budget limits and budget vs actual tracking"),
         (name = "Reports", description = "Monthly reports, category breakdowns, and trends"),
         (name = "Ledger", description = "Double-entry ledger, event sourcing, and reconciliation"),
+        (name = "Auth", description = "User registration, login, token refresh, and profile"),
     ),
     // Public API: no authentication required. Empty security requirement
     // documents that explicitly (satisfies OpenAPI `security-defined`).

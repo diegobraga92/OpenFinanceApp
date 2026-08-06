@@ -3,6 +3,7 @@
 //! Serves the REST API, Swagger UI, and health endpoints.
 //! Configuration is loaded from environment variables (see [`config::Config`]).
 
+mod auth;
 mod config;
 mod db;
 mod events;
@@ -64,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
     let app_state = AppState {
         pg_pool,
         event_publisher,
+        jwt_secret: config.jwt_secret.clone(),
     };
 
     // Build main application router

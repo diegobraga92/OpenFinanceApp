@@ -13,9 +13,10 @@ pub struct Config {
     pub database_pool_max_connections: u32,
     /// Number of seconds to wait when acquiring a connection before timing out (defaults to 10).
     pub database_pool_acquire_timeout_secs: u64,
-    /// RabbitMQ connection URL. Not yet consumed by application code.
-    #[allow(dead_code)]
+    /// RabbitMQ connection URL (AMQP).
     pub rabbitmq_url: String,
+    /// Secret used to sign JWTs.
+    pub jwt_secret: String,
     /// OpenTelemetry OTLP endpoint for exporting traces (defaults to `http://localhost:4317`).
     pub otel_endpoint: String,
 }
@@ -43,6 +44,8 @@ impl Config {
                 .unwrap_or(10),
             rabbitmq_url: env::var("RABBITMQ_URL")
                 .unwrap_or_else(|_| "amqp://pudim:pudim@localhost:5672".into()),
+            jwt_secret: env::var("JWT_SECRET")
+                .unwrap_or_else(|_| "dev-secret-change-me-in-production".into()),
             otel_endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
                 .unwrap_or_else(|_| "http://localhost:4317".into()),
         }

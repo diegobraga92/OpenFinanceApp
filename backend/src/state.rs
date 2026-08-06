@@ -9,4 +9,6 @@ pub struct AppState {
     pub pg_pool: PgPool,
     /// RabbitMQ event publisher for ledger events.
     pub event_publisher: EventPublisher,
+    /// JWT secret used to sign access/refresh tokens.
+    pub jwt_secret: String,
 }

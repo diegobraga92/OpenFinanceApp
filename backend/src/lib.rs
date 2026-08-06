@@ -6,6 +6,8 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 
+/// Authentication: JWT creation/verification, password hashing, and RBAC claims.
+pub mod auth;
 /// Environment-based application configuration.
 pub mod config;
 /// PostgreSQL connection pool and migration helpers.
