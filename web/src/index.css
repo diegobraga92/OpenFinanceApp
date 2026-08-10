@@ -139,6 +139,18 @@ section,
   border-radius: 0.75rem;
 }
 
+/* Toast entrance */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ---- Responsive header / navigation ---- */
 .nav-toggle {
   display: none;

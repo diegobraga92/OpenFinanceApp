@@ -9,6 +9,7 @@ import {
 } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
+import { useToast } from './Toast';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -37,6 +38,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
   const [form, setForm] = useState<FormState>({ category_id: '', amount_limit: '' });
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<BudgetSummaryItem | null>(null);
+  const { push: pushToast } = useToast();
 
   const expenseCategories = categories.filter((c) => c.type === 'expense');
 
@@ -103,6 +105,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
       });
       setShowForm(false);
       await loadData();
+      pushToast({ message: 'Budget saved' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save budget');
     } finally {
@@ -115,6 +118,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
       await deleteBudget(id);
       setPendingDelete(null);
       await loadData();
+      pushToast({ message: 'Budget deleted' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete budget');
     }

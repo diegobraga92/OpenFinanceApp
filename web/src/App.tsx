@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import {
   Category,
+  createTransaction,
   fetchBudgetSummary,
   fetchCategories,
   fetchSummary,
@@ -17,9 +18,21 @@ import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
 import { EmptyState } from './components/EmptyState';
+import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
 
 type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
+
+const TABS: Tab[] = [
+  'dashboard',
+  'transactions',
+  'budgets',
+  'reports',
+  'reconciliation',
+  'receipts',
+  'audit',
+  'categories',
+];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -33,6 +46,7 @@ export default function App() {
   const [budgetAlert, setBudgetAlert] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const { toggle: toggleTheme, mode: themeMode } = useTheme();
+  const { push: pushToast } = useToast();
 
   const loadCategories = useCallback(async () => {
     try {
@@ -104,10 +118,46 @@ export default function App() {
     checkBudgetAlerts();
   }, [loadData, checkBudgetAlerts]);
 
+  // Restore tab from URL hash (supports refresh + shareable links).
+  useEffect(() => {
+    const fromHash = window.location.hash.replace(/^#/, '') as Tab;
+    if ((TABS as string[]).includes(fromHash)) setTab(fromHash);
+  }, []);
+
+  // Keep the URL hash in sync with the active tab.
+  useEffect(() => {
+    window.history.replaceState(null, '', `#${tab}`);
+  }, [tab]);
+
   const handleTransactionCreated = async () => {
     setShowForm(false);
     setEditingTransaction(null);
     await loadData();
+    pushToast({ message: 'Transaction saved' });
+  };
+
+  const handleTransactionDeleted = async (deleted: Transaction) => {
+    await loadData();
+    pushToast({
+      message: `Transaction "${deleted.description}" deleted`,
+      actionLabel: 'Undo',
+      onAction: async () => {
+        try {
+          await createTransaction({
+            description: deleted.description,
+            amount: deleted.amount,
+            type: deleted.type === 'income' ? 'income' : 'expense',
+            category_id: deleted.category_id || null,
+            date: deleted.date,
+            notes: deleted.notes || null,
+          });
+          pushToast({ message: 'Transaction restored' });
+          await loadData();
+        } catch (err) {
+          pushToast({ message: err instanceof Error ? err.message : 'Could not restore transaction' });
+        }
+      },
+    });
   };
 
   const handleCloseForm = () => {
@@ -283,7 +333,7 @@ export default function App() {
                     setEditingTransaction(t);
                     setShowForm(true);
                   }}
-                  onDelete={() => loadData()}
+                  onDelete={(t) => handleTransactionDeleted(t)}
                 />
               )}
             </div>
@@ -344,7 +394,7 @@ export default function App() {
                   setEditingTransaction(t);
                   setShowForm(true);
                 }}
-                onDelete={() => loadData()}
+                onDelete={(t) => handleTransactionDeleted(t)}
               />
             )}
           </div>

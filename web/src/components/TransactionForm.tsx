@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import type { Category, Transaction } from '../api';
 import { createTransaction, updateTransaction } from '../api';
 
@@ -20,6 +20,15 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
   const [notes, setNotes] = useState(editing?.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Close on Escape for keyboard users.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
 
   const filteredCategories = categories.filter((c) => c.type === type);
 
@@ -50,9 +59,15 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
   };
 
   return (
-    <div style={styles.overlay}>
-      <form style={styles.form} onSubmit={handleSubmit}>
-        <h3 style={styles.title}>
+    <div
+      style={styles.overlay}
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <form style={styles.form} onSubmit={handleSubmit} role="dialog" aria-modal="true" aria-labelledby="tx-form-title">
+        <h3 id="tx-form-title" style={styles.title}>
           {editing ? 'Edit Transaction' : 'Add Transaction'}
         </h3>
 

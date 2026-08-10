@@ -4,6 +4,7 @@ import {
   saveReceipt,
   fetchReceipts,
 } from '../api';
+import { useToast } from './Toast';
 
 interface Props {
   formatMoney: (value: string | number) => string;
@@ -16,6 +17,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
   const [loading, setLoading] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [gallery, setGallery] = useState<Record<string, string | number | null>[]>([]);
+  const { push: pushToast } = useToast();
 
   const loadGallery = async () => {
     try {
@@ -54,6 +56,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
       });
       setSavedId(res.id);
       await loadGallery();
+      pushToast({ message: 'Receipt saved' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save receipt');
     } finally {

@@ -4,6 +4,7 @@ import {
   ReconciliationUploadRequest,
   uploadReconciliation,
 } from '../api';
+import { useToast } from './Toast';
 
 interface Props {
   formatMoney: (value: string | number) => string;
@@ -21,6 +22,7 @@ export function ReconciliationUpload({ formatMoney }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ReconciliationUploadResponse | null>(null);
+  const { push: pushToast } = useToast();
 
   const parseCsv = (text: string): CsvRow[] => {
     const lines = text
@@ -75,6 +77,9 @@ export function ReconciliationUpload({ formatMoney }: Props) {
       setLoading(true);
       const res = await uploadReconciliation(payload);
       setResult(res);
+      pushToast({
+        message: `Reconciliation done: ${res.matched_rows} matched, ${res.unmatched_rows} unmatched`,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload reconciliation');
     } finally {

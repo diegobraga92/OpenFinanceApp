@@ -4,8 +4,10 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Dimensions,
   FlatList,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -37,6 +39,8 @@ import {
   uploadReconciliation,
 } from './src/api';
 import { colors } from './src/theme/tokens';
+import { DonutChart } from './src/components/DonutChart';
+import { TrendChart } from './src/components/TrendChart';
 
 type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
 
@@ -82,6 +86,7 @@ export default function App() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Budget states
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummaryResponse | null>(null);
@@ -185,6 +190,27 @@ export default function App() {
     if (screen === 'budgets') loadBudgets();
     if (screen === 'reports') loadReports();
   }, [screen, loadBudgets, loadReports]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+      if (screen === 'budgets') await loadBudgets();
+      if (screen === 'reports') await loadReports();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [screen, loadData, loadBudgets, loadReports]);
+
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={colors.textMuted}
+      colors={[colors.primary]}
+      progressBackgroundColor={colors.surface}
+    />
+  );
 
   const formatMoney = (value: string | number) => {
     const n = typeof value === 'string' ? parseFloat(value) : value;
@@ -453,7 +479,7 @@ export default function App() {
   };
 
   const renderDashboard = () => (
-    <ScrollView style={styles.content}>
+    <ScrollView style={styles.content} refreshControl={refreshControl}>
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Current Balance</Text>
         <Text style={[styles.balanceValue, { color: parseFloat(summary?.balance || '0') < 0 ? colors.danger : colors.primary }]}>
@@ -503,7 +529,22 @@ export default function App() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
         {transactions.length === 0 ? (
-          <Text style={styles.emptyText}>No transactions yet.</Text>
+          <View style={styles.dashboardEmpty}>
+            <Text style={styles.dashboardEmptyIcon}>💸</Text>
+            <Text style={styles.dashboardEmptyTitle}>No transactions yet</Text>
+            <Text style={styles.dashboardEmptyDesc}>
+              Add your first income or expense to start tracking your money.
+            </Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                resetForm();
+                setShowAddForm(true);
+              }}
+            >
+              <Text style={styles.addButtonText}>+ Add Transaction</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           transactions.slice(0, 5).map((t) => renderTransactionRow(t))
         )}
@@ -544,13 +585,14 @@ export default function App() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => renderTransactionRow(item)}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={refreshControl}
         />
       )}
     </View>
   );
 
   const renderBudgets = () => (
-    <ScrollView style={styles.content}>
+    <ScrollView style={styles.content} refreshControl={refreshControl}>
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Budgets</Text>
         <TouchableOpacity style={styles.addButton} onPress={openBudgetCreate}>
@@ -664,19 +706,30 @@ export default function App() {
     const totalIncome = (monthlyReport?.months ?? []).reduce((s, m) => s + parseFloat(m.income_total), 0);
     const totalExpense = (monthlyReport?.months ?? []).reduce((s, m) => s + parseFloat(m.expense_total), 0);
     const net = totalIncome - totalExpense;
+    const chartWidth = Dimensions.get('window').width - 64;
+
+    const donutData = (categoryBreakdown?.categories ?? [])
+      .slice(0, 6)
+      .map((c) => ({
+        label: c.category_name || 'Uncategorised',
+        value: parseFloat(c.total),
+        color: c.color || '#6366f1',
+      }));
+    const totalSpent = donutData.reduce((s, d) => s + d.value, 0);
+
+    const trendData = (monthlyReport?.months ?? []).map((m) => ({
+      label: `${SHORT_MONTHS[m.month - 1]}/${String(m.year).slice(2)}`,
+      income: parseFloat(m.income_total),
+      expense: parseFloat(m.expense_total),
+    }));
 
     const maxBreakdown = Math.max(
       1,
       ...(categoryBreakdown?.categories ?? []).slice(0, 8).map((c) => parseFloat(c.percentage)),
     );
 
-    const maxMonthly = Math.max(
-      1,
-      ...(monthlyReport?.months ?? []).map((m) => Math.max(parseFloat(m.income_total), parseFloat(m.expense_total))),
-    );
-
     return (
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} refreshControl={refreshControl}>
         <View style={styles.pageHeader}>
           <Text style={styles.pageTitle}>Reports</Text>
         </View>
@@ -701,6 +754,30 @@ export default function App() {
           {(categoryBreakdown?.categories ?? []).length === 0 ? (
             <Text style={styles.emptyText}>No expenses this month.</Text>
           ) : (
+            <>
+              <View style={styles.chartArea}>
+                <DonutChart
+                  data={donutData}
+                  centerValue={formatMoney(totalSpent)}
+                  centerLabel="Spent"
+                />
+              </View>
+              <View style={styles.donutLegend}>
+                {donutData.map((d) => (
+                  <View key={d.label} style={styles.legendRow}>
+                    <View style={[styles.legendSwatch, { backgroundColor: d.color }]} />
+                    <Text style={styles.legendLabel} numberOfLines={1}>
+                      {d.label}
+                    </Text>
+                    <Text style={styles.legendValue}>
+                      {totalSpent > 0 ? `${Math.round((d.value / totalSpent) * 100)}%` : '0%'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+          {(categoryBreakdown?.categories ?? []).length > 0 && (
             (categoryBreakdown?.categories ?? []).slice(0, 8).map((c) => (
               <View key={c.category_id || 'none'} style={styles.categoryRow}>
                 <View style={styles.categoryLabelRow}>
@@ -727,29 +804,30 @@ export default function App() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Monthly Income vs Expenses</Text>
-          {(monthlyReport?.months ?? []).map((m) => {
-            const income = parseFloat(m.income_total);
-            const expense = parseFloat(m.expense_total);
-            return (
-              <View key={`${m.year}-${m.month}`} style={styles.trendRow}>
-                <Text style={styles.trendLabel}>
-                  {SHORT_MONTHS[m.month - 1]} {String(m.year).slice(2)}
-                </Text>
-                <View style={styles.trendBars}>
-                  <View style={styles.trendBarTrack}>
-                    <View style={[styles.trendBarIncome, { width: `${(income / maxMonthly) * 50}%` }]} />
-                  </View>
-                  <View style={styles.trendBarTrack}>
-                    <View style={[styles.trendBarExpense, { width: `${(expense / maxMonthly) * 50}%` }]} />
-                  </View>
-                </View>
-                <View>
-                  <Text style={styles.trendIncomeText}>+{formatMoney(income)}</Text>
-                  <Text style={styles.trendExpenseText}>-{formatMoney(expense)}</Text>
-                </View>
+          {(monthlyReport?.months ?? []).length === 0 ? (
+            <Text style={styles.emptyText}>No monthly data yet.</Text>
+          ) : (
+            <>
+              <View style={styles.chartArea}>
+                <TrendChart data={trendData} width={chartWidth} formatValue={formatMoney} />
               </View>
-            );
-          })}
+              {(monthlyReport?.months ?? []).map((m) => {
+                const income = parseFloat(m.income_total);
+                const expense = parseFloat(m.expense_total);
+                return (
+                  <View key={`${m.year}-${m.month}`} style={styles.trendRow}>
+                    <Text style={styles.trendLabel}>
+                      {SHORT_MONTHS[m.month - 1]} {String(m.year).slice(2)}
+                    </Text>
+                    <View style={styles.trendValues}>
+                      <Text style={styles.trendIncomeText}>+{formatMoney(income)}</Text>
+                      <Text style={styles.trendExpenseText}>-{formatMoney(expense)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </>
+          )}
         </View>
       </ScrollView>
     );
@@ -1517,6 +1595,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  dashboardEmpty: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 6,
+  },
+  dashboardEmptyIcon: {
+    fontSize: 32,
+    marginBottom: 4,
+  },
+  dashboardEmptyTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  dashboardEmptyDesc: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 260,
+  },
   emptyCard: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -1967,25 +2066,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     width: 44,
   },
-  trendBars: {
+  trendValues: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
     flex: 1,
-    gap: 2,
-  },
-  trendBarTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.surfaceHover,
-    overflow: 'hidden',
-  },
-  trendBarIncome: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 3,
-  },
-  trendBarExpense: {
-    height: '100%',
-    backgroundColor: colors.danger,
-    borderRadius: 3,
   },
   trendIncomeText: {
     color: colors.primary,
@@ -1994,6 +2079,42 @@ const styles = StyleSheet.create({
   trendExpenseText: {
     color: colors.danger,
     fontSize: 11,
+  },
+  chartArea: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  donutLegend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.bg,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    minWidth: 0,
+  },
+  legendSwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    flexShrink: 1,
+    maxWidth: 140,
+  },
+  legendValue: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
   },
   readOnlyField: {
     backgroundColor: colors.bg,

@@ -8,7 +8,7 @@ interface Props {
   categories: Category[];
   formatMoney: (value: string) => string;
   onEdit: (transaction: Transaction) => void;
-  onDelete: () => void;
+  onDelete: (deleted: Transaction) => void;
 }
 
 export function TransactionTable({ transactions, categories, formatMoney, onEdit, onDelete }: Props) {
@@ -16,12 +16,12 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
   const [deleting, setDeleting] = useState(false);
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (deleted: Transaction) => {
     setDeleting(true);
     try {
-      await deleteTransaction(id);
+      await deleteTransaction(deleted.id);
       setPendingDelete(null);
-      onDelete();
+      onDelete(deleted);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Failed to delete');
     } finally {
@@ -86,7 +86,7 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
             : ''
         }
         confirmLabel={deleting ? 'Deleting…' : 'Delete'}
-        onConfirm={() => pendingDelete && handleDelete(pendingDelete.id)}
+        onConfirm={() => pendingDelete && handleDelete(pendingDelete)}
         onCancel={() => !deleting && setPendingDelete(null)}
       />
     </div>

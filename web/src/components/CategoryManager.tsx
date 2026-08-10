@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import type { Category } from '../api';
 import { createCategory } from '../api';
+import { useToast } from './Toast';
 
 interface Props {
   categories: Category[];
@@ -27,6 +28,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
   const [color, setColor] = useState('#6366f1');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { push: pushToast } = useToast();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -34,6 +36,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
     setError(null);
     try {
       await createCategory({ name, type, icon, color });
+      pushToast({ message: `Category "${name}" created` });
       setName('');
       setIcon(type === 'expense' ? 'shopping-cart' : 'briefcase');
       await onCategoriesChanged();
