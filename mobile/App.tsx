@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
@@ -42,6 +42,7 @@ import {
 import { colors } from './src/theme/tokens';
 import { DonutChart } from './src/components/DonutChart';
 import { TrendChart } from './src/components/TrendChart';
+import { EmptyState } from './src/components/EmptyState';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
@@ -72,6 +73,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const screenOpacity = useRef(new Animated.Value(1)).current;
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
@@ -90,6 +92,7 @@ export default function App() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Budget states
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummaryResponse | null>(null);
@@ -194,6 +197,16 @@ export default function App() {
     if (screen === 'reports') loadReports();
   }, [screen, loadBudgets, loadReports]);
 
+  // Fade screen content in on every navigation.
+  useEffect(() => {
+    screenOpacity.setValue(0);
+    Animated.timing(screenOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [screen, screenOpacity]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -238,6 +251,17 @@ export default function App() {
   const categoryById = new Map(categories.map((c) => [c.id, c]));
   const expenseCategories = categories.filter((c) => c.type === 'expense');
   const incomeCategories = categories.filter((c) => c.type === 'income');
+
+  // Local search over loaded transactions (description + category).
+  const filteredTransactions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return transactions;
+    return transactions.filter((t) => {
+      if (t.description.toLowerCase().includes(q)) return true;
+      const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
+      return (cat?.name.toLowerCase().includes(q) ?? false) || (cat?.icon?.toLowerCase().includes(q) ?? false);
+    });
+  }, [transactions, searchQuery, categoryById]);
 
   // Transaction form helpers
   const resetForm = () => {
@@ -480,7 +504,7 @@ export default function App() {
           </View>
         </View>
         <View>
-          <Text style={[styles.transactionAmount, { color: isIncome ? colors.primary : colors.danger }]}>
+          <Text style={[styles.transactionAmount, { color: isIncome ? colors.income : colors.expense }]}>
             {isIncome ? '+' : '-'}{formatMoney(t.amount)}
           </Text>
         </View>
@@ -499,20 +523,25 @@ export default function App() {
   const renderDashboard = () => (
     <ScrollView style={styles.content} refreshControl={refreshControl}>
       <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Current Balance</Text>
-        <Text style={[styles.balanceValue, { color: parseFloat(summary?.balance || '0') < 0 ? colors.danger : colors.primary }]}>
+        <View style={styles.balanceHeader}>
+          <Text style={styles.balanceLabel}>Current Balance</Text>
+          <Text style={styles.balanceMonth}>
+            {MONTHS[new Date().getMonth()]} {new Date().getFullYear()}
+          </Text>
+        </View>
+        <Text style={[styles.balanceValue, { color: parseFloat(summary?.balance || '0') < 0 ? colors.expense : colors.income }]}>
           {formatMoney(summary?.balance || '0')}
         </Text>
         <View style={styles.balanceRow}>
           <View style={styles.balanceItem}>
             <Text style={styles.balanceItemLabel}>Income</Text>
-            <Text style={[styles.balanceItemValue, { color: colors.primary }]}>
+            <Text style={[styles.balanceItemValue, { color: colors.income }]}>
               {formatMoney(summary?.income_total || '0')}
             </Text>
           </View>
           <View style={styles.balanceItem}>
             <Text style={styles.balanceItemLabel}>Expenses</Text>
-            <Text style={[styles.balanceItemValue, { color: colors.danger }]}>
+            <Text style={[styles.balanceItemValue, { color: colors.expense }]}>
               {formatMoney(summary?.expense_total || '0')}
             </Text>
           </View>
@@ -584,6 +613,18 @@ export default function App() {
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
+      <View style={styles.searchBox}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search transactions…"
+          placeholderTextColor={colors.textDim}
+          clearButtonMode="while-editing"
+          accessibilityLabel="Search transactions"
+        />
+      </View>
       {transactions.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No transactions yet.</Text>
@@ -597,13 +638,21 @@ export default function App() {
             <Text style={styles.addButtonText}>Add your first one</Text>
           </TouchableOpacity>
         </View>
+      ) : filteredTransactions.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No matches for "{searchQuery}".</Text>
+          <TouchableOpacity style={styles.addButton} onPress={() => setSearchQuery('')}>
+            <Text style={styles.addButtonText}>Clear search</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
-          data={transactions}
+          data={filteredTransactions}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => renderTransactionRow(item)}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshControl={refreshControl}
+          keyboardShouldPersistTaps="handled"
         />
       )}
     </View>
@@ -629,11 +678,19 @@ export default function App() {
       </View>
 
       {!budgetSummary ? (
-        <Text style={styles.emptyText}>Loading budgets…</Text>
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading budgets…</Text>
+        </View>
       ) : budgetSummary.items.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No budgets for {MONTHS[budgetMonth - 1]} {budgetYear}.</Text>
-          <Text style={styles.emptySubtext}>Tap "+ Add" to set your first spending limit.</Text>
+          <EmptyState
+            icon="🎯"
+            title={`No budgets for ${MONTHS[budgetMonth - 1]} ${budgetYear}`}
+            description="Set a spending limit per category to track how much you use each month."
+            actionLabel="+ Add Budget"
+            onAction={openBudgetCreate}
+          />
         </View>
       ) : (
         <>
@@ -644,7 +701,7 @@ export default function App() {
             </View>
             <View style={styles.overviewCard}>
               <Text style={styles.overviewLabel}>Spent</Text>
-              <Text style={[styles.overviewValue, { color: colors.danger }]}>
+              <Text style={[styles.overviewValue, { color: colors.expense }]}>
                 {formatMoney(budgetSummary.total_spent)}
               </Text>
             </View>
@@ -654,8 +711,8 @@ export default function App() {
                 styles.overviewValue,
                 {
                   color: parseFloat(budgetSummary.total_budgeted) - parseFloat(budgetSummary.total_spent) >= 0
-                    ? colors.primary
-                    : colors.danger,
+                    ? colors.income
+                    : colors.expense,
                 },
               ]}>
                 {formatMoney(parseFloat(budgetSummary.total_budgeted) - parseFloat(budgetSummary.total_spent))}
@@ -980,7 +1037,22 @@ export default function App() {
             <Text style={styles.categoryCardName}>{c.name}</Text>
           </View>
         ))}
-        {expenseCategories.length === 0 && <Text style={styles.emptyText}>No expense categories.</Text>}
+        {expenseCategories.length === 0 && (
+          <EmptyState
+            compact
+            icon="🛒"
+            title="No expense categories"
+            description="Create your first spending category to organize expenses."
+            actionLabel="+ New Category"
+            onAction={() => {
+              setNewCatName('');
+              setNewCatType('expense');
+              setNewCatIcon('shopping-cart');
+              setNewCatColor('#6366f1');
+              setShowCategoryForm(true);
+            }}
+          />
+        )}
       </View>
 
       <Text style={styles.groupTitle}>Income Categories</Text>
@@ -993,7 +1065,22 @@ export default function App() {
             <Text style={styles.categoryCardName}>{c.name}</Text>
           </View>
         ))}
-        {incomeCategories.length === 0 && <Text style={styles.emptyText}>No income categories.</Text>}
+        {incomeCategories.length === 0 && (
+          <EmptyState
+            compact
+            icon="💰"
+            title="No income categories"
+            description="Create one to track your earnings."
+            actionLabel="+ New Category"
+            onAction={() => {
+              setNewCatName('');
+              setNewCatType('income');
+              setNewCatIcon('briefcase');
+              setNewCatColor('#6366f1');
+              setShowCategoryForm(true);
+            }}
+          />
+        )}
       </View>
 
       <Modal
@@ -1283,7 +1370,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
       ) : (
-        <>
+        <Animated.View style={[styles.screenContainer, { opacity: screenOpacity }]}>
           {screen === 'dashboard' && renderDashboard()}
           {screen === 'transactions' && renderTransactions()}
           {screen === 'budgets' && renderBudgets()}
@@ -1465,7 +1552,7 @@ export default function App() {
               </View>
             </Modal>
           )}
-        </>
+        </Animated.View>
       )}
 
       {/* Drawer overlay */}
@@ -1581,6 +1668,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  loadingBox: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
   loadingText: {
     color: colors.textMuted,
     marginTop: 12,
@@ -1597,6 +1689,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
+  screenContainer: {
+    flex: 1,
+  },
   balanceCard: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -1608,6 +1703,17 @@ const styles = StyleSheet.create({
   balanceLabel: {
     color: colors.textMuted,
     fontSize: 14,
+    marginBottom: 4,
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  balanceMonth: {
+    color: colors.textDim,
+    fontSize: 12,
     marginBottom: 4,
   },
   balanceValue: {
@@ -1717,6 +1823,26 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 3,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    paddingVertical: 10,
   },
   pageHeader: {
     flexDirection: 'row',

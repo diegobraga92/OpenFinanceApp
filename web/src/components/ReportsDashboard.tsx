@@ -230,7 +230,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                         type="monotone"
                         dataKey="balance"
                         name="Balance"
-                        stroke="#3b82f6"
+                        stroke="var(--color-chart-neutral)"
                         strokeWidth={2}
                         dot={false}
                         strokeDasharray="5 5"
@@ -415,7 +415,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                         type="monotone"
                         dataKey="net"
                         name="Net"
-                        stroke="#3b82f6"
+                        stroke="var(--color-chart-neutral)"
                         strokeWidth={2}
                         dot={false}
                         strokeDasharray="5 5"

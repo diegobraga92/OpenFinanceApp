@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   Category,
   createTransaction,
@@ -6,8 +6,10 @@ import {
   fetchCategories,
   fetchSummary,
   fetchTransactions,
+  fetchTrends,
   SummaryResponse,
   Transaction,
+  TrendsResponse,
 } from './api';
 import { TransactionForm } from './components/TransactionForm';
 import { CategoryManager } from './components/CategoryManager';
@@ -34,12 +36,30 @@ const TABS: Tab[] = [
   'categories',
 ];
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const NAV_ITEMS: [Tab, string][] = [
+  ['dashboard', 'Dashboard'],
+  ['transactions', 'Transactions'],
+  ['budgets', 'Budgets'],
+  ['reports', 'Reports'],
+  ['reconciliation', 'Reconciliation'],
+  ['receipts', 'Receipts'],
+  ['audit', 'Audit'],
+  ['categories', 'Categories'],
+];
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [categories, setCategories] = useState<Category[]>([]);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [trends, setTrends] = useState<TrendsResponse | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,14 +94,16 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [cats, summ, txns] = await Promise.all([
+      const [cats, summ, txns, trnds] = await Promise.all([
         loadCategories(),
         fetchSummary(),
         loadTransactions(),
+        fetchTrends(6).catch(() => null),
       ]);
       setCategories(cats);
       setSummary(summ);
       setTransactions(txns);
+      setTrends(trnds);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -194,6 +216,57 @@ export default function App() {
     setEditingTransaction(null);
   };
 
+  // Local search over the currently loaded transactions (description + category).
+  const filteredTransactions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return transactions;
+    const catById = new Map(categories.map((c) => [c.id, c]));
+    return transactions.filter((t) => {
+      if (t.description.toLowerCase().includes(q)) return true;
+      const cat = t.category_id ? catById.get(t.category_id) : undefined;
+      return (cat?.name.toLowerCase().includes(q) ?? false) || (cat?.icon?.toLowerCase().includes(q) ?? false);
+    });
+  }, [transactions, searchQuery, categories]);
+
+  // --- Dashboard trend analytics (sparkline + month-over-month deltas) ---
+  const sortedTrends = useMemo(() => {
+    if (!trends?.trends || trends.trends.length < 2) return null;
+    return [...trends.trends].sort((a, b) => a.year - b.year || a.month - b.month);
+  }, [trends]);
+
+  const sparkPoints = useMemo(() => {
+    if (!sortedTrends) return null;
+    let running = 0;
+    return sortedTrends.map((t) => {
+      running += parseFloat(t.net);
+      return running;
+    });
+  }, [sortedTrends]);
+
+  const monthDeltas = useMemo(() => {
+    if (!sortedTrends) return null;
+    const prev = sortedTrends[sortedTrends.length - 2];
+    const curr = sortedTrends[sortedTrends.length - 1];
+    const prevIncome = parseFloat(prev.income_total);
+    const prevExpense = parseFloat(prev.expense_total);
+    return {
+      income: prevIncome > 0 ? (parseFloat(curr.income_total) - prevIncome) / prevIncome : 0,
+      expense: prevExpense > 0 ? (parseFloat(curr.expense_total) - prevExpense) / prevExpense : 0,
+    };
+  }, [sortedTrends]);
+
+  const renderDelta = (delta: number | undefined, inverse = false) => {
+    if (delta === undefined || !isFinite(delta) || delta === 0) {
+      return <span style={styles.deltaNeutral}>—</span>;
+    }
+    const positive = inverse ? delta < 0 : delta > 0;
+    return (
+      <span style={positive ? styles.deltaUp : styles.deltaDown}>
+        {delta > 0 ? '▲' : '▼'} {Math.abs(Math.round(delta * 100))}%
+      </span>
+    );
+  };
+
   const formatMoney = (value: string | number) => {
     const n = typeof value === 'string' ? parseFloat(value) : value;
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -222,31 +295,35 @@ export default function App() {
             aria-expanded={navOpen}
             onClick={() => setNavOpen((v) => !v)}
           >
-            {navOpen ? '✕' : '☰'}
+            {navOpen ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            )}
           </button>
           <nav
             style={styles.nav}
             className={navOpen ? 'app-nav app-nav-open' : 'app-nav'}
             aria-label="Main navigation"
           >
-            {([
-              ['dashboard', 'Dashboard'],
-              ['transactions', 'Transactions'],
-              ['budgets', 'Budgets'],
-              ['reports', 'Reports'],
-              ['reconciliation', 'Reconciliation'],
-              ['receipts', 'Receipts'],
-              ['audit', 'Audit'],
-              ['categories', 'Categories'],
-            ] as [Tab, string][]).map(([key, label]) => (
-              <button
-                key={key}
-                style={{ ...styles.navButton, ...(tab === key ? styles.navButtonActive : {}) }}
-                aria-current={tab === key ? 'page' : undefined}
-                onClick={() => { setTab(key); setNavOpen(false); }}
-              >
-                {label}
-              </button>
+            {NAV_ITEMS.map(([key, label], i) => (
+              <span key={key} style={styles.navItem}>
+                {i === 4 && <span className="nav-divider" style={styles.navDivider} aria-hidden="true" />}
+                <button
+                  style={{ ...styles.navButton, ...(tab === key ? styles.navButtonActive : {}) }}
+                  aria-current={tab === key ? 'page' : undefined}
+                  onClick={() => { setTab(key); setNavOpen(false); }}
+                >
+                  {label}
+                </button>
+              </span>
             ))}
           </nav>
           <button
@@ -284,8 +361,45 @@ export default function App() {
           </div>
         ) : tab === 'dashboard' ? (
           <div>
-            <div style={styles.balanceCard}>
-              <p style={styles.balanceLabel}>Current Balance</p>
+            <div className="section" style={styles.balanceCard}>
+              <div style={styles.balanceHeader}>
+                <div>
+                  <p style={styles.balanceLabel}>Current Balance</p>
+                  <p style={styles.balanceMonth}>
+                    {MONTH_NAMES[new Date().getMonth()]} {new Date().getFullYear()}
+                  </p>
+                </div>
+                {sparkPoints && sparkPoints.length > 1 && (
+                  <svg
+                    width="110"
+                    height="44"
+                    viewBox="0 0 110 44"
+                    role="img"
+                    aria-label="Balance trend over the last 6 months"
+                    style={styles.sparkline}
+                  >
+                    <polyline
+                      points={(() => {
+                        const min = Math.min(...sparkPoints);
+                        const max = Math.max(...sparkPoints);
+                        const range = max - min || 1;
+                        return sparkPoints
+                          .map((v, i) => {
+                            const x = 2 + (i / (sparkPoints.length - 1)) * 106;
+                            const y = 2 + (1 - (v - min) / range) * 40;
+                            return `${x},${y}`;
+                          })
+                          .join(' ');
+                      })()}
+                      fill="none"
+                      stroke={sparkPoints[sparkPoints.length - 1] >= 0 ? 'var(--color-income)' : 'var(--color-expense)'}
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                )}
+              </div>
               <h2 style={{
                 ...styles.balanceValue,
                 color: parseFloat(summary?.balance ?? '0') < 0 ? 'var(--color-expense)' : 'var(--color-income)',
@@ -294,13 +408,17 @@ export default function App() {
               </h2>
               <div style={styles.balanceRow}>
                 <div style={styles.balanceItem}>
-                  <p style={styles.balanceItemLabel}>Income</p>
+                  <p style={styles.balanceItemLabel}>
+                    Income {monthDeltas && renderDelta(monthDeltas.income)}
+                  </p>
                   <p style={{ ...styles.balanceItemValue, color: 'var(--color-income)' }}>
                     {formatMoney(summary?.income_total ?? '0')}
                   </p>
                 </div>
                 <div style={styles.balanceItem}>
-                  <p style={styles.balanceItemLabel}>Expenses</p>
+                  <p style={styles.balanceItemLabel}>
+                    Expenses {monthDeltas && renderDelta(monthDeltas.expense, true)}
+                  </p>
                   <p style={{ ...styles.balanceItemValue, color: 'var(--color-expense)' }}>
                     {formatMoney(summary?.expense_total ?? '0')}
                   </p>
@@ -309,7 +427,7 @@ export default function App() {
             </div>
 
             {summary && summary.by_category.length > 0 && (
-              <div style={styles.section}>
+              <div className="section" style={styles.section}>
                 <h3 style={styles.sectionTitle}>Category Breakdown</h3>
                 <div style={styles.categoryBars}>
                   {summary.by_category.slice(0, 8).map((cat) => (
@@ -319,7 +437,15 @@ export default function App() {
                           {cat.icon && <span style={styles.categoryIcon}>{cat.icon}</span>}
                           {cat.category_name || 'Uncategorised'}
                         </span>
-                        <span style={styles.categoryBarTotal}>{formatMoney(cat.total)}</span>
+                        <span style={styles.categoryBarTotal}>
+                          {formatMoney(cat.total)}
+                          <span style={styles.categoryBarPct}>
+                            {' '}
+                            {Math.round(
+                              (parseFloat(cat.total) / Math.max(parseFloat(summary.income_total), parseFloat(summary.expense_total), 1)) * 100,
+                            )}%
+                          </span>
+                        </span>
                       </div>
                       <div style={styles.categoryBarTrack}>
                         <div style={{
@@ -334,7 +460,7 @@ export default function App() {
               </div>
             )}
 
-            <div style={styles.section}>
+            <div className="section" style={styles.section}>
               <div style={styles.sectionHeader}>
                 <h3 style={styles.sectionTitle}>Recent Transactions</h3>
                 <button style={styles.viewAllButton} onClick={() => setTab('transactions')}>
@@ -382,6 +508,14 @@ export default function App() {
             <div style={styles.pageHeader}>
               <h2 style={styles.pageTitle}>Transactions</h2>
               <div style={styles.pageActions}>
+                <input
+                  type="search"
+                  style={styles.searchInput}
+                  placeholder="Search transactions…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Search transactions"
+                />
                 <button
                   type="button"
                   style={styles.secondaryButton}
@@ -413,7 +547,7 @@ export default function App() {
             )}
 
             {transactions.length === 0 ? (
-              <div style={styles.section}>
+              <div className="section" style={styles.section}>
                 <EmptyState
                   icon="💸"
                   title="No transactions yet"
@@ -425,9 +559,19 @@ export default function App() {
                   }}
                 />
               </div>
+            ) : filteredTransactions.length === 0 ? (
+              <div className="section" style={styles.section}>
+                <EmptyState
+                  icon="🔍"
+                  title="No matches"
+                  description={`No transactions match "${searchQuery}". Try a different search.`}
+                  actionLabel="Clear search"
+                  onAction={() => setSearchQuery('')}
+                />
+              </div>
             ) : (
               <TransactionTable
-                transactions={transactions}
+                transactions={filteredTransactions}
                 categories={categories}
                 formatMoney={formatMoney}
                 onEdit={(t) => {
@@ -488,6 +632,17 @@ const styles: Record<string, CSSProperties> = {
     flex: 1,
     justifyContent: 'center',
     gap: '0.25rem',
+  },
+  navItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+  },
+  navDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: 'var(--color-border)',
+    margin: '0.375rem 0.375rem',
   },
   navButton: {
     padding: '0.5rem 1rem',
@@ -584,10 +739,23 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: 'var(--shadow-card)',
     marginBottom: '2rem',
   },
+  balanceHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
   balanceLabel: {
     color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     marginBottom: '0.25rem',
+  },
+  balanceMonth: {
+    color: 'var(--color-text-dim)',
+    fontSize: '0.75rem',
+    margin: 0,
+  },
+  sparkline: {
+    opacity: 0.85,
   },
   balanceValue: {
     fontSize: '2.5rem',
@@ -608,6 +776,23 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--color-text-muted)',
     fontSize: '0.75rem',
     margin: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+  },
+  deltaUp: {
+    color: 'var(--color-income)',
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+  },
+  deltaDown: {
+    color: 'var(--color-expense)',
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+  },
+  deltaNeutral: {
+    color: 'var(--color-text-dim)',
+    fontSize: '0.6875rem',
   },
   balanceItemValue: {
     fontSize: '1.25rem',
@@ -674,6 +859,11 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--color-text-muted)',
     fontWeight: 500,
   },
+  categoryBarPct: {
+    color: 'var(--color-text-dim)',
+    fontWeight: 400,
+    fontSize: '0.75rem',
+  },
   categoryBarTrack: {
     height: '0.5rem',
     borderRadius: '9999px',
@@ -695,6 +885,17 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
+    flexWrap: 'wrap',
+  },
+  searchInput: {
+    backgroundColor: 'var(--color-input-bg)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '0.5rem',
+    padding: '0.625rem 0.875rem',
+    color: 'var(--color-text)',
+    fontSize: '0.875rem',
+    minWidth: 220,
+    flex: 1,
   },
   pageTitle: {
     fontSize: '1.5rem',

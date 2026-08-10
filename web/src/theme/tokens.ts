@@ -56,6 +56,8 @@ export interface Palette {
   income: string;
   /** Expense amount color */
   expense: string;
+  /** Neutral chart series color (e.g. balance line) */
+  chartNeutral: string;
   /** Modal / drawer scrim */
   overlay: string;
   /** Card shadow (light theme only; transparent in dark) */
@@ -86,6 +88,7 @@ export const darkPalette: Palette = {
   success: '#22c55e',
   income: '#22c55e',
   expense: '#ef4444',
+  chartNeutral: '#3b82f6',
   overlay: 'rgba(0, 0, 0, 0.6)',
   shadow: '0 0 0 rgba(0, 0, 0, 0)',
 };
@@ -114,6 +117,7 @@ export const lightPalette: Palette = {
   success: '#16a34a',
   income: '#16a34a',
   expense: '#dc2626',
+  chartNeutral: '#2563eb',
   overlay: 'rgba(15, 23, 42, 0.45)',
   shadow: '0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.06)',
 };

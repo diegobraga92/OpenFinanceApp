@@ -28,6 +28,7 @@
   --color-success: #22c55e;
   --color-income: #22c55e;
   --color-expense: #ef4444;
+  --color-chart-neutral: #3b82f6;
   --color-overlay: rgba(0, 0, 0, 0.6);
   --shadow-card: 0 0 0 rgba(0, 0, 0, 0);
 }
@@ -57,6 +58,7 @@
   --color-success: #16a34a;
   --color-income: #16a34a;
   --color-expense: #dc2626;
+  --color-chart-neutral: #2563eb;
   --color-overlay: rgba(15, 23, 42, 0.45);
   --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.06);
 }
@@ -151,6 +153,18 @@ section,
   }
 }
 
+/* Card hover lift (light interaction feedback) */
+@media (hover: hover) {
+  .section,
+  .card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .section:hover,
+  .card:hover {
+    transform: translateY(-1px);
+  }
+}
+
 /* ---- Responsive header / navigation ---- */
 .nav-toggle {
   display: none;
@@ -158,10 +172,12 @@ section,
   border: 1px solid var(--color-border);
   color: var(--color-text-muted);
   border-radius: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 1.125rem;
-  line-height: 1;
+  padding: 0.5rem;
+  line-height: 0;
   cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
 }
 
 .app-nav {
@@ -186,9 +202,18 @@ section,
     display: flex;
   }
 
-  .app-nav > button {
+  .app-nav > span {
+    display: flex;
     width: 100%;
+  }
+
+  .app-nav > span > button {
+    flex: 1;
     text-align: left;
+  }
+
+  .nav-divider {
+    display: none !important;
   }
 }
 

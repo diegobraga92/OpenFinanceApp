@@ -58,7 +58,7 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
           const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
           const isIncome = t.type === 'income';
           return (
-            <div key={t.id} style={styles.card}>
+            <div key={t.id} className="card" style={styles.card}>
               <div style={styles.cardTop}>
                 <span style={styles.cardDate}>{formatDate(t.date)}</span>
                 <span
