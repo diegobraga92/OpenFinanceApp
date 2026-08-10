@@ -12,7 +12,7 @@ interface Props {
   refreshControl?: ReactNode;
   onAdd: () => void;
   onEdit: (t: Transaction) => void;
-  onDelete: (id: string) => void;
+  onDelete: (t: Transaction) => void;
 }
 
 export function TransactionsScreen({

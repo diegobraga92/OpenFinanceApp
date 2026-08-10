@@ -10,7 +10,7 @@ interface Props {
   category?: Category;
   formatMoney: (value: string | number) => string;
   onEdit: (t: Transaction) => void;
-  onDelete: (id: string) => void;
+  onDelete: (t: Transaction) => void;
 }
 
 export function TransactionRow({
@@ -45,7 +45,7 @@ export function TransactionRow({
         <TouchableOpacity onPress={() => onEdit(t)} style={styles.editButton}>
           <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => onDelete(t.id)} style={styles.deleteButton}>
+        <TouchableOpacity onPress={() => onDelete(t)} style={styles.deleteButton}>
           <Text style={styles.deleteButtonText}>Del</Text>
         </TouchableOpacity>
       </View>

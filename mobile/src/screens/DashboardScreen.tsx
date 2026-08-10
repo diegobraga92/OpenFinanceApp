@@ -14,7 +14,7 @@ interface Props {
   refreshControl?: ReactNode;
   onAddTransaction: () => void;
   onEdit: (t: Transaction) => void;
-  onDelete: (id: string) => void;
+  onDelete: (t: Transaction) => void;
 }
 
 export function DashboardScreen({

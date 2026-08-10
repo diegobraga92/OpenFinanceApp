@@ -23,7 +23,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow PudimFinance to use Face ID to unlock your finances."
+        }
+      ]
     ]
   }
 }

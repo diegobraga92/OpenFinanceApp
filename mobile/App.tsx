@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   RefreshControl,
   Text,
@@ -13,6 +12,7 @@ import {
   Category,
   Transaction,
   SummaryResponse,
+  createTransaction,
   deleteTransaction,
   fetchCategories,
   fetchSummary,
@@ -21,6 +21,9 @@ import {
 import { colors } from './src/theme/tokens';
 import { AddTransactionForm } from './src/screens/AddTransactionForm';
 import { styles, DRAWER_WIDTH } from './src/theme/styles';
+import { SnackbarProvider, useSnackbar } from './src/components/Snackbar';
+import { BiometricLock } from './src/components/BiometricLock';
+import { OnboardingGate } from './src/screens/OnboardingScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
@@ -31,6 +34,19 @@ import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
 
 export default function App() {
+  return (
+    <SnackbarProvider>
+      <BiometricLock>
+        <OnboardingGate>
+          <AppContent />
+        </OnboardingGate>
+      </BiometricLock>
+    </SnackbarProvider>
+  );
+}
+
+function AppContent() {
+  const { show: showSnackbar } = useSnackbar();
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
@@ -125,22 +141,30 @@ export default function App() {
     setShowAddForm(false);
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert('Delete Transaction', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
+  const handleDelete = (t: Transaction) => {
+    deleteTransaction(t.id)
+      .then(async () => {
+        await loadData();
+        showSnackbar(`Transaction "${t.description}" deleted`, 'Undo', async () => {
           try {
-            await deleteTransaction(id);
+            await createTransaction({
+              description: t.description,
+              amount: t.amount,
+              type: t.type === 'income' ? 'income' : 'expense',
+              category_id: t.category_id || null,
+              date: t.date,
+              notes: t.notes || null,
+            });
             await loadData();
+            showSnackbar('Transaction restored');
           } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete');
+            showSnackbar(err instanceof Error ? err.message : 'Could not restore transaction');
           }
-        },
-      },
-    ]);
+        });
+      })
+      .catch((err) => {
+        showSnackbar(err instanceof Error ? err.message : 'Failed to delete');
+      });
   };
 
   const handleEdit = (t: Transaction) => {
