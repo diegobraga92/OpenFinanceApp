@@ -42,6 +42,8 @@ export interface Palette {
   dangerBorder: string;
   /** Error banner text */
   dangerText: string;
+  /** Text placed on top of the danger color */
+  onDanger: string;
   /** Warning accent (budget near limit) */
   warning: string;
   /** Warning banner background */
@@ -81,6 +83,7 @@ export const darkPalette: Palette = {
   dangerBg: '#450a0a',
   dangerBorder: '#991b1b',
   dangerText: '#fca5a5',
+  onDanger: '#ffffff',
   warning: '#f59e0b',
   warningBg: '#451a03',
   warningBorder: '#b45309',
@@ -110,6 +113,7 @@ export const lightPalette: Palette = {
   dangerBg: '#fef2f2',
   dangerBorder: '#fecaca',
   dangerText: '#b91c1c',
+  onDanger: '#ffffff',
   warning: '#d97706',
   warningBg: '#fffbeb',
   warningBorder: '#fde68a',
@@ -141,6 +145,7 @@ export function cssVars(palette: Palette): Record<string, string> {
     '--color-danger-bg': palette.dangerBg,
     '--color-danger-border': palette.dangerBorder,
     '--color-danger-text': palette.dangerText,
+    '--color-on-danger': palette.onDanger,
     '--color-warning': palette.warning,
     '--color-warning-bg': palette.warningBg,
     '--color-warning-border': palette.warningBorder,

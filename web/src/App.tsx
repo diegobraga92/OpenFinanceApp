@@ -508,14 +508,26 @@ export default function App() {
             <div style={styles.pageHeader}>
               <h2 style={styles.pageTitle}>Transactions</h2>
               <div style={styles.pageActions}>
-                <input
-                  type="search"
-                  style={styles.searchInput}
-                  placeholder="Search transactions…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Search transactions"
-                />
+                <div style={styles.searchWrap}>
+                  <input
+                    type="search"
+                    style={styles.searchInput}
+                    placeholder="Search transactions…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search transactions"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      style={styles.searchClear}
+                      onClick={() => setSearchQuery('')}
+                      aria-label="Clear search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
                   style={styles.secondaryButton}
@@ -887,15 +899,33 @@ const styles: Record<string, CSSProperties> = {
     gap: '0.5rem',
     flexWrap: 'wrap',
   },
+  searchWrap: {
+    position: 'relative',
+    flex: 1,
+    minWidth: 220,
+  },
   searchInput: {
     backgroundColor: 'var(--color-input-bg)',
     border: '1px solid var(--color-border)',
     borderRadius: '0.5rem',
-    padding: '0.625rem 0.875rem',
+    padding: '0.625rem 2rem 0.625rem 0.875rem',
     color: 'var(--color-text)',
     fontSize: '0.875rem',
-    minWidth: 220,
-    flex: 1,
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  searchClear: {
+    position: 'absolute',
+    right: '0.375rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--color-text-dim)',
+    cursor: 'pointer',
+    fontSize: '0.75rem',
+    padding: '0.25rem',
+    lineHeight: 1,
   },
   pageTitle: {
     fontSize: '1.5rem',

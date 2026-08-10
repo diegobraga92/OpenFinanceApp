@@ -42,7 +42,7 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
       title="Delete transaction?"
       message={
         pendingDelete
-          ? `"${pendingDelete.description}" (${formatMoney(pendingDelete.amount)}) will be permanently removed. This action cannot be undone.`
+          ? `"${pendingDelete.description}" (${formatMoney(pendingDelete.amount)}) will be deleted. You can undo this within a few seconds.`
           : ''
       }
       confirmLabel={deleting ? 'Deleting…' : 'Delete'}

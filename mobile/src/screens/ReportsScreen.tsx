@@ -17,12 +17,14 @@ import { styles } from '../theme/styles';
 import { SHORT_MONTHS } from '../theme/constants';
 import { DonutChart } from '../components/DonutChart';
 import { TrendChart } from '../components/TrendChart';
+import { useSnackbar } from '../components/Snackbar';
 
 interface Props {
   formatMoney: (value: string | number) => string;
 }
 
 export function ReportsScreen({ formatMoney }: Props) {
+  const { show: showSnackbar } = useSnackbar();
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReportResponse | null>(null);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdownResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,9 +50,9 @@ export function ReportsScreen({ formatMoney }: Props) {
       setMonthlyReport(monthly);
       setCategoryBreakdown(breakdown);
     } catch (err) {
-      // Non-fatal: keep whatever data we have.
+      showSnackbar(err instanceof Error ? err.message : 'Failed to load reports');
     }
-  }, []);
+  }, [showSnackbar]);
 
   useEffect(() => {
     loadReports();

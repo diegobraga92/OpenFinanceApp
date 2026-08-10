@@ -121,7 +121,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '0.5rem',
     border: 'none',
     backgroundColor: 'var(--color-danger)',
-    color: 'var(--color-primary-text)',
+    color: 'var(--color-on-danger)',
     fontWeight: 600,
     cursor: 'pointer',
     fontSize: '0.875rem',

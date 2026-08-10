@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Animated,
@@ -32,6 +33,19 @@ import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 
 type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
+
+const DRAWER_ITEMS: {
+  key: Screen;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+}[] = [
+  { key: 'dashboard', icon: 'stats-chart-outline', label: 'Dashboard' },
+  { key: 'transactions', icon: 'swap-horizontal-outline', label: 'Transactions' },
+  { key: 'budgets', icon: 'pie-chart-outline', label: 'Budgets' },
+  { key: 'reports', icon: 'trending-up-outline', label: 'Reports' },
+  { key: 'reconciliation', icon: 'sync-outline', label: 'Reconciliation' },
+  { key: 'categories', icon: 'pricetags-outline', label: 'Categories' },
+];
 
 export default function App() {
   return (
@@ -177,8 +191,8 @@ function AppContent() {
       <StatusBar style="light" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuButton}>
-          <Text style={styles.menuButtonText}>☰</Text>
+        <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuButton} accessibilityLabel="Open menu">
+          <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>🏦 PudimFinance</Text>
         <View style={styles.headerSpacer} />
@@ -264,8 +278,10 @@ function AppContent() {
                 resetForm();
                 setShowAddForm(true);
               }}
+              accessibilityLabel="Add transaction"
+              accessibilityRole="button"
             >
-              <Text style={styles.fabText}>+</Text>
+              <Ionicons name="add" size={28} color={colors.primaryText} />
             </TouchableOpacity>
           )}
 
@@ -285,59 +301,30 @@ function AppContent() {
           >
             <View style={styles.drawerHeader}>
               <Text style={styles.drawerTitle}>🏦 PudimFinance</Text>
-              <TouchableOpacity onPress={() => setDrawerOpen(false)} style={styles.drawerClose}>
-                <Text style={styles.drawerCloseText}>✕</Text>
+              <TouchableOpacity onPress={() => setDrawerOpen(false)} style={styles.drawerClose} accessibilityLabel="Close menu">
+                <Ionicons name="close" size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.drawerItem, screen === 'dashboard' && styles.drawerItemActive]}
-              onPress={() => navigate('dashboard')}
-            >
-              <Text style={[styles.drawerItemText, screen === 'dashboard' && styles.drawerItemTextActive]}>
-                📊 Dashboard
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.drawerItem, screen === 'transactions' && styles.drawerItemActive]}
-              onPress={() => navigate('transactions')}
-            >
-              <Text style={[styles.drawerItemText, screen === 'transactions' && styles.drawerItemTextActive]}>
-                💸 Transactions
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.drawerItem, screen === 'budgets' && styles.drawerItemActive]}
-              onPress={() => navigate('budgets')}
-            >
-              <Text style={[styles.drawerItemText, screen === 'budgets' && styles.drawerItemTextActive]}>
-                💰 Budgets
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.drawerItem, screen === 'reports' && styles.drawerItemActive]}
-              onPress={() => navigate('reports')}
-            >
-              <Text style={[styles.drawerItemText, screen === 'reports' && styles.drawerItemTextActive]}>
-                📈 Reports
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.drawerItem, screen === 'reconciliation' && styles.drawerItemActive]}
-              onPress={() => navigate('reconciliation')}
-            >
-              <Text style={[styles.drawerItemText, screen === 'reconciliation' && styles.drawerItemTextActive]}>
-                🔄 Reconciliation
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.drawerItem, screen === 'categories' && styles.drawerItemActive]}
-              onPress={() => navigate('categories')}
-            >
-              <Text style={[styles.drawerItemText, screen === 'categories' && styles.drawerItemTextActive]}>
-                🏷️ Categories
-              </Text>
-            </TouchableOpacity>
+            {DRAWER_ITEMS.map((item) => {
+              const active = screen === item.key;
+              return (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[styles.drawerItem, active && styles.drawerItemActive]}
+                  onPress={() => navigate(item.key)}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={18}
+                    color={active ? colors.primary : colors.textMuted}
+                  />
+                  <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </Animated.View>
         </TouchableOpacity>
       )}

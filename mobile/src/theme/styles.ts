@@ -20,10 +20,6 @@ export const styles = StyleSheet.create({
   menuButton: {
     padding: 4,
   },
-  menuButtonText: {
-    color: colors.text,
-    fontSize: 22,
-  },
   headerTitle: {
     color: colors.text,
     fontSize: 18,
@@ -475,11 +471,6 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-  fabText: {
-    color: colors.bg,
-    fontSize: 28,
-    fontWeight: '600',
-  },
   drawerOverlay: {
     position: 'absolute',
     top: 0,
@@ -516,11 +507,10 @@ export const styles = StyleSheet.create({
   drawerClose: {
     padding: 4,
   },
-  drawerCloseText: {
-    color: colors.textMuted,
-    fontSize: 16,
-  },
   drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 14,
   },

@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { AuditEvent, fetchAuditEvents } from '../api';
 
 interface Props {
@@ -11,20 +11,23 @@ export function AuditDashboard({ token }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const load = async (page = 0) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchAuditEvents(token, { event_type: eventType || undefined, page, page_size: 50 });
-      setItems(res.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load audit events');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const load = useCallback(
+    async (page = 0) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetchAuditEvents(token, { event_type: eventType || undefined, page, page_size: 50 });
+        setItems(res.items);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load audit events');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, eventType],
+  );
 
-  useEffect(() => { if (token) load(); }, [token]);
+  useEffect(() => { if (token) load(); }, [token, load]);
 
   return (
     <div>

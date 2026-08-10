@@ -15,6 +15,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { MONTHS } from '../theme/constants';
 import { EmptyState } from '../components/EmptyState';
+import { useSnackbar } from '../components/Snackbar';
 
 interface Props {
   categories: Category[];
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function BudgetsScreen({ categories, formatMoney }: Props) {
+  const { show: showSnackbar } = useSnackbar();
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummaryResponse | null>(null);
   const [budgetMonth, setBudgetMonth] = useState(new Date().getMonth() + 1);
   const [budgetYear, setBudgetYear] = useState(new Date().getFullYear());
@@ -39,9 +41,9 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       const summ = await fetchBudgetSummary(budgetYear, budgetMonth);
       setBudgetSummary(summ);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to load budgets');
+      showSnackbar(err instanceof Error ? err.message : 'Failed to load budgets');
     }
-  }, [budgetYear, budgetMonth]);
+  }, [budgetYear, budgetMonth, showSnackbar]);
 
   useEffect(() => {
     loadBudgets();
@@ -109,7 +111,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       setShowBudgetForm(false);
       await loadBudgets();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save budget');
+      showSnackbar(err instanceof Error ? err.message : 'Failed to save budget');
     } finally {
       setSaving(false);
     }
@@ -126,7 +128,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
             await deleteBudget(id);
             await loadBudgets();
           } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete budget');
+            showSnackbar(err instanceof Error ? err.message : 'Failed to delete budget');
           }
         },
       },
