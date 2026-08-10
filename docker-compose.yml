@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: pudim
       POSTGRES_DB: pudimfinance
     ports:
-      - "5432:5432"
+      - "${PG_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,8 +22,8 @@ services:
       RABBITMQ_DEFAULT_USER: pudim
       RABBITMQ_DEFAULT_PASS: pudim
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBIT_PORT:-5672}:5672"
+      - "${RABBIT_MGMT_PORT:-15672}:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -36,7 +36,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "${BACKEND_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgres://pudim:pudim@postgres:5432/pudimfinance
       RABBITMQ_URL: amqp://pudim:pudim@rabbitmq:5672
@@ -54,17 +54,22 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      # VITE_API_BASE_URL is baked into the JS bundle at build time.
+      #   empty/unset   → web app uses same-origin URLs; nginx proxies
+      #                   /api, /health, /swagger-ui to the backend.
+      #   http://<ip>:<port> → web app calls the backend directly.
+      # See README → "LAN Server Deployment" for details.
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     ports:
-      - "5173:80"
-    environment:
-      VITE_API_BASE_URL: http://localhost:3000
+      - "${WEB_PORT:-5173}:80"
     depends_on:
       - backend
 
   prometheus:
     image: prom/prometheus:v2.53.0
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -77,7 +82,7 @@ services:
   grafana:
     image: grafana/grafana:11.1.0
     ports:
-      - "3001:3000"
+      - "${GRAFANA_PORT:-3001}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin

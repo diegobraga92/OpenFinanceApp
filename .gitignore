@@ -14,6 +14,7 @@ mobile/dist/
 # Docker
 *.env
 !*.env.example
+!*.env.docker
 
 # Terraform
 infra/.terraform/

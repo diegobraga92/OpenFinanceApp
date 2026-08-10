@@ -6,11 +6,16 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Backend routes are served under /api/... — pass the URI through unchanged.
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // Same-origin passthrough for the remaining backend endpoints.
+      '/health': 'http://localhost:3000',
+      '/metrics': 'http://localhost:3000',
+      '/swagger-ui': 'http://localhost:3000',
+      '/api-docs': 'http://localhost:3000',
     },
   },
 });

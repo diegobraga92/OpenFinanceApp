@@ -1,6 +1,9 @@
 import type { components, operations } from './api-types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// When VITE_API_BASE_URL is set (e.g. http://192.168.1.100:3000) the app calls the
+// backend directly. When unset/empty it uses relative URLs — in Docker the nginx
+// proxy forwards them to the backend; in dev the Vite proxy does the same.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export type HealthResponse = components['schemas']['HealthResponse'];
 export type HealthError = components['schemas']['HealthError'];

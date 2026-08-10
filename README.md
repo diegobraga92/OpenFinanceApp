@@ -50,6 +50,9 @@ docker compose up --build
 #   Web UI:       http://localhost:5173
 ```
 
+Running on a shared LAN server where Docker ports may conflict? See
+[LAN Server Deployment](#lan-server-deployment).
+
 ### Backend (local, without Docker)
 
 ```bash
@@ -73,6 +76,149 @@ cd mobile
 npm install
 npx expo start
 ```
+
+---
+
+## LAN Server Deployment
+
+Running PudimFinance on a LAN server that already hosts other web services in Docker
+requires two things:
+
+1. **No port conflicts** — the default host ports (`3000`, `5173`, `5432`, `5672`,
+   `15672`, `9090`, `3001`) may already be taken by other containers.
+2. **A backend URL that works from other devices** — the web app defaults to same-origin
+   URLs, so it must be able to reach the backend from LAN clients (not from `localhost`
+   on the server itself).
+
+All host ports and the web → backend URL are configurable via environment variables,
+so you never need to edit `docker-compose.yml`.
+
+### 1. Check for port conflicts
+
+```bash
+ss -tlnp | grep -E ':(3000|5173|5432|5672|15672|9090|3001)\b'
+```
+
+Anything listed is already in use — override it with a free port in step 2.
+
+### 2. Configure the deployment
+
+A ready-made template is committed at [`.env.docker`](.env.docker). Use it with
+`--env-file` so it does **not** overwrite the root `.env` used by `scripts/run.sh`:
+
+```bash
+cp .env.docker .env.docker.local
+$EDITOR .env.docker.local
+```
+
+Set `PUBLIC_HOST` to this server's LAN IP/hostname as seen by other devices:
+
+```bash
+hostname -I        # e.g. 192.168.1.100
+```
+
+Then change any ports that collided in step 1:
+
+```dotenv
+PUBLIC_HOST=192.168.1.100
+BACKEND_PORT=3100   # 3000 was taken by another container
+WEB_PORT=4200       # 5173 was taken by another container
+```
+
+### 3. Choose how the web app reaches the backend
+
+`VITE_API_BASE_URL` is **baked into the web bundle at build time**. Two supported
+strategies:
+
+#### Option A — direct backend URL (simplest)
+
+Uncomment and set `VITE_API_BASE_URL` to the backend's LAN address:
+
+```dotenv
+VITE_API_BASE_URL=http://192.168.1.100:3100
+```
+
+Then build and start:
+
+```bash
+docker compose --env-file .env.docker.local up --build -d
+```
+
+Browsers call `http://192.168.1.100:3100` directly (the backend is already
+CORS-permissive and binds `0.0.0.0`).
+
+**Trade-off:** the URL is baked in — if the server IP or port changes, edit
+`.env.docker.local` and rebuild the `web` container:
+
+```bash
+docker compose --env-file .env.docker.local build web
+docker compose --env-file .env.docker.local up -d web
+```
+
+#### Option B — same-origin nginx proxy (recommended, no rebuild on IP change)
+
+Leave `VITE_API_BASE_URL` **empty** (the default):
+
+```dotenv
+VITE_API_BASE_URL=
+```
+
+The web container's nginx proxies `/api/`, `/health`, `/metrics`, `/swagger-ui`, and
+`/api-docs/` to the backend over the internal Docker network, so the app uses relative
+URLs and works from any device, at any server IP/port, with no rebuild:
+
+```bash
+docker compose --env-file .env.docker.local up --build -d
+```
+
+**Trade-off:** all API traffic is funneled through the web container, and the backend
+is not directly reachable via HTTP from the LAN.
+
+> **Note:** with either option, if you run `docker compose up` *without* `--env-file`,
+> Compose falls back to the root `.env`, which sets `VITE_API_BASE_URL=http://localhost:3000`
+> (fine for the dev quickstart, broken for LAN clients).
+
+### 4. Open the firewall (if enabled)
+
+```bash
+sudo ufw allow 4200/tcp   # web UI — required for both options
+sudo ufw allow 3100/tcp   # backend — only needed for Option A
+```
+
+### 5. Verify
+
+From the server itself:
+
+```bash
+curl -s http://localhost:4200/health
+# {"status":"ok","database":"connected",...}
+```
+
+From another machine on the same LAN (replace with your server's IP):
+
+```bash
+curl -s http://192.168.1.100:4200/health
+curl -s http://192.168.1.100:4200/api/categories
+```
+
+Then open `http://192.168.1.100:4200` in a browser on the LAN device.
+
+### Configuration reference
+
+| Variable | Default | Host port / role |
+|----------|---------|------------------|
+| `PUBLIC_HOST` | — | Server LAN IP/hostname (documentation only) |
+| `PG_PORT` | `5432` | PostgreSQL |
+| `RABBIT_PORT` | `5672` | RabbitMQ AMQP |
+| `RABBIT_MGMT_PORT` | `15672` | RabbitMQ management UI |
+| `BACKEND_PORT` | `3000` | Rust backend API |
+| `WEB_PORT` | `5173` | Web UI (nginx) |
+| `PROMETHEUS_PORT` | `9090` | Prometheus |
+| `GRAFANA_PORT` | `3001` | Grafana |
+| `VITE_API_BASE_URL` | *(empty)* | Web → backend URL (baked at build time) |
+
+Internal container-to-container communication (`postgres:5432`, `backend:3000`,
+`prometheus:9090`, ...) is unaffected — only host-facing ports are configurable.
 
 ---
 
