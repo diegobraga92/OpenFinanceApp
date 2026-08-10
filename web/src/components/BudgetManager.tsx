@@ -7,6 +7,8 @@ import {
   deleteBudget,
   fetchBudgetSummary,
 } from '../api';
+import { ConfirmDialog } from './ConfirmDialog';
+import { EmptyState } from './EmptyState';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -34,6 +36,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
   const [editing, setEditing] = useState<BudgetSummaryItem | null>(null);
   const [form, setForm] = useState<FormState>({ category_id: '', amount_limit: '' });
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<BudgetSummaryItem | null>(null);
 
   const expenseCategories = categories.filter((c) => c.type === 'expense');
 
@@ -108,9 +111,9 @@ export function BudgetManager({ categories, formatMoney }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this budget?')) return;
     try {
       await deleteBudget(id);
+      setPendingDelete(null);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete budget');
@@ -118,9 +121,9 @@ export function BudgetManager({ categories, formatMoney }: Props) {
   };
 
   const getProgressColor = (percentage: number): string => {
-    if (percentage >= 100) return '#ef4444';
-    if (percentage >= 80) return '#f59e0b';
-    return '#22c55e';
+    if (percentage >= 100) return 'var(--color-danger)';
+    if (percentage >= 80) return 'var(--color-warning)';
+    return 'var(--color-primary)';
   };
 
   const formatPct = (value: string | number) => {
@@ -165,8 +168,13 @@ export function BudgetManager({ categories, formatMoney }: Props) {
         </div>
       ) : summary && summary.items.length === 0 ? (
         <div style={styles.emptyCard}>
-          <p style={styles.emptyText}>No budgets set for {MONTHS[month - 1]} {year}.</p>
-          <p style={styles.emptySubtext}>Click "+ Add Budget" to set your first spending limit.</p>
+          <EmptyState
+            icon="🎯"
+            title={`No budgets for ${MONTHS[month - 1]} ${year}`}
+            description="Set a spending limit per category to track how much you use each month."
+            actionLabel="+ Add Budget"
+            onAction={openCreate}
+          />
         </div>
       ) : summary ? (
         <div>
@@ -177,13 +185,13 @@ export function BudgetManager({ categories, formatMoney }: Props) {
             </div>
             <div style={styles.overviewCard}>
               <p style={styles.overviewLabel}>Total Spent</p>
-              <p style={{ ...styles.overviewValue, color: '#ef4444' }}>{formatMoney(summary.total_spent)}</p>
+              <p style={{ ...styles.overviewValue, color: 'var(--color-expense)' }}>{formatMoney(summary.total_spent)}</p>
             </div>
             <div style={styles.overviewCard}>
               <p style={styles.overviewLabel}>Remaining</p>
               <p style={{
                 ...styles.overviewValue,
-                color: parseFloat(summary.total_budgeted) - parseFloat(summary.total_spent) >= 0 ? '#22c55e' : '#ef4444',
+                color: parseFloat(summary.total_budgeted) - parseFloat(summary.total_spent) >= 0 ? 'var(--color-income)' : 'var(--color-expense)',
               }}>
                 {formatMoney(parseFloat(summary.total_budgeted) - parseFloat(summary.total_spent))}
               </p>
@@ -198,7 +206,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                 <div key={item.budget.id} style={styles.budgetCard}>
                   <div style={styles.budgetHeader}>
                     <div style={styles.budgetCategory}>
-                      <span style={{ ...styles.categoryIcon, backgroundColor: item.budget.color || '#334155' }}>
+                      <span style={{ ...styles.categoryIcon, backgroundColor: item.budget.color || 'var(--color-border)' }}>
                         {item.budget.icon || '•'}
                       </span>
                       <span style={styles.categoryName}>{item.budget.category_name}</span>
@@ -210,7 +218,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                     </div>
                     <div style={styles.budgetActions}>
                       <button style={styles.actionButton} onClick={() => openEdit(item)}>Edit</button>
-                      <button style={styles.deleteButton} onClick={() => handleDelete(item.budget.id)}>Delete</button>
+                      <button style={styles.deleteButton} onClick={() => setPendingDelete(item)}>Delete</button>
                     </div>
                   </div>
 
@@ -324,6 +332,18 @@ export function BudgetManager({ categories, formatMoney }: Props) {
           </form>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete budget?"
+        message={
+          pendingDelete
+            ? `The budget for ${pendingDelete.budget.category_name} (${MONTHS[month - 1]} ${year}) will be removed. This action cannot be undone.`
+            : ''
+        }
+        onConfirm={() => pendingDelete && handleDelete(pendingDelete.budget.id)}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
@@ -341,13 +361,13 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
   },
   pageSubtitle: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     margin: '0.25rem 0 0 0',
   },
   primaryButton: {
-    backgroundColor: '#22c55e',
-    color: '#0f172a',
+    backgroundColor: 'var(--color-primary)',
+    color: 'var(--color-primary-text)',
     border: 'none',
     padding: '0.625rem 1.25rem',
     borderRadius: '0.5rem',
@@ -359,16 +379,16 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#450a0a',
-    border: '1px solid #991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-bg)',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     padding: '0.75rem 1rem',
     borderRadius: '0.5rem',
     marginBottom: '1.5rem',
   },
   retryButton: {
-    backgroundColor: '#991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     border: 'none',
     padding: '0.375rem 1rem',
     borderRadius: '0.375rem',
@@ -383,9 +403,9 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '2rem',
   },
   navButton: {
-    backgroundColor: '#1e293b',
-    border: '1px solid #334155',
-    color: '#94a3b8',
+    backgroundColor: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
     borderRadius: '0.5rem',
     width: '2.5rem',
     height: '2.5rem',
@@ -395,29 +415,29 @@ const styles: Record<string, CSSProperties> = {
   monthLabel: {
     fontSize: '1.125rem',
     fontWeight: 600,
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
     minWidth: '10rem',
     textAlign: 'center',
   },
   loading: {
     textAlign: 'center',
     padding: '3rem 0',
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
   },
   emptyCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '2rem',
     textAlign: 'center',
-    border: '1px dashed #334155',
+    border: '1px dashed var(--color-border)',
   },
   emptyText: {
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
     fontSize: '1rem',
     margin: '0 0 0.5rem 0',
   },
   emptySubtext: {
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
     fontSize: '0.875rem',
     margin: 0,
   },
@@ -428,13 +448,13 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '2rem',
   },
   overviewCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.25rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
   },
   overviewLabel: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.75rem',
     margin: '0 0 0.25rem 0',
     textTransform: 'uppercase',
@@ -444,7 +464,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '1.5rem',
     fontWeight: 700,
     margin: 0,
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
   },
   budgetList: {
     display: 'flex',
@@ -452,10 +472,10 @@ const styles: Record<string, CSSProperties> = {
     gap: '1rem',
   },
   budgetCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.25rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
   },
   budgetHeader: {
     display: 'flex',
@@ -478,13 +498,13 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '1rem',
   },
   categoryName: {
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
     fontWeight: 500,
     fontSize: '0.9375rem',
   },
   warningBadge: {
-    backgroundColor: '#7c2d12',
-    color: '#fbbf24',
+    backgroundColor: 'var(--color-warning-bg)',
+    color: 'var(--color-warning-text)',
     fontSize: '0.625rem',
     fontWeight: 600,
     padding: '0.125rem 0.5rem',
@@ -498,8 +518,8 @@ const styles: Record<string, CSSProperties> = {
   },
   actionButton: {
     background: 'transparent',
-    border: '1px solid #334155',
-    color: '#94a3b8',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
     padding: '0.25rem 0.75rem',
     borderRadius: '0.375rem',
     fontSize: '0.75rem',
@@ -507,8 +527,8 @@ const styles: Record<string, CSSProperties> = {
   },
   deleteButton: {
     background: 'transparent',
-    border: '1px solid #991b1b',
-    color: '#ef4444',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger)',
     padding: '0.25rem 0.75rem',
     borderRadius: '0.375rem',
     fontSize: '0.75rem',
@@ -517,7 +537,7 @@ const styles: Record<string, CSSProperties> = {
   progressTrack: {
     height: '0.625rem',
     borderRadius: '9999px',
-    backgroundColor: '#334155',
+    backgroundColor: 'var(--color-border)',
     overflow: 'hidden',
     marginBottom: '0.5rem',
   },
@@ -533,7 +553,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '0.8125rem',
   },
   spentText: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
   },
   pctText: {
     fontWeight: 600,
@@ -542,17 +562,17 @@ const styles: Record<string, CSSProperties> = {
     marginTop: '0.25rem',
   },
   remainingText: {
-    color: '#22c55e',
+    color: 'var(--color-primary)',
     fontSize: '0.8125rem',
   },
   overText: {
-    color: '#ef4444',
+    color: 'var(--color-danger)',
     fontSize: '0.8125rem',
   },
   overlay: {
     position: 'fixed',
     inset: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'var(--color-overlay)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -560,12 +580,12 @@ const styles: Record<string, CSSProperties> = {
     padding: '1rem',
   },
   form: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '2rem',
     width: '100%',
     maxWidth: 480,
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem',
@@ -576,7 +596,7 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
   },
   formWarning: {
-    color: '#fbbf24',
+    color: 'var(--color-warning-text)',
     fontSize: '0.875rem',
     margin: 0,
   },
@@ -585,26 +605,26 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     gap: '0.375rem',
     fontSize: '0.875rem',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
   },
   input: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #334155',
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
     borderRadius: '0.5rem',
     padding: '0.5rem 0.75rem',
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
     fontSize: '0.875rem',
     width: '100%',
     boxSizing: 'border-box',
   },
   monthPreview: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
   },
   error: {
-    backgroundColor: '#450a0a',
-    border: '1px solid #991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-bg)',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     padding: '0.5rem 0.75rem',
     borderRadius: '0.375rem',
     fontSize: '0.875rem',
@@ -618,9 +638,9 @@ const styles: Record<string, CSSProperties> = {
   cancelButton: {
     padding: '0.5rem 1.25rem',
     borderRadius: '0.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
     background: 'transparent',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     cursor: 'pointer',
     fontSize: '0.875rem',
   },
@@ -628,8 +648,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '0.5rem 1.25rem',
     borderRadius: '0.5rem',
     border: 'none',
-    backgroundColor: '#22c55e',
-    color: '#0f172a',
+    backgroundColor: 'var(--color-primary)',
+    color: 'var(--color-primary-text)',
     fontWeight: 600,
     cursor: 'pointer',
     fontSize: '0.875rem',

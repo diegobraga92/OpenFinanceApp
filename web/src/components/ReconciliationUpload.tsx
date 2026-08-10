@@ -145,12 +145,12 @@ export function ReconciliationUpload({ formatMoney }: Props) {
               <p style={styles.summaryValue}>{result.total_rows}</p>
             </div>
             <div style={styles.summaryCard}>
-              <p style={{ ...styles.summaryLabel, color: '#22c55e' }}>Matched</p>
-              <p style={{ ...styles.summaryValue, color: '#22c55e' }}>{result.matched_rows}</p>
+              <p style={{ ...styles.summaryLabel, color: 'var(--color-income)' }}>Matched</p>
+              <p style={{ ...styles.summaryValue, color: 'var(--color-income)' }}>{result.matched_rows}</p>
             </div>
             <div style={styles.summaryCard}>
-              <p style={{ ...styles.summaryLabel, color: '#ef4444' }}>Unmatched</p>
-              <p style={{ ...styles.summaryValue, color: '#ef4444' }}>{result.unmatched_rows}</p>
+              <p style={{ ...styles.summaryLabel, color: 'var(--color-expense)' }}>Unmatched</p>
+              <p style={{ ...styles.summaryValue, color: 'var(--color-expense)' }}>{result.unmatched_rows}</p>
             </div>
           </div>
 
@@ -177,8 +177,8 @@ export function ReconciliationUpload({ formatMoney }: Props) {
                       <span
                         style={{
                           ...styles.statusBadge,
-                          backgroundColor: item.match_status === 'matched' ? '#14532d' : '#450a0a',
-                          color: item.match_status === 'matched' ? '#22c55e' : '#ef4444',
+                          backgroundColor: item.match_status === 'matched' ? 'var(--color-primary)' : 'var(--color-danger-bg)',
+                          color: item.match_status === 'matched' ? 'var(--color-primary-text)' : 'var(--color-danger)',
                         }}
                       >
                         {item.match_status}
@@ -211,15 +211,15 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
   },
   pageSubtitle: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     margin: '0.25rem 0 0 0',
   },
   section: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
     marginBottom: '2rem',
   },
   sectionTitle: {
@@ -231,9 +231,9 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#450a0a',
-    border: '1px solid #991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-bg)',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     padding: '0.75rem 1rem',
     borderRadius: '0.5rem',
     marginBottom: '1rem',
@@ -241,7 +241,7 @@ const styles: Record<string, CSSProperties> = {
   dismissButton: {
     background: 'transparent',
     border: 'none',
-    color: '#fca5a5',
+    color: 'var(--color-danger-text)',
     cursor: 'pointer',
   },
   form: {
@@ -254,24 +254,24 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     gap: '0.375rem',
     fontSize: '0.875rem',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
   },
   input: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #334155',
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
     borderRadius: '0.5rem',
     padding: '0.5rem 0.75rem',
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
     fontSize: '0.875rem',
     width: '100%',
     boxSizing: 'border-box',
   },
   csvInput: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #334155',
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
     borderRadius: '0.5rem',
     padding: '0.75rem',
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
     fontSize: '0.8125rem',
     fontFamily: 'monospace',
     minHeight: '10rem',
@@ -281,8 +281,8 @@ const styles: Record<string, CSSProperties> = {
   },
   submitButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#22c55e',
-    color: '#0f172a',
+    backgroundColor: 'var(--color-primary)',
+    color: 'var(--color-primary-text)',
     border: 'none',
     padding: '0.625rem 1.5rem',
     borderRadius: '0.5rem',
@@ -297,13 +297,13 @@ const styles: Record<string, CSSProperties> = {
   },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: 'var(--color-bg)',
     borderRadius: '0.75rem',
     padding: '1rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
   },
   summaryLabel: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.75rem',
     margin: '0 0 0.25rem 0',
     textTransform: 'uppercase',
@@ -325,19 +325,19 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '0.625rem 0.75rem',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontWeight: 500,
     fontSize: '0.75rem',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    borderBottom: '1px solid #334155',
+    borderBottom: '1px solid var(--color-border)',
   },
   tr: {
-    borderBottom: '1px solid #1e293b',
+    borderBottom: '1px solid var(--color-surface)',
   },
   td: {
     padding: '0.625rem 0.75rem',
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
   },
   numCell: {
     textAlign: 'right',

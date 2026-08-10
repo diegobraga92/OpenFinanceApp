@@ -16,6 +16,8 @@ import { BudgetManager } from './components/BudgetManager';
 import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
+import { EmptyState } from './components/EmptyState';
+import { useTheme } from './theme/ThemeContext';
 
 type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
 
@@ -29,6 +31,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [budgetAlert, setBudgetAlert] = useState<string | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const { toggle: toggleTheme, mode: themeMode } = useTheme();
 
   const loadCategories = useCallback(async () => {
     try {
@@ -76,11 +80,16 @@ export default function App() {
     try {
       const now = new Date();
       const { items } = await fetchBudgetSummary(now.getFullYear(), now.getMonth() + 1);
-      const over = items.find((i) => parseFloat(i.percentage) >= 80);
-      if (over) {
-        const pct = Math.round(parseFloat(over.percentage));
+      const over = items.filter((i) => parseFloat(i.percentage) >= 80);
+      if (over.length > 0) {
+        const worst = [...over].sort(
+          (a, b) => parseFloat(b.percentage) - parseFloat(a.percentage),
+        )[0];
+        const pct = Math.round(parseFloat(worst.percentage));
+        const extras = over.length - 1;
+        const prefix = extras > 0 ? `${extras} more budget${extras > 1 ? 's' : ''} at/over 80% · ` : '';
         setBudgetAlert(
-          `⚠️ You've spent ${pct}% of your ${over.budget.category_name} budget this month`
+          `⚠️ ${prefix}You've spent ${pct}% of your ${worst.budget.category_name} budget this month`
         );
       } else {
         setBudgetAlert(null);
@@ -117,60 +126,59 @@ export default function App() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <div style={styles.headerInner}>
-          <h1 style={styles.logo} onClick={() => setTab('dashboard')} role="button" tabIndex={0}>
+        <div style={styles.headerInner} className="header-inner">
+          <h1
+            style={styles.logo}
+            onClick={() => { setTab('dashboard'); setNavOpen(false); }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setTab('dashboard'); setNavOpen(false); } }}
+          >
             🏦 PudimFinance
           </h1>
-          <nav style={styles.nav}>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'dashboard' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('dashboard')}
-            >
-              Dashboard
-            </button>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'transactions' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('transactions')}
-            >
-              Transactions
-            </button>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'budgets' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('budgets')}
-            >
-              Budgets
-            </button>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'reports' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('reports')}
-            >
-              Reports
-            </button>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'reconciliation' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('reconciliation')}
-            >
-              Reconciliation
-            </button>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'receipts' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('receipts')}
-            >
-              Receipts
-            </button>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'audit' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('audit')}
-            >
-              Audit
-            </button>
-            <button
-              style={{ ...styles.navButton, ...(tab === 'categories' ? styles.navButtonActive : {}) }}
-              onClick={() => setTab('categories')}
-            >
-              Categories
-            </button>
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label="Toggle navigation"
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen((v) => !v)}
+          >
+            {navOpen ? '✕' : '☰'}
+          </button>
+          <nav
+            style={styles.nav}
+            className={navOpen ? 'app-nav app-nav-open' : 'app-nav'}
+            aria-label="Main navigation"
+          >
+            {([
+              ['dashboard', 'Dashboard'],
+              ['transactions', 'Transactions'],
+              ['budgets', 'Budgets'],
+              ['reports', 'Reports'],
+              ['reconciliation', 'Reconciliation'],
+              ['receipts', 'Receipts'],
+              ['audit', 'Audit'],
+              ['categories', 'Categories'],
+            ] as [Tab, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                style={{ ...styles.navButton, ...(tab === key ? styles.navButtonActive : {}) }}
+                aria-current={tab === key ? 'page' : undefined}
+                onClick={() => { setTab(key); setNavOpen(false); }}
+              >
+                {label}
+              </button>
+            ))}
           </nav>
+          <button
+            type="button"
+            style={styles.themeToggle}
+            onClick={toggleTheme}
+            aria-label={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            title={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {themeMode === 'light' ? '🌙' : '☀️'}
+          </button>
         </div>
       </header>
 
@@ -190,8 +198,10 @@ export default function App() {
         )}
 
         {loading && !error ? (
-          <div style={styles.loading}>
-            <p>Loading…</p>
+          <div aria-label="Loading" aria-busy="true">
+            <div className="skeleton" style={{ height: 180, marginBottom: '2rem' }} />
+            <div className="skeleton" style={{ height: 220, marginBottom: '2rem' }} />
+            <div className="skeleton" style={{ height: 120 }} />
           </div>
         ) : tab === 'dashboard' ? (
           <div>
@@ -199,20 +209,20 @@ export default function App() {
               <p style={styles.balanceLabel}>Current Balance</p>
               <h2 style={{
                 ...styles.balanceValue,
-                color: parseFloat(summary?.balance ?? '0') < 0 ? '#ef4444' : '#22c55e',
+                color: parseFloat(summary?.balance ?? '0') < 0 ? 'var(--color-expense)' : 'var(--color-income)',
               }}>
                 {formatMoney(summary?.balance ?? '0')}
               </h2>
               <div style={styles.balanceRow}>
                 <div style={styles.balanceItem}>
                   <p style={styles.balanceItemLabel}>Income</p>
-                  <p style={{ ...styles.balanceItemValue, color: '#22c55e' }}>
+                  <p style={{ ...styles.balanceItemValue, color: 'var(--color-income)' }}>
                     {formatMoney(summary?.income_total ?? '0')}
                   </p>
                 </div>
                 <div style={styles.balanceItem}>
                   <p style={styles.balanceItemLabel}>Expenses</p>
-                  <p style={{ ...styles.balanceItemValue, color: '#ef4444' }}>
+                  <p style={{ ...styles.balanceItemValue, color: 'var(--color-expense)' }}>
                     {formatMoney(summary?.expense_total ?? '0')}
                   </p>
                 </div>
@@ -253,7 +263,17 @@ export default function App() {
                 </button>
               </div>
               {transactions.length === 0 ? (
-                <p style={styles.emptyText}>No transactions yet.</p>
+                <EmptyState
+                  compact
+                  icon="💸"
+                  title="No transactions yet"
+                  description="Add your first income or expense to start tracking your money."
+                  actionLabel="+ Add Transaction"
+                  onAction={() => {
+                    setEditingTransaction(null);
+                    setShowForm(true);
+                  }}
+                />
               ) : (
                 <TransactionTable
                   transactions={transactions.slice(0, 8)}
@@ -303,7 +323,18 @@ export default function App() {
             )}
 
             {transactions.length === 0 ? (
-              <p style={styles.emptyText}>No transactions yet. Add your first one!</p>
+              <div style={styles.section}>
+                <EmptyState
+                  icon="💸"
+                  title="No transactions yet"
+                  description="Every expense and income starts here — add your first one to see your balance come to life."
+                  actionLabel="+ Add Transaction"
+                  onAction={() => {
+                    setEditingTransaction(null);
+                    setShowForm(true);
+                  }}
+                />
+              </div>
             ) : (
               <TransactionTable
                 transactions={transactions}
@@ -326,7 +357,7 @@ export default function App() {
       </main>
 
       <footer style={styles.footer}>
-        <p>PudimFinance • Layer 2: Budgets, Reports & Insights</p>
+        <p>PudimFinance • Personal finance tracking</p>
       </footer>
     </div>
   );
@@ -338,12 +369,12 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    backgroundColor: '#0f172a',
-    color: '#e2e8f0',
+    backgroundColor: 'var(--color-bg)',
+    color: 'var(--color-text)',
   },
   header: {
-    backgroundColor: '#1e293b',
-    borderBottom: '1px solid #334155',
+    backgroundColor: 'var(--color-surface)',
+    borderBottom: '1px solid var(--color-border)',
     padding: '0 2rem',
   },
   headerInner: {
@@ -364,22 +395,34 @@ const styles: Record<string, CSSProperties> = {
   },
   nav: {
     display: 'flex',
-    gap: '0.5rem',
+    flex: 1,
+    justifyContent: 'center',
+    gap: '0.25rem',
   },
   navButton: {
     padding: '0.5rem 1rem',
     borderRadius: '0.5rem',
     border: '1px solid transparent',
     background: 'transparent',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     fontWeight: 500,
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
   navButtonActive: {
-    backgroundColor: '#334155',
-    color: '#e2e8f0',
+    backgroundColor: 'var(--color-surface-hover)',
+    color: 'var(--color-text)',
+  },
+  themeToggle: {
+    background: 'transparent',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
+    borderRadius: '0.5rem',
+    padding: '0.375rem 0.625rem',
+    fontSize: '1rem',
+    lineHeight: 1,
+    cursor: 'pointer',
   },
   main: {
     flex: 1,
@@ -391,17 +434,17 @@ const styles: Record<string, CSSProperties> = {
   footer: {
     padding: '1.5rem 2rem',
     textAlign: 'center',
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
     fontSize: '0.875rem',
-    borderTop: '1px solid #1e293b',
+    borderTop: '1px solid var(--color-border)',
   },
   budgetAlertBanner: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#451a03',
-    border: '1px solid #b45309',
-    color: '#fbbf24',
+    backgroundColor: 'var(--color-warning-bg)',
+    border: '1px solid var(--color-warning-border)',
+    color: 'var(--color-warning-text)',
     padding: '0.75rem 1rem',
     borderRadius: '0.5rem',
     marginBottom: '1.5rem',
@@ -413,7 +456,7 @@ const styles: Record<string, CSSProperties> = {
   budgetAlertDismiss: {
     background: 'transparent',
     border: 'none',
-    color: '#fbbf24',
+    color: 'var(--color-warning-text)',
     fontSize: '1rem',
     cursor: 'pointer',
     padding: '0 0.25rem',
@@ -422,16 +465,16 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#450a0a',
-    border: '1px solid #991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-bg)',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     padding: '0.75rem 1rem',
     borderRadius: '0.5rem',
     marginBottom: '1.5rem',
   },
   retryButton: {
-    backgroundColor: '#991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     border: 'none',
     padding: '0.375rem 1rem',
     borderRadius: '0.375rem',
@@ -441,17 +484,18 @@ const styles: Record<string, CSSProperties> = {
   loading: {
     textAlign: 'center',
     padding: '3rem 0',
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
   },
   balanceCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
+    boxShadow: 'var(--shadow-card)',
     marginBottom: '2rem',
   },
   balanceLabel: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     marginBottom: '0.25rem',
   },
@@ -459,6 +503,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '2.5rem',
     fontWeight: 700,
     margin: '0 0 1rem 0',
+    fontVariantNumeric: 'tabular-nums',
   },
   balanceRow: {
     display: 'flex',
@@ -470,7 +515,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '0.125rem',
   },
   balanceItemLabel: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.75rem',
     margin: 0,
   },
@@ -478,12 +523,14 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '1.25rem',
     fontWeight: 600,
     margin: 0,
+    fontVariantNumeric: 'tabular-nums',
   },
   section: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
+    boxShadow: 'var(--shadow-card)',
     marginBottom: '2rem',
   },
   sectionHeader: {
@@ -500,12 +547,12 @@ const styles: Record<string, CSSProperties> = {
   viewAllButton: {
     background: 'transparent',
     border: 'none',
-    color: '#22c55e',
+    color: 'var(--color-primary)',
     fontSize: '0.875rem',
     cursor: 'pointer',
   },
   emptyText: {
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
     textAlign: 'center',
     padding: '2rem 0',
   },
@@ -534,13 +581,13 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '1rem',
   },
   categoryBarTotal: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontWeight: 500,
   },
   categoryBarTrack: {
     height: '0.5rem',
     borderRadius: '9999px',
-    backgroundColor: '#334155',
+    backgroundColor: 'var(--color-surface-hover)',
     overflow: 'hidden',
   },
   categoryBarFill: {
@@ -560,8 +607,8 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
   },
   primaryButton: {
-    backgroundColor: '#22c55e',
-    color: '#0f172a',
+    backgroundColor: 'var(--color-primary)',
+    color: 'var(--color-primary-text)',
     border: 'none',
     padding: '0.625rem 1.25rem',
     borderRadius: '0.5rem',

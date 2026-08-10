@@ -173,13 +173,13 @@ export function ReportsDashboard({ formatMoney }: Props) {
               <div style={styles.overviewCards}>
                 <div style={styles.overviewCard}>
                   <p style={styles.overviewLabel}>Total Income</p>
-                  <p style={{ ...styles.overviewValue, color: '#22c55e' }}>
+                  <p style={{ ...styles.overviewValue, color: 'var(--color-income)' }}>
                     {formatMoney(monthly.months.reduce((sum, m) => sum + parseFloat(m.income_total), 0))}
                   </p>
                 </div>
                 <div style={styles.overviewCard}>
                   <p style={styles.overviewLabel}>Total Expenses</p>
-                  <p style={{ ...styles.overviewValue, color: '#ef4444' }}>
+                  <p style={{ ...styles.overviewValue, color: 'var(--color-expense)' }}>
                     {formatMoney(monthly.months.reduce((sum, m) => sum + parseFloat(m.expense_total), 0))}
                   </p>
                 </div>
@@ -187,7 +187,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                   <p style={styles.overviewLabel}>Net</p>
                   <p style={{
                     ...styles.overviewValue,
-                    color: monthly.months.reduce((sum, m) => sum + parseFloat(m.balance), 0) >= 0 ? '#22c55e' : '#ef4444',
+                    color: monthly.months.reduce((sum, m) => sum + parseFloat(m.balance), 0) >= 0  ? 'var(--color-income)' : 'var(--color-expense)',
                   }}>
                     {formatMoney(monthly.months.reduce((sum, m) => sum + parseFloat(m.balance), 0))}
                   </p>
@@ -202,19 +202,19 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       ...m,
                       label: `${MONTH_NAMES[m.month - 1]} '${String(m.year).slice(2)}`,
                     }))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} />
-                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                      <XAxis dataKey="label" stroke="var(--color-text-muted)" fontSize={12} />
+                      <YAxis stroke="var(--color-text-muted)" fontSize={12} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.5rem' }}
-                        labelStyle={{ color: '#e2e8f0' }}
+                        contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '0.5rem' }}
+                        labelStyle={{ color: 'var(--color-text)' }}
                       />
                       <Legend />
                       <Line
                         type="monotone"
                         dataKey="income_total"
                         name="Income"
-                        stroke="#22c55e"
+                        stroke="var(--color-income)"
                         strokeWidth={2}
                         dot={false}
                       />
@@ -222,7 +222,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                         type="monotone"
                         dataKey="expense_total"
                         name="Expenses"
-                        stroke="#ef4444"
+                        stroke="var(--color-expense)"
                         strokeWidth={2}
                         dot={false}
                       />
@@ -258,13 +258,13 @@ export function ReportsDashboard({ formatMoney }: Props) {
                           <td style={styles.td}>
                             {MONTH_NAMES[m.month - 1]} {m.year}
                           </td>
-                          <td style={{ ...styles.td, ...styles.numCell, color: '#22c55e' }}>
+                          <td style={{ ...styles.td, ...styles.numCell, color: 'var(--color-income)' }}>
                             {formatMoney(m.income_total)}
                           </td>
-                          <td style={{ ...styles.td, ...styles.numCell, color: '#ef4444' }}>
+                          <td style={{ ...styles.td, ...styles.numCell, color: 'var(--color-expense)' }}>
                             {formatMoney(m.expense_total)}
                           </td>
-                          <td style={{ ...styles.td, ...styles.numCell, color: parseFloat(m.balance) >= 0 ? '#e2e8f0' : '#ef4444' }}>
+                          <td style={{ ...styles.td, ...styles.numCell, color: parseFloat(m.balance) >= 0  ? 'var(--color-text)' : 'var(--color-expense)' }}>
                             {formatMoney(m.balance)}
                           </td>
                         </tr>
@@ -306,8 +306,8 @@ export function ReportsDashboard({ formatMoney }: Props) {
                               ))}
                             </Pie>
                             <Tooltip
-                              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.5rem' }}
-                              labelStyle={{ color: '#e2e8f0' }}
+                              contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '0.5rem' }}
+                              labelStyle={{ color: 'var(--color-text)' }}
                             />
                           </PieChart>
                         </ResponsiveContainer>
@@ -387,19 +387,19 @@ export function ReportsDashboard({ formatMoney }: Props) {
                 <div style={styles.chartContainer}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="displayLabel" stroke="#94a3b8" fontSize={12} />
-                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                      <XAxis dataKey="displayLabel" stroke="var(--color-text-muted)" fontSize={12} />
+                      <YAxis stroke="var(--color-text-muted)" fontSize={12} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.5rem' }}
-                        labelStyle={{ color: '#e2e8f0' }}
+                        contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '0.5rem' }}
+                        labelStyle={{ color: 'var(--color-text)' }}
                       />
                       <Legend />
                       <Line
                         type="monotone"
                         dataKey="income_total"
                         name="Income"
-                        stroke="#22c55e"
+                        stroke="var(--color-income)"
                         strokeWidth={2}
                         dot={false}
                       />
@@ -407,7 +407,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                         type="monotone"
                         dataKey="expense_total"
                         name="Expenses"
-                        stroke="#ef4444"
+                        stroke="var(--color-expense)"
                         strokeWidth={2}
                         dot={false}
                       />
@@ -441,13 +441,13 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       {(trends?.trends ?? []).map((t) => (
                         <tr key={`${t.year}-${t.month}`} style={styles.tr}>
                           <td style={styles.td}>{MONTH_NAMES[t.month - 1]} {t.year}</td>
-                          <td style={{ ...styles.td, ...styles.numCell, color: '#22c55e' }}>
+                          <td style={{ ...styles.td, ...styles.numCell, color: 'var(--color-income)' }}>
                             {formatMoney(t.income_total)}
                           </td>
-                          <td style={{ ...styles.td, ...styles.numCell, color: '#ef4444' }}>
+                          <td style={{ ...styles.td, ...styles.numCell, color: 'var(--color-expense)' }}>
                             {formatMoney(t.expense_total)}
                           </td>
-                          <td style={{ ...styles.td, ...styles.numCell, color: parseFloat(t.net) >= 0 ? '#e2e8f0' : '#ef4444' }}>
+                          <td style={{ ...styles.td, ...styles.numCell, color: parseFloat(t.net) >= 0  ? 'var(--color-text)' : 'var(--color-expense)' }}>
                             {formatMoney(t.net)}
                           </td>
                         </tr>
@@ -477,7 +477,7 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
   },
   pageSubtitle: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     margin: '0.25rem 0 0 0',
   },
@@ -485,16 +485,16 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#450a0a',
-    border: '1px solid #991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-bg)',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     padding: '0.75rem 1rem',
     borderRadius: '0.5rem',
     marginBottom: '1.5rem',
   },
   retryButton: {
-    backgroundColor: '#991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     border: 'none',
     padding: '0.375rem 1rem',
     borderRadius: '0.375rem',
@@ -509,20 +509,20 @@ const styles: Record<string, CSSProperties> = {
   subNavButton: {
     padding: '0.5rem 1rem',
     borderRadius: '0.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
     background: 'transparent',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     cursor: 'pointer',
   },
   subNavButtonActive: {
-    backgroundColor: '#334155',
-    color: '#e2e8f0',
+    backgroundColor: 'var(--color-border)',
+    color: 'var(--color-text)',
   },
   loading: {
     textAlign: 'center',
     padding: '3rem 0',
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
   },
   overviewCards: {
     display: 'grid',
@@ -531,13 +531,13 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '2rem',
   },
   overviewCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.25rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
   },
   overviewLabel: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.75rem',
     margin: '0 0 0.25rem 0',
     textTransform: 'uppercase',
@@ -549,10 +549,10 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
   },
   section: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
     marginBottom: '2rem',
   },
   sectionTitle: {
@@ -590,19 +590,19 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '0.875rem',
   },
   barName: {
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
   },
   barMeta: {
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.8125rem',
   },
   barPct: {
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
   },
   barTrack: {
     height: '0.5rem',
     borderRadius: '9999px',
-    backgroundColor: '#334155',
+    backgroundColor: 'var(--color-border)',
     overflow: 'hidden',
   },
   barFill: {
@@ -620,19 +620,19 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '0.625rem 0.75rem',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontWeight: 500,
     fontSize: '0.75rem',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    borderBottom: '1px solid #334155',
+    borderBottom: '1px solid var(--color-border)',
   },
   tr: {
-    borderBottom: '1px solid #1e293b',
+    borderBottom: '1px solid var(--color-surface)',
   },
   td: {
     padding: '0.625rem 0.75rem',
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
   },
   numCell: {
     textAlign: 'right',
@@ -642,14 +642,14 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '0.875rem',
   },
   emptyCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '2rem',
     textAlign: 'center',
-    border: '1px dashed #334155',
+    border: '1px dashed var(--color-border)',
   },
   emptyText: {
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
   },
   trendControls: {
     display: 'flex',
@@ -659,14 +659,14 @@ const styles: Record<string, CSSProperties> = {
   trendButton: {
     padding: '0.5rem 1rem',
     borderRadius: '0.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
     background: 'transparent',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.875rem',
     cursor: 'pointer',
   },
   trendButtonActive: {
-    backgroundColor: '#334155',
-    color: '#e2e8f0',
+    backgroundColor: 'var(--color-border)',
+    color: 'var(--color-text)',
   },
 };

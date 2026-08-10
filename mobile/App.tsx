@@ -36,6 +36,7 @@ import {
   updateTransaction,
   uploadReconciliation,
 } from './src/api';
+import { colors } from './src/theme/tokens';
 
 type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
 
@@ -423,7 +424,7 @@ export default function App() {
       <View key={t.id} style={styles.transactionRow}>
         <View style={styles.transactionLeft}>
           {cat && (
-            <View style={[styles.categoryIconCircle, { backgroundColor: cat.color || '#334155' }]}>
+            <View style={[styles.categoryIconCircle, { backgroundColor: cat.color || colors.surfaceHover }]}>
               <Text style={styles.categoryIconText}>{cat.icon || '•'}</Text>
             </View>
           )}
@@ -435,7 +436,7 @@ export default function App() {
           </View>
         </View>
         <View>
-          <Text style={[styles.transactionAmount, { color: isIncome ? '#22c55e' : '#ef4444' }]}>
+          <Text style={[styles.transactionAmount, { color: isIncome ? colors.primary : colors.danger }]}>
             {isIncome ? '+' : '-'}{formatMoney(t.amount)}
           </Text>
         </View>
@@ -455,19 +456,19 @@ export default function App() {
     <ScrollView style={styles.content}>
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Current Balance</Text>
-        <Text style={[styles.balanceValue, { color: parseFloat(summary?.balance || '0') < 0 ? '#ef4444' : '#22c55e' }]}>
+        <Text style={[styles.balanceValue, { color: parseFloat(summary?.balance || '0') < 0 ? colors.danger : colors.primary }]}>
           {formatMoney(summary?.balance || '0')}
         </Text>
         <View style={styles.balanceRow}>
           <View style={styles.balanceItem}>
             <Text style={styles.balanceItemLabel}>Income</Text>
-            <Text style={[styles.balanceItemValue, { color: '#22c55e' }]}>
+            <Text style={[styles.balanceItemValue, { color: colors.primary }]}>
               {formatMoney(summary?.income_total || '0')}
             </Text>
           </View>
           <View style={styles.balanceItem}>
             <Text style={styles.balanceItemLabel}>Expenses</Text>
-            <Text style={[styles.balanceItemValue, { color: '#ef4444' }]}>
+            <Text style={[styles.balanceItemValue, { color: colors.danger }]}>
               {formatMoney(summary?.expense_total || '0')}
             </Text>
           </View>
@@ -583,7 +584,7 @@ export default function App() {
             </View>
             <View style={styles.overviewCard}>
               <Text style={styles.overviewLabel}>Spent</Text>
-              <Text style={[styles.overviewValue, { color: '#ef4444' }]}>
+              <Text style={[styles.overviewValue, { color: colors.danger }]}>
                 {formatMoney(budgetSummary.total_spent)}
               </Text>
             </View>
@@ -593,8 +594,8 @@ export default function App() {
                 styles.overviewValue,
                 {
                   color: parseFloat(budgetSummary.total_budgeted) - parseFloat(budgetSummary.total_spent) >= 0
-                    ? '#22c55e'
-                    : '#ef4444',
+                    ? colors.primary
+                    : colors.danger,
                 },
               ]}>
                 {formatMoney(parseFloat(budgetSummary.total_budgeted) - parseFloat(budgetSummary.total_spent))}
@@ -604,18 +605,18 @@ export default function App() {
 
           {budgetSummary.items.map((item) => {
             const pct = parseFloat(item.percentage);
-            const color = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e';
+            const color = pct >= 100 ? colors.danger : pct >= 80 ? colors.warning : colors.primary;
             return (
               <View key={item.budget.id} style={styles.budgetCard}>
                 <View style={styles.budgetHeader}>
                   <View style={styles.budgetCategoryRow}>
-                    <View style={[styles.categoryIconCircle, { backgroundColor: item.budget.color || '#334155' }]}>
+                    <View style={[styles.categoryIconCircle, { backgroundColor: item.budget.color || colors.surfaceHover }]}>
                       <Text style={styles.categoryIconText}>{item.budget.icon || '•'}</Text>
                     </View>
                     <Text style={styles.budgetCategoryName}>{item.budget.category_name}</Text>
                     {pct >= 80 && (
-                      <View style={[styles.warningBadge, { backgroundColor: pct >= 100 ? '#450a0a' : '#451a03' }]}>
-                        <Text style={{ color: pct >= 100 ? '#ef4444' : '#fbbf24', fontSize: 10, fontWeight: '600' }}>
+                      <View style={[styles.warningBadge, { backgroundColor: pct >= 100 ? colors.dangerBg : colors.warningBg }]}>
+                        <Text style={{ color: pct >= 100 ? colors.danger : colors.warningText, fontSize: 10, fontWeight: '600' }}>
                           {pct >= 100 ? 'OVER' : 'WARN'}
                         </Text>
                       </View>
@@ -683,15 +684,15 @@ export default function App() {
         <View style={styles.overviewCards}>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewLabel}>Income</Text>
-            <Text style={[styles.overviewValue, { color: '#22c55e' }]}>{formatMoney(totalIncome)}</Text>
+            <Text style={[styles.overviewValue, { color: colors.primary }]}>{formatMoney(totalIncome)}</Text>
           </View>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewLabel}>Expenses</Text>
-            <Text style={[styles.overviewValue, { color: '#ef4444' }]}>{formatMoney(totalExpense)}</Text>
+            <Text style={[styles.overviewValue, { color: colors.danger }]}>{formatMoney(totalExpense)}</Text>
           </View>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewLabel}>Net</Text>
-            <Text style={[styles.overviewValue, { color: net >= 0 ? '#22c55e' : '#ef4444' }]}>{formatMoney(net)}</Text>
+            <Text style={[styles.overviewValue, { color: net >= 0 ? colors.primary : colors.danger }]}>{formatMoney(net)}</Text>
           </View>
         </View>
 
@@ -770,7 +771,7 @@ export default function App() {
           value={reconStatementName}
           onChangeText={setReconStatementName}
           placeholder="e.g. Nubank August 2026"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={colors.textDim}
         />
 
         <Text style={styles.label}>CSV Data</Text>
@@ -779,7 +780,7 @@ export default function App() {
           value={reconCsv}
           onChangeText={setReconCsv}
           placeholder={"2026-08-01,Supermarket,150.00\n2026-08-02,Salary,2500.00"}
-          placeholderTextColor="#64748b"
+          placeholderTextColor={colors.textDim}
           multiline
           numberOfLines={6}
           autoCapitalize="none"
@@ -797,7 +798,7 @@ export default function App() {
           disabled={reconLoading}
         >
           {reconLoading ? (
-            <ActivityIndicator color="#0f172a" />
+            <ActivityIndicator color={colors.primaryText} />
           ) : (
             <Text style={styles.submitButtonText}>Upload & Reconcile</Text>
           )}
@@ -813,12 +814,12 @@ export default function App() {
               <Text style={styles.reconSummaryValue}>{reconResult.total_rows}</Text>
             </View>
             <View style={styles.reconSummaryItem}>
-              <Text style={[styles.reconSummaryLabel, { color: '#22c55e' }]}>Matched</Text>
-              <Text style={[styles.reconSummaryValue, { color: '#22c55e' }]}>{reconResult.matched_rows}</Text>
+              <Text style={[styles.reconSummaryLabel, { color: colors.primary }]}>Matched</Text>
+              <Text style={[styles.reconSummaryValue, { color: colors.primary }]}>{reconResult.matched_rows}</Text>
             </View>
             <View style={styles.reconSummaryItem}>
-              <Text style={[styles.reconSummaryLabel, { color: '#ef4444' }]}>Unmatched</Text>
-              <Text style={[styles.reconSummaryValue, { color: '#ef4444' }]}>{reconResult.unmatched_rows}</Text>
+              <Text style={[styles.reconSummaryLabel, { color: colors.danger }]}>Unmatched</Text>
+              <Text style={[styles.reconSummaryValue, { color: colors.danger }]}>{reconResult.unmatched_rows}</Text>
             </View>
           </View>
 
@@ -834,14 +835,14 @@ export default function App() {
                   style={[
                     styles.reconStatusBadge,
                     {
-                      backgroundColor: item.match_status === 'matched' ? '#14532d' : '#450a0a',
+                      backgroundColor: item.match_status === 'matched' ? colors.primaryHover : colors.dangerBg,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.reconStatusText,
-                      { color: item.match_status === 'matched' ? '#22c55e' : '#ef4444' },
+                      { color: item.match_status === 'matched' ? colors.primary : colors.danger },
                     ]}
                   >
                     {item.match_status}
@@ -877,7 +878,7 @@ export default function App() {
       <View style={styles.categoryGrid}>
         {expenseCategories.map((c) => (
           <View key={c.id} style={styles.categoryCard}>
-            <View style={[styles.categoryIconCircle, { backgroundColor: c.color || '#334155' }]}>
+            <View style={[styles.categoryIconCircle, { backgroundColor: c.color || colors.surfaceHover }]}>
               <Text style={styles.categoryIconText}>{c.icon || '•'}</Text>
             </View>
             <Text style={styles.categoryCardName}>{c.name}</Text>
@@ -890,7 +891,7 @@ export default function App() {
       <View style={styles.categoryGrid}>
         {incomeCategories.map((c) => (
           <View key={c.id} style={styles.categoryCard}>
-            <View style={[styles.categoryIconCircle, { backgroundColor: c.color || '#334155' }]}>
+            <View style={[styles.categoryIconCircle, { backgroundColor: c.color || colors.surfaceHover }]}>
               <Text style={styles.categoryIconText}>{c.icon || '•'}</Text>
             </View>
             <Text style={styles.categoryCardName}>{c.name}</Text>
@@ -915,7 +916,7 @@ export default function App() {
               value={newCatName}
               onChangeText={setNewCatName}
               placeholder="e.g. Pets"
-              placeholderTextColor="#64748b"
+              placeholderTextColor={colors.textDim}
             />
 
             <Text style={styles.label}>Type</Text>
@@ -986,7 +987,7 @@ export default function App() {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator color="#0f172a" />
+                  <ActivityIndicator color={colors.primaryText} />
                 ) : (
                   <Text style={styles.submitButtonText}>Create</Text>
                 )}
@@ -1009,7 +1010,7 @@ export default function App() {
           value={description}
           onChangeText={setDescription}
           placeholder="e.g. Lunch at Restaurante X"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={colors.textDim}
         />
 
         <Text style={styles.label}>Amount (R$)</Text>
@@ -1018,7 +1019,7 @@ export default function App() {
           value={amount}
           onChangeText={setAmount}
           placeholder="0.00"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={colors.textDim}
           keyboardType="decimal-pad"
         />
 
@@ -1028,7 +1029,7 @@ export default function App() {
           value={date}
           onChangeText={setDate}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={colors.textDim}
           autoCapitalize="none"
         />
 
@@ -1093,7 +1094,7 @@ export default function App() {
           disabled={saving}
         >
           {saving ? (
-            <ActivityIndicator color="#0f172a" />
+            <ActivityIndicator color={colors.primaryText} />
           ) : (
             <Text style={styles.submitButtonText}>
               {editing ? 'Save Changes' : 'Add Transaction'}
@@ -1127,7 +1128,7 @@ export default function App() {
 
       {loading && !error ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading…</Text>
         </View>
       ) : error ? (
@@ -1177,7 +1178,7 @@ export default function App() {
                     value={newCatName}
                     onChangeText={setNewCatName}
                     placeholder="e.g. Pets"
-                    placeholderTextColor="#64748b"
+                    placeholderTextColor={colors.textDim}
                   />
 
                   <Text style={styles.label}>Type</Text>
@@ -1233,7 +1234,7 @@ export default function App() {
                       onPress={handleCategorySubmit}
                       disabled={saving}
                     >
-                      {saving ? <ActivityIndicator color="#0f172a" /> : <Text style={styles.submitButtonText}>Create</Text>}
+                      {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.submitButtonText}>Create</Text>}
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1286,7 +1287,7 @@ export default function App() {
                     value={budgetAmountLimit}
                     onChangeText={setBudgetAmountLimit}
                     placeholder="500.00"
-                    placeholderTextColor="#64748b"
+                    placeholderTextColor={colors.textDim}
                     keyboardType="decimal-pad"
                   />
 
@@ -1308,7 +1309,7 @@ export default function App() {
                       disabled={saving || expenseCategories.length === 0}
                     >
                       {saving ? (
-                        <ActivityIndicator color="#0f172a" />
+                        <ActivityIndicator color={colors.primaryText} />
                       ) : (
                         <Text style={styles.submitButtonText}>
                           {editingBudget ? 'Save' : 'Create'}
@@ -1399,26 +1400,26 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: colors.surfaceHover,
   },
   menuButton: {
     padding: 4,
   },
   menuButtonText: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 22,
   },
   headerTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
     flex: 1,
@@ -1437,7 +1438,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     marginTop: 12,
   },
   errorContainer: {
@@ -1447,21 +1448,21 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   errorText: {
-    color: '#fca5a5',
+    color: colors.dangerText,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
   },
   balanceCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     marginBottom: 16,
   },
   balanceLabel: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 14,
     marginBottom: 4,
   },
@@ -1478,7 +1479,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   balanceItemLabel: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 12,
   },
   balanceItemValue: {
@@ -1486,26 +1487,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   section: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
   },
   emptyText: {
-    color: '#64748b',
+    color: colors.textDim,
     textAlign: 'center',
     padding: 16,
   },
   emptySubtext: {
-    color: '#64748b',
+    color: colors.textDim,
     fontSize: 13,
     textAlign: 'center',
     padding: 4,
@@ -1517,12 +1518,12 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     marginTop: 8,
   },
   categoryRow: {
@@ -1534,18 +1535,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   categoryName: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 14,
   },
   categoryTotal: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 14,
     fontWeight: '500',
   },
   progressTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#334155',
+    backgroundColor: colors.surfaceHover,
     overflow: 'hidden',
   },
   progressFill: {
@@ -1559,19 +1560,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pageTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 22,
     fontWeight: '700',
   },
   addButton: {
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.primary,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
   addButtonText: {
-    color: '#0f172a',
+    color: colors.bg,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -1601,12 +1602,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   transactionDescription: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
   transactionMeta: {
-    color: '#64748b',
+    color: colors.textDim,
     fontSize: 12,
     marginTop: 2,
   },
@@ -1623,10 +1624,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
   },
   editButtonText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 12,
   },
   deleteButton: {
@@ -1634,43 +1635,43 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#991b1b',
+    borderColor: colors.dangerBorder,
   },
   deleteButtonText: {
-    color: '#ef4444',
+    color: colors.danger,
     fontSize: 12,
   },
   separator: {
     height: 1,
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
   },
   formCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     marginTop: 8,
   },
   formTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
   },
   label: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 14,
     marginBottom: 4,
     marginTop: 12,
   },
   input: {
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     borderRadius: 8,
     padding: 12,
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 16,
   },
   typeToggle: {
@@ -1682,19 +1683,19 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     alignItems: 'center',
   },
   typeButtonActive: {
-    backgroundColor: '#334155',
-    borderColor: '#475569',
+    backgroundColor: colors.surfaceHover,
+    borderColor: colors.borderStrong,
   },
   typeButtonText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontWeight: '500',
   },
   typeButtonTextActive: {
-    color: '#e2e8f0',
+    color: colors.text,
   },
   categoryGrid: {
     flexDirection: 'row',
@@ -1706,22 +1707,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: '#0f172a',
+    borderColor: colors.surfaceHover,
+    backgroundColor: colors.bg,
   },
   categoryChipActive: {
-    borderColor: '#22c55e',
-    backgroundColor: '#14532d',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryHover,
   },
   categoryChipText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 13,
   },
   categoryChipTextActive: {
-    color: '#e2e8f0',
+    color: colors.text,
   },
   submitButton: {
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.primary,
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -1731,7 +1732,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   submitButtonText: {
-    color: '#0f172a',
+    color: colors.bg,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1742,7 +1743,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   cancelButtonText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 16,
   },
   fab: {
@@ -1752,7 +1753,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 5,
@@ -1762,7 +1763,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: {
-    color: '#0f172a',
+    color: colors.bg,
     fontSize: 28,
     fontWeight: '600',
   },
@@ -1780,9 +1781,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     width: DRAWER_WIDTH,
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRightWidth: 1,
-    borderRightColor: '#334155',
+    borderRightColor: colors.surfaceHover,
     paddingTop: 48,
   },
   drawerHeader: {
@@ -1792,10 +1793,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: colors.surfaceHover,
   },
   drawerTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -1803,7 +1804,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   drawerCloseText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 16,
   },
   drawerItem: {
@@ -1811,14 +1812,14 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   drawerItemActive: {
-    backgroundColor: '#334155',
+    backgroundColor: colors.surfaceHover,
   },
   drawerItemText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 16,
   },
   drawerItemTextActive: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontWeight: '600',
   },
   monthNav: {
@@ -1829,9 +1830,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   navButton: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     borderRadius: 8,
     width: 40,
     height: 40,
@@ -1839,11 +1840,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navButtonText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 18,
   },
   monthLabel: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     minWidth: 140,
@@ -1856,30 +1857,30 @@ const styles = StyleSheet.create({
   },
   overviewCard: {
     flex: 1,
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
   },
   overviewLabel: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   overviewValue: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
   budgetCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     marginBottom: 12,
   },
   budgetHeader: {
@@ -1895,7 +1896,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   budgetCategoryName: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '500',
     flex: 1,
@@ -1916,7 +1917,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   budgetMetaText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 13,
   },
   budgetPctText: {
@@ -1924,15 +1925,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   remainingText: {
-    color: '#22c55e',
+    color: colors.primary,
     fontSize: 13,
   },
   overText: {
-    color: '#ef4444',
+    color: colors.danger,
     fontSize: 13,
   },
   groupTitle: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
     marginTop: 16,
@@ -1941,17 +1942,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   categoryCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     width: 100,
   },
   categoryCardName: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 13,
     textAlign: 'center',
   },
@@ -1962,7 +1963,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   trendLabel: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 12,
     width: 44,
   },
@@ -1973,63 +1974,63 @@ const styles = StyleSheet.create({
   trendBarTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#334155',
+    backgroundColor: colors.surfaceHover,
     overflow: 'hidden',
   },
   trendBarIncome: {
     height: '100%',
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.primary,
     borderRadius: 3,
   },
   trendBarExpense: {
     height: '100%',
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.danger,
     borderRadius: 3,
   },
   trendIncomeText: {
-    color: '#22c55e',
+    color: colors.primary,
     fontSize: 11,
   },
   trendExpenseText: {
-    color: '#ef4444',
+    color: colors.danger,
     fontSize: 11,
   },
   readOnlyField: {
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     borderRadius: 8,
     padding: 12,
   },
   readOnlyText: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 16,
   },
   reconHint: {
-    color: '#64748b',
+    color: colors.textDim,
     fontSize: 13,
     marginBottom: 4,
   },
   reconCsvInput: {
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     borderRadius: 8,
     padding: 12,
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 13,
     fontFamily: 'monospace',
     minHeight: 100,
     textAlignVertical: 'top',
   },
   reconErrorBox: {
-    backgroundColor: '#450a0a',
+    backgroundColor: colors.dangerBg,
     borderRadius: 8,
     padding: 10,
     marginTop: 12,
   },
   reconErrorText: {
-    color: '#fca5a5',
+    color: colors.dangerText,
     fontSize: 13,
   },
   reconSummaryRow: {
@@ -2039,18 +2040,18 @@ const styles = StyleSheet.create({
   },
   reconSummaryItem: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
     borderRadius: 8,
     padding: 10,
     alignItems: 'center',
   },
   reconSummaryLabel: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 11,
     marginBottom: 4,
   },
   reconSummaryValue: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -2060,18 +2061,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: colors.surface,
     gap: 8,
   },
   reconRowLeft: {
     flex: 1,
   },
   reconDate: {
-    color: '#64748b',
+    color: colors.textDim,
     fontSize: 11,
   },
   reconDescription: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 13,
     marginTop: 2,
   },
@@ -2080,7 +2081,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reconAmount: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -2096,18 +2097,18 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     padding: 16,
   },
   modalContent: {
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     maxHeight: '90%',
   },
   modalTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
@@ -2124,19 +2125,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   iconButton: {
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.surfaceHover,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   iconButtonActive: {
-    borderColor: '#22c55e',
-    backgroundColor: '#14532d',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryHover,
   },
   iconButtonText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 12,
   },
   colorGrid: {
@@ -2152,10 +2153,10 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   colorButtonActive: {
-    borderColor: '#e2e8f0',
+    borderColor: colors.text,
   },
   monthPreview: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 14,
     marginTop: 12,
   },

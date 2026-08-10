@@ -1,6 +1,7 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Category, Transaction } from '../api';
 import { deleteTransaction } from '../api';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface Props {
   transactions: Transaction[];
@@ -11,15 +12,20 @@ interface Props {
 }
 
 export function TransactionTable({ transactions, categories, formatMoney, onEdit, onDelete }: Props) {
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this transaction?')) return;
+    setDeleting(true);
     try {
       await deleteTransaction(id);
+      setPendingDelete(null);
       onDelete();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Failed to delete');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -55,21 +61,34 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
                       {cat.name}
                     </span>
                   ) : (
-                    <span style={{ color: '#64748b' }}>—</span>
+                    <span style={{ color: 'var(--color-text-dim)' }}>—</span>
                   )}
                 </td>
-                <td style={{ ...styles.td, ...styles.amount, color: isIncome ? '#22c55e' : '#ef4444' }}>
+                <td style={{ ...styles.td, ...styles.amount, color: isIncome ? 'var(--color-income)' : 'var(--color-expense)' }}>
                   {isIncome ? '+' : '-'}{formatMoney(t.amount)}
                 </td>
                 <td style={styles.td} align="right">
                   <button style={styles.actionButton} onClick={() => onEdit(t)}>Edit</button>
-                  <button style={styles.deleteButton} onClick={() => handleDelete(t.id)}>Delete</button>
+                  <button style={styles.deleteButton} onClick={() => setPendingDelete(t)}>Delete</button>
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete transaction?"
+        message={
+          pendingDelete
+            ? `"${pendingDelete.description}" (${formatMoney(pendingDelete.amount)}) will be permanently removed. This action cannot be undone.`
+            : ''
+        }
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        onConfirm={() => pendingDelete && handleDelete(pendingDelete.id)}
+        onCancel={() => !deleting && setPendingDelete(null)}
+      />
     </div>
   );
 }
@@ -86,19 +105,19 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '0.625rem 0.75rem',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontWeight: 500,
     fontSize: '0.75rem',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    borderBottom: '1px solid #334155',
+    borderBottom: '1px solid var(--color-border)',
   },
   tr: {
-    borderBottom: '1px solid #1e293b',
+    borderBottom: '1px solid var(--color-surface)',
   },
   td: {
     padding: '0.625rem 0.75rem',
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
   },
   badge: {
     display: 'inline-flex',
@@ -106,7 +125,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '0.25rem',
     padding: '0.125rem 0.5rem',
     borderRadius: '0.375rem',
-    backgroundColor: '#334155',
+    backgroundColor: 'var(--color-border)',
     fontSize: '0.75rem',
   },
   icon: {
@@ -118,8 +137,8 @@ const styles: Record<string, CSSProperties> = {
   },
   actionButton: {
     background: 'transparent',
-    border: '1px solid #334155',
-    color: '#94a3b8',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
     padding: '0.25rem 0.75rem',
     borderRadius: '0.375rem',
     fontSize: '0.75rem',
@@ -128,8 +147,8 @@ const styles: Record<string, CSSProperties> = {
   },
   deleteButton: {
     background: 'transparent',
-    border: '1px solid #991b1b',
-    color: '#ef4444',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger)',
     padding: '0.25rem 0.75rem',
     borderRadius: '0.375rem',
     fontSize: '0.75rem',

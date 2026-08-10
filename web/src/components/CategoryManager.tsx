@@ -53,7 +53,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
       <div style={styles.grid}>
         {items.map((c) => (
           <div key={c.id} style={styles.card}>
-            <div style={{ ...styles.swatch, backgroundColor: c.color || '#334155' }}>
+            <div style={{ ...styles.swatch, backgroundColor: c.color || 'var(--color-border)' }}>
               {c.icon || '•'}
             </div>
             <div style={styles.cardInfo}>
@@ -173,10 +173,10 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
   },
   formCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
     marginBottom: '2rem',
   },
   formTitle: {
@@ -185,9 +185,9 @@ const styles: Record<string, CSSProperties> = {
     margin: '0 0 1rem 0',
   },
   error: {
-    backgroundColor: '#450a0a',
-    border: '1px solid #991b1b',
-    color: '#fca5a5',
+    backgroundColor: 'var(--color-danger-bg)',
+    border: '1px solid var(--color-danger-border)',
+    color: 'var(--color-danger-text)',
     padding: '0.5rem 0.75rem',
     borderRadius: '0.375rem',
     fontSize: '0.875rem',
@@ -207,15 +207,15 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     gap: '0.375rem',
     fontSize: '0.875rem',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     flex: 1,
   },
   input: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #334155',
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
     borderRadius: '0.5rem',
     padding: '0.5rem 0.75rem',
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
     fontSize: '0.875rem',
     width: '100%',
     boxSizing: 'border-box',
@@ -226,18 +226,18 @@ const styles: Record<string, CSSProperties> = {
     gap: '0.375rem',
   },
   iconButton: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #334155',
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
     borderRadius: '0.375rem',
     padding: '0.25rem 0.5rem',
-    color: '#94a3b8',
+    color: 'var(--color-text-muted)',
     fontSize: '0.75rem',
     cursor: 'pointer',
   },
   iconButtonActive: {
-    backgroundColor: '#334155',
-    borderColor: '#22c55e',
-    color: '#e2e8f0',
+    backgroundColor: 'var(--color-border)',
+    borderColor: 'var(--color-primary)',
+    color: 'var(--color-text)',
   },
   colorGrid: {
     display: 'flex',
@@ -252,12 +252,12 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
   colorButtonActive: {
-    borderColor: '#e2e8f0',
+    borderColor: 'var(--color-text)',
   },
   submitButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#22c55e',
-    color: '#0f172a',
+    backgroundColor: 'var(--color-primary)',
+    color: 'var(--color-primary-text)',
     border: 'none',
     padding: '0.5rem 1.5rem',
     borderRadius: '0.5rem',
@@ -271,10 +271,10 @@ const styles: Record<string, CSSProperties> = {
     gap: '2rem',
   },
   group: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.5rem',
-    border: '1px solid #334155',
+    border: '1px solid var(--color-border)',
   },
   groupTitle: {
     fontSize: '1rem',
@@ -292,8 +292,8 @@ const styles: Record<string, CSSProperties> = {
     gap: '0.75rem',
     padding: '0.75rem',
     borderRadius: '0.5rem',
-    backgroundColor: '#0f172a',
-    border: '1px solid #334155',
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
   },
   swatch: {
     width: '2rem',
@@ -312,15 +312,15 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     fontSize: '0.875rem',
     fontWeight: 500,
-    color: '#e2e8f0',
+    color: 'var(--color-text)',
   },
   cardParent: {
     margin: 0,
     fontSize: '0.75rem',
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
   },
   empty: {
-    color: '#64748b',
+    color: 'var(--color-text-dim)',
     fontSize: '0.875rem',
   },
 };
