@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import type { Category, Transaction } from '../api';
 import { deleteTransaction } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 interface Props {
   transactions: Transaction[];
@@ -14,6 +15,7 @@ interface Props {
 export function TransactionTable({ transactions, categories, formatMoney, onEdit, onDelete }: Props) {
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   const handleDelete = async (deleted: Transaction) => {
@@ -33,6 +35,63 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
     const d = new Date(date + 'T00:00:00');
     return d.toLocaleDateString('pt-BR');
   };
+
+  const deleteDialog = (
+    <ConfirmDialog
+      open={pendingDelete !== null}
+      title="Delete transaction?"
+      message={
+        pendingDelete
+          ? `"${pendingDelete.description}" (${formatMoney(pendingDelete.amount)}) will be permanently removed. This action cannot be undone.`
+          : ''
+      }
+      confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+      onConfirm={() => pendingDelete && handleDelete(pendingDelete)}
+      onCancel={() => !deleting && setPendingDelete(null)}
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <div style={styles.cardList}>
+        {transactions.map((t) => {
+          const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
+          const isIncome = t.type === 'income';
+          return (
+            <div key={t.id} style={styles.card}>
+              <div style={styles.cardTop}>
+                <span style={styles.cardDate}>{formatDate(t.date)}</span>
+                <span
+                  style={{
+                    ...styles.cardAmount,
+                    color: isIncome ? 'var(--color-income)' : 'var(--color-expense)',
+                  }}
+                >
+                  {isIncome ? '+' : '-'}{formatMoney(t.amount)}
+                </span>
+              </div>
+              <div style={styles.cardDescription}>{t.description}</div>
+              <div style={styles.cardBottom}>
+                {cat ? (
+                  <span style={styles.badge}>
+                    {cat.icon && <span style={styles.icon}>{cat.icon}</span>}
+                    {cat.name}
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--color-text-dim)' }}>—</span>
+                )}
+                <div style={styles.cardActions}>
+                  <button style={styles.actionButton} onClick={() => onEdit(t)}>Edit</button>
+                  <button style={styles.deleteButton} onClick={() => setPendingDelete(t)}>Delete</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {deleteDialog}
+      </div>
+    );
+  }
 
   return (
     <div style={styles.wrapper}>
@@ -76,19 +135,7 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
           })}
         </tbody>
       </table>
-
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title="Delete transaction?"
-        message={
-          pendingDelete
-            ? `"${pendingDelete.description}" (${formatMoney(pendingDelete.amount)}) will be permanently removed. This action cannot be undone.`
-            : ''
-        }
-        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
-        onConfirm={() => pendingDelete && handleDelete(pendingDelete)}
-        onCancel={() => !deleting && setPendingDelete(null)}
-      />
+      {deleteDialog}
     </div>
   );
 }
@@ -96,6 +143,49 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
 const styles: Record<string, CSSProperties> = {
   wrapper: {
     overflowX: 'auto',
+  },
+  cardList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+  },
+  card: {
+    backgroundColor: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '0.75rem',
+    padding: '0.875rem 1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.375rem',
+    boxShadow: 'var(--shadow-card)',
+  },
+  cardTop: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardDate: {
+    color: 'var(--color-text-muted)',
+    fontSize: '0.8125rem',
+  },
+  cardAmount: {
+    fontWeight: 700,
+    fontSize: '1rem',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  cardDescription: {
+    color: 'var(--color-text)',
+    fontSize: '0.9375rem',
+    fontWeight: 500,
+  },
+  cardBottom: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardActions: {
+    display: 'flex',
+    gap: '0.5rem',
   },
   table: {
     width: '100%',

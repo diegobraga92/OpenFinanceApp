@@ -129,6 +129,35 @@ export default function App() {
     window.history.replaceState(null, '', `#${tab}`);
   }, [tab]);
 
+  const exportTransactionsCsv = () => {
+    if (transactions.length === 0) return;
+    const categoryById = new Map(categories.map((c) => [c.id, c]));
+    const rows = [
+      ['Date', 'Type', 'Description', 'Category', 'Amount', 'Notes'],
+      ...transactions.map((t) => [
+        t.date,
+        t.type,
+        `"${t.description.replace(/"/g, '""')}"`,
+        t.category_id && categoryById.get(t.category_id)
+          ? `"${categoryById.get(t.category_id)!.name.replace(/"/g, '""')}"`
+          : 'Uncategorised',
+        t.amount,
+        t.notes ? `"${t.notes.replace(/"/g, '""')}"` : '',
+      ]),
+    ];
+    const csv = rows.map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    pushToast({ message: `Exported ${transactions.length} transactions` });
+  };
+
   const handleTransactionCreated = async () => {
     setShowForm(false);
     setEditingTransaction(null);
@@ -352,15 +381,26 @@ export default function App() {
           <div>
             <div style={styles.pageHeader}>
               <h2 style={styles.pageTitle}>Transactions</h2>
-              <button
-                style={styles.primaryButton}
-                onClick={() => {
-                  setEditingTransaction(null);
-                  setShowForm(true);
+              <div style={styles.pageActions}>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  onClick={exportTransactionsCsv}
+                  disabled={transactions.length === 0}
+                  title={transactions.length === 0 ? 'No transactions to export' : 'Download CSV'}
+                >
+                  ⬇ Export CSV
+                </button>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setShowForm(true);
                 }}
               >
                 + Add Transaction
               </button>
+            </div>
             </div>
 
             {showForm && (
@@ -651,10 +691,25 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     marginBottom: '1.5rem',
   },
+  pageActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
   pageTitle: {
     fontSize: '1.5rem',
     fontWeight: 700,
     margin: 0,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    color: 'var(--color-text-muted)',
+    border: '1px solid var(--color-border)',
+    padding: '0.625rem 1.25rem',
+    borderRadius: '0.5rem',
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   primaryButton: {
     backgroundColor: 'var(--color-primary)',

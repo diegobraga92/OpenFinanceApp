@@ -7,6 +7,7 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -41,6 +42,7 @@ import {
 import { colors } from './src/theme/tokens';
 import { DonutChart } from './src/components/DonutChart';
 import { TrendChart } from './src/components/TrendChart';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
 
@@ -86,6 +88,7 @@ export default function App() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // Budget states
@@ -215,6 +218,21 @@ export default function App() {
   const formatMoney = (value: string | number) => {
     const n = typeof value === 'string' ? parseFloat(value) : value;
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  /** Format an ISO date (YYYY-MM-DD) as DD/MM/YYYY for display. */
+  const formatDateDisplay = (iso: string) => {
+    const [y, m, d] = iso.split('-');
+    if (!y || !m || !d) return iso;
+    return `${d}/${m}/${y}`;
+  };
+
+  /** Build an ISO date string from a local Date (avoids UTC off-by-one). */
+  const toIsoDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
 
   const categoryById = new Map(categories.map((c) => [c.id, c]));
@@ -1102,14 +1120,62 @@ export default function App() {
         />
 
         <Text style={styles.label}>Date</Text>
-        <TextInput
-          style={styles.input}
-          value={date}
-          onChangeText={setDate}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.textDim}
-          autoCapitalize="none"
-        />
+        <TouchableOpacity
+          style={styles.dateButton}
+          onPress={() => setShowDatePicker(true)}
+          accessibilityLabel="Pick transaction date"
+          accessibilityRole="button"
+        >
+          <Text style={styles.dateButtonText}>📅 {formatDateDisplay(date)}</Text>
+        </TouchableOpacity>
+
+        {Platform.OS === 'ios' && showDatePicker && (
+          <Modal
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowDatePicker(false)}
+          >
+            <View style={styles.datePickerOverlay}>
+              <View style={styles.datePickerModal}>
+                <View style={styles.datePickerHeader}>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.datePickerTitle}>Select Date</Text>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                    <Text style={styles.datePickerDone}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={new Date(`${date}T12:00:00`)}
+                  mode="date"
+                  display="spinner"
+                  maximumDate={new Date()}
+                  onChange={(event, selected) => {
+                    if (event.type === 'set' && selected) {
+                      setDate(toIsoDate(selected));
+                    }
+                  }}
+                />
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {Platform.OS === 'android' && showDatePicker && (
+          <DateTimePicker
+            value={new Date(`${date}T12:00:00`)}
+            mode="date"
+            display="default"
+            maximumDate={new Date()}
+            onChange={(event, selected) => {
+              setShowDatePicker(false);
+              if (event.type === 'set' && selected) {
+                setDate(toIsoDate(selected));
+              }
+            }}
+          />
+        )}
 
         <Text style={styles.label}>Type</Text>
         <View style={styles.typeToggle}>
@@ -1772,6 +1838,53 @@ const styles = StyleSheet.create({
     padding: 12,
     color: colors.text,
     fontSize: 16,
+  },
+  dateButton: {
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  dateButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  datePickerModal: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 24,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceHover,
+  },
+  datePickerTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  datePickerCancel: {
+    color: colors.textMuted,
+    fontSize: 15,
+  },
+  datePickerDone: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '600',
   },
   typeToggle: {
     flexDirection: 'row',
