@@ -3,11 +3,30 @@ import {
   scanReceipt,
   saveReceipt,
   fetchReceipts,
+  fetchPriceHistory,
+  mergeProducts,
 } from '../api';
 import { useToast } from './Toast';
 
 interface Props {
   formatMoney: (value: string | number) => string;
+}
+
+interface ReceiptItem {
+  id: string;
+  receipt_id: string;
+  description: string;
+  quantity: string | number;
+  unit_price: string | number;
+  total_price: string | number;
+  normalized_product_id: string | null;
+}
+
+interface PricePoint {
+  receipt_date: string | null;
+  store_name: string | null;
+  unit_price: string | number | null;
+  description: string;
 }
 
 export function ReceiptScanner({ formatMoney }: Props) {
@@ -17,16 +36,61 @@ export function ReceiptScanner({ formatMoney }: Props) {
   const [loading, setLoading] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [gallery, setGallery] = useState<Record<string, string | number | null>[]>([]);
+  const [itemsByReceipt, setItemsByReceipt] = useState<ReceiptItem[]>([]);
+  const [priceHistory, setPriceHistory] = useState<PricePoint[] | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [mergeTarget, setMergeTarget] = useState('');
+  const [mergeSource, setMergeSource] = useState('');
+  const [merging, setMerging] = useState(false);
   const { push: pushToast } = useToast();
 
   const loadGallery = async () => {
     try {
       const res = await fetchReceipts();
       setGallery(res.items as Record<string, string | number | null>[]);
+      const items = (res as unknown as { items_by_receipt?: ReceiptItem[] }).items_by_receipt;
+      setItemsByReceipt(items ?? []);
     } catch { /* non-critical */ }
   };
 
   useEffect(() => { loadGallery(); }, []);
+
+  // Unique products (by normalized_product_id) available in the gallery.
+  const products = itemsByReceipt.filter(
+    (i) => i.normalized_product_id,
+  );
+
+  const showPriceHistory = async (productId: string, productLabel: string) => {
+    setSelectedProduct(productLabel);
+    setPriceHistory(null);
+    try {
+      const res = await fetchPriceHistory(productId);
+      setPriceHistory(res.points as PricePoint[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load price history');
+    }
+  };
+
+  const handleMerge = async () => {
+    if (!mergeTarget || !mergeSource || mergeTarget === mergeSource) {
+      setError('Pick two different products to merge');
+      return;
+    }
+    setMerging(true);
+    setError(null);
+    try {
+      const res = await mergeProducts({ target_id: mergeTarget, source_id: mergeSource });
+      pushToast({ message: `Products merged (${res.status})` });
+      setMergeTarget('');
+      setMergeSource('');
+      setPriceHistory(null);
+      await loadGallery();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to merge products');
+    } finally {
+      setMerging(false);
+    }
+  };
 
   const parseQr = async () => {
     setError(null);
@@ -136,6 +200,106 @@ export function ReceiptScanner({ formatMoney }: Props) {
           </div>
         )}
       </div>
+
+      {products.length > 0 && (
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Products</h3>
+          <p style={styles.productHint}>Click a product to see its price history.</p>
+          <div style={styles.productGrid}>
+            {products.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                style={styles.productChip}
+                onClick={() => showPriceHistory(p.normalized_product_id!, p.description)}
+              >
+                {p.description}
+              </button>
+            ))}
+          </div>
+
+          {priceHistory && (
+            <div style={styles.priceHistory}>
+              <h4 style={styles.priceHistoryTitle}>Price history — {selectedProduct}</h4>
+              {priceHistory.length === 0 ? (
+                <p style={styles.empty}>No price history available yet.</p>
+              ) : (
+                <div style={styles.tableWrapper}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Date</th>
+                        <th style={styles.th}>Store</th>
+                        <th style={styles.th} align="right">Unit price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {priceHistory.map((pt, i) => (
+                        <tr key={i} style={styles.tr}>
+                          <td style={styles.td}>{pt.receipt_date || '—'}</td>
+                          <td style={styles.td}>{pt.store_name || '—'}</td>
+                          <td style={styles.td} align="right">
+                            {pt.unit_price != null ? formatMoney(pt.unit_price) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {products.length > 1 && (
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Merge duplicate products</h3>
+          <p style={styles.productHint}>
+            Reassign all items from the source product to the target product.
+          </p>
+          <div style={styles.mergeRow}>
+            <label style={styles.label}>
+              Keep (target)
+              <select
+                style={styles.select}
+                value={mergeTarget}
+                onChange={(e) => setMergeTarget(e.target.value)}
+              >
+                <option value="">Select…</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.normalized_product_id!}>
+                    {p.description}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={styles.label}>
+              Merge away (source)
+              <select
+                style={styles.select}
+                value={mergeSource}
+                onChange={(e) => setMergeSource(e.target.value)}
+              >
+                <option value="">Select…</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.normalized_product_id!}>
+                    {p.description}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              style={styles.button}
+              onClick={handleMerge}
+              disabled={merging}
+            >
+              {merging ? 'Merging…' : 'Merge'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -160,4 +324,11 @@ const styles: Record<string, CSSProperties> = {
   th: { textAlign: 'left', padding: '0.625rem 0.75rem', color: 'var(--color-text-muted)', fontWeight: 500, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' },
   tr: { borderBottom: '1px solid var(--color-surface)' },
   td: { padding: '0.625rem 0.75rem', color: 'var(--color-text)' },
+  productHint: { color: 'var(--color-text-muted)', fontSize: '0.8125rem', margin: '0 0 0.75rem 0' },
+  productGrid: { display: 'flex', flexWrap: 'wrap', gap: '0.375rem', marginBottom: '1rem' },
+  productChip: { backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '0.5rem', padding: '0.375rem 0.75rem', color: 'var(--color-text)', fontSize: '0.8125rem', cursor: 'pointer' },
+  priceHistory: { marginTop: '0.5rem' },
+  priceHistoryTitle: { fontSize: '0.9375rem', fontWeight: 600, margin: '0 0 0.75rem 0' },
+  mergeRow: { display: 'flex', gap: '0.75rem', alignItems: 'flex-end' },
+  select: { backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '0.5rem', padding: '0.625rem 0.75rem', color: 'var(--color-text)', fontSize: '0.875rem', width: '100%', boxSizing: 'border-box' },
 };

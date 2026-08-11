@@ -18,6 +18,7 @@ import {
 import { TransactionForm } from './components/TransactionForm';
 import { CategoryManager } from './components/CategoryManager';
 import { AccountManager } from './components/AccountManager';
+import { LedgerManager } from './components/LedgerManager';
 import { TransactionTable } from './components/TransactionTable';
 import { AuditDashboard } from './components/AuditDashboard';
 import { BudgetManager } from './components/BudgetManager';
@@ -28,12 +29,13 @@ import { EmptyState } from './components/EmptyState';
 import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
 
 const TABS: Tab[] = [
   'dashboard',
   'transactions',
   'accounts',
+  'ledger',
   'budgets',
   'reports',
   'reconciliation',
@@ -51,6 +53,7 @@ const NAV_ITEMS: [Tab, string][] = [
   ['dashboard', 'Dashboard'],
   ['transactions', 'Transactions'],
   ['accounts', 'Accounts'],
+  ['ledger', 'Ledger'],
   ['budgets', 'Budgets'],
   ['reports', 'Reports'],
   ['reconciliation', 'Reconciliation'],
@@ -562,6 +565,8 @@ export default function App() {
             accounts={accounts}
             onAccountsChanged={loadAccounts}
           />
+        ) : tab === 'ledger' ? (
+          <LedgerManager formatMoney={formatMoney} />
         ) : tab === 'transactions' ? (
           <div>
             <div style={styles.pageHeader}>

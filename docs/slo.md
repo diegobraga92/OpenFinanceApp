@@ -46,7 +46,7 @@
 | `GET /api/reports/category-breakdown` | 99.5% | < 100ms | < 300ms | < 1s |
 | `GET /api/reports/trends` | 99.5% | < 100ms | < 300ms | < 1s |
 | `POST /api/ledger/transactions` | 99.95% | < 50ms | < 150ms | < 300ms |
-| `GET /api/ledger/accounts` | 99.9% | < 10ms | < 50ms | < 100ms |
+| `GET /api/accounts` | 99.9% | < 10ms | < 50ms | < 100ms |
 | `GET /api/ledger/transactions` | 99.9% | < 50ms | < 150ms | < 300ms |
 | `POST /api/migrate/single-to-double` | 99.0% | < 1s | < 5s | < 10s |
 | `POST /api/reconciliation` | 99.0% | < 500ms | < 2s | < 5s |

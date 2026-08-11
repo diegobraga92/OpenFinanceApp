@@ -33,12 +33,15 @@ import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { AccountsScreen } from './src/screens/AccountsScreen';
 import { NotificationSettingsScreen } from './src/screens/NotificationSettingsScreen';
+import { ReceiptsScreen } from './src/screens/ReceiptsScreen';
+import { AuditScreen } from './src/screens/AuditScreen';
+import { LedgerScreen } from './src/screens/LedgerScreen';
 import { BudgetsScreen } from './src/screens/BudgetsScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 
-type Screen = 'dashboard' | 'transactions' | 'accounts' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit';
 
 const DRAWER_ITEMS: {
   key: Screen;
@@ -48,10 +51,13 @@ const DRAWER_ITEMS: {
   { key: 'dashboard', icon: 'stats-chart-outline', label: 'Dashboard' },
   { key: 'transactions', icon: 'swap-horizontal-outline', label: 'Transactions' },
   { key: 'accounts', icon: 'wallet-outline', label: 'Accounts' },
+  { key: 'ledger', icon: 'book-outline', label: 'Ledger' },
   { key: 'budgets', icon: 'pie-chart-outline', label: 'Budgets' },
   { key: 'reports', icon: 'trending-up-outline', label: 'Reports' },
   { key: 'reconciliation', icon: 'sync-outline', label: 'Reconciliation' },
   { key: 'categories', icon: 'pricetags-outline', label: 'Categories' },
+  { key: 'receipts', icon: 'receipt-outline', label: 'Receipts' },
+  { key: 'audit', icon: 'list-outline', label: 'Audit Log' },
   { key: 'notifications', icon: 'notifications-outline', label: 'Notification Capture' },
 ];
 
@@ -274,6 +280,9 @@ function AppContent() {
           {screen === 'notifications' && (
             <NotificationSettingsScreen categories={categories} />
           )}
+          {screen === 'receipts' && <ReceiptsScreen formatMoney={formatMoney} />}
+          {screen === 'audit' && <AuditScreen />}
+          {screen === 'ledger' && <LedgerScreen formatMoney={formatMoney} />}
           {screen === 'reconciliation' && <ReconciliationScreen formatMoney={formatMoney} />}
           {showAddForm && (
             <AddTransactionForm

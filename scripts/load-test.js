@@ -51,7 +51,7 @@ export function smoke() {
     ['GET /api/reports/monthly', http.get(`${BASE}/api/reports/monthly`, { headers: HEADERS })],
     ['GET /api/reports/category-breakdown', http.get(`${BASE}/api/reports/category-breakdown`, { headers: HEADERS })],
     ['GET /api/reports/trends', http.get(`${BASE}/api/reports/trends`, { headers: HEADERS })],
-    ['GET /api/ledger/accounts', http.get(`${BASE}/api/ledger/accounts`, { headers: HEADERS })],
+    ['GET /api/accounts', http.get(`${BASE}/api/accounts`, { headers: HEADERS })],
     ['GET /metrics', http.get(`${BASE}/metrics`, { headers: HEADERS })],
   ];
 
@@ -69,7 +69,7 @@ export function apiTraffic() {
     () => http.get(`${BASE}/api/categories`, { headers: HEADERS }),
     () => http.get(`${BASE}/api/reports/trends`, { headers: HEADERS }),
     () => http.get(`${BASE}/api/reports/monthly`, { headers: HEADERS }),
-    () => http.get(`${BASE}/api/ledger/accounts`, { headers: HEADERS }),
+    () => http.get(`${BASE}/api/accounts`, { headers: HEADERS }),
   ];
   const readRes = reads[Math.floor(Math.random() * reads.length)]();
   check(readRes, { 'read status 2xx': (r) => r.status >= 200 && r.status < 300 });

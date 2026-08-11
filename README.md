@@ -277,12 +277,22 @@ Internal container-to-container communication (`postgres:5432`, `backend:3000`,
 | `GET` | `/api/accounts/{id}` | Get single account with balance |
 | `PUT` | `/api/accounts/{id}` | Update account |
 | `DELETE` | `/api/accounts/{id}` | Delete account (409 if in use) |
+| `GET` | `/api/ledger/transactions` | List double-entry ledger transactions |
+| `POST` | `/api/ledger/transactions` | Create balanced double-entry transaction |
+| `POST` | `/api/migrate/single-to-double` | Migrate simple transactions to double-entry |
 | `GET` | `/api/transactions` | Paginated list with filters (category, type, date range) |
 | `POST` | `/api/transactions` | Create transaction |
 | `GET` | `/api/transactions/{id}` | Get single transaction |
 | `PUT` | `/api/transactions/{id}` | Update transaction |
 | `DELETE` | `/api/transactions/{id}` | Delete transaction |
 | `GET` | `/api/summary` | Current month totals (income, expense, balance), grouped by category |
+| `GET` | `/api/receipts` | List saved receipts (includes items + normalized product ids) |
+| `POST` | `/api/receipts` | Save a parsed receipt |
+| `POST` | `/api/receipts/scan` | Parse an NFC-e QR code into receipt data |
+| `GET` | `/api/receipts/price-history` | Price history for a normalized product |
+| `POST` | `/api/receipts/product/merge` | Merge duplicate normalized products |
+| `POST` | `/api/reconciliation` | Upload bank statement CSV for reconciliation |
+| `GET` | `/api/audit/events` | List immutable audit events (admin-only) |
 
 The full OpenAPI 3.1 spec is available at `http://localhost:3000/api-docs/openapi.json` and served via Swagger UI at `http://localhost:3000/swagger-ui`.
 

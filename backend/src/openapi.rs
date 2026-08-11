@@ -60,7 +60,6 @@ use crate::routes::transactions;
         accounts::delete_account,
         ledger::create_ledger_transaction,
         ledger::list_ledger_transactions,
-        ledger::list_accounts,
         ledger::migrate_single_to_double,
         ledger::reconcile,
         auth::register,

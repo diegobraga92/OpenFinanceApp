@@ -32,41 +32,11 @@ pub fn router() -> Router<AppState> {
             axum::routing::post(create_ledger_transaction),
         )
         .route("/api/ledger/transactions", get(list_ledger_transactions))
-        .route("/api/ledger/accounts", get(list_accounts))
         .route(
             "/api/migrate/single-to-double",
             axum::routing::post(migrate_single_to_double),
         )
         .route("/api/reconciliation", axum::routing::post(reconcile))
-}
-
-/// Lists all accounts in the chart of accounts.
-#[utoipa::path(
-    get,
-    path = "/api/ledger/accounts",
-    tag = "Ledger",
-    operation_id = "list_ledger_accounts",
-    responses(
-        (status = 200, description = "List of accounts", body = [crate::models::Account]),
-    ),
-)]
-pub async fn list_accounts(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<crate::models::Account>>, (StatusCode, Json<serde_json::Value>)> {
-    let accounts = sqlx::query_as::<_, crate::models::Account>(
-        "SELECT id, name, type, parent_id, created_at FROM accounts ORDER BY name",
-    )
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        error!("Failed to list accounts: {}", e);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Failed to list accounts" })),
-        )
-    })?;
-
-    Ok(Json(accounts))
 }
 
 /// Lists ledger transactions (grouped by transaction_id) with their entries.

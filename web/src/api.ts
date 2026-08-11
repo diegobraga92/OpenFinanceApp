@@ -16,8 +16,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 // hammering the backend.
 let refreshPromise: Promise<string | null> | null = null;
 
-export type HealthResponse = components['schemas']['HealthResponse'];
-export type HealthError = components['schemas']['HealthError'];
 export type Category = components['schemas']['Category'];
 export type CreateCategoryRequest = components['schemas']['CreateCategoryRequest'];
 export type UpdateCategoryRequest = components['schemas']['UpdateCategoryRequest'];
@@ -28,7 +26,6 @@ export type TransactionListResponse = components['schemas']['TransactionListResp
 export type SummaryResponse = components['schemas']['SummaryResponse'];
 export type Budget = components['schemas']['Budget'];
 export type CreateBudgetRequest = components['schemas']['CreateBudgetRequest'];
-export type BudgetListResponse = components['schemas']['BudgetListResponse'];
 export type BudgetWithCategory = components['schemas']['BudgetWithCategory'];
 export type BudgetSummaryItem = components['schemas']['BudgetSummaryItem'];
 export type BudgetSummaryResponse = components['schemas']['BudgetSummaryResponse'];
@@ -148,10 +145,6 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-export async function fetchHealth(): Promise<HealthResponse> {
-  return request<HealthResponse>('/health');
-}
-
 export async function fetchCategories(type?: 'income' | 'expense'): Promise<Category[]> {
   const query = type ? `?type=${encodeURIComponent(type)}` : '';
   return request<Category[]>(`/api/categories${query}`);
@@ -162,10 +155,6 @@ export async function createCategory(payload: CreateCategoryRequest): Promise<Ca
     method: 'POST',
     body: JSON.stringify(payload),
   });
-}
-
-export async function fetchCategory(id: string): Promise<Category> {
-  return request<Category>(`/api/categories/${id}`);
 }
 
 export async function updateCategory(id: string, payload: UpdateCategoryRequest): Promise<Category> {
@@ -199,10 +188,6 @@ export async function fetchTransactions(params?: {
 
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<TransactionListResponse>(`/api/transactions${query}`);
-}
-
-export async function fetchTransaction(id: string): Promise<Transaction> {
-  return request<Transaction>(`/api/transactions/${id}`);
 }
 
 export async function createTransaction(
@@ -239,14 +224,6 @@ export async function fetchSummary(
   if (month !== undefined) qs.set('month', String(month));
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<SummaryResponse>(`/api/summary${query}`);
-}
-
-export async function fetchBudgets(year?: number, month?: number): Promise<BudgetListResponse> {
-  const qs = new URLSearchParams();
-  if (year !== undefined) qs.set('year', String(year));
-  if (month !== undefined) qs.set('month', String(month));
-  const query = qs.toString() ? `?${qs.toString()}` : '';
-  return request<BudgetListResponse>(`/api/budgets${query}`);
 }
 
 export async function createBudget(payload: CreateBudgetRequest): Promise<BudgetWithCategory> {
@@ -301,10 +278,6 @@ export async function fetchTrends(months?: number): Promise<TrendsResponse> {
   if (months !== undefined) qs.set('months', String(months));
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<TrendsResponse>(`/api/reports/trends${query}`);
-}
-
-export async function fetchAccounts(): Promise<Account[]> {
-  return request<Account[]>('/api/ledger/accounts');
 }
 
 export async function fetchAccountsWithBalance(): Promise<AccountWithBalance[]> {

@@ -7,7 +7,6 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3
 // hammering the backend.
 let refreshPromise: Promise<string | null> | null = null;
 
-export type HealthResponse = components['schemas']['HealthResponse'];
 export type Category = components['schemas']['Category'];
 export type CreateCategoryRequest = components['schemas']['CreateCategoryRequest'];
 export type UpdateCategoryRequest = components['schemas']['UpdateCategoryRequest'];
@@ -18,7 +17,6 @@ export type TransactionListResponse = components['schemas']['TransactionListResp
 export type SummaryResponse = components['schemas']['SummaryResponse'];
 export type Budget = components['schemas']['Budget'];
 export type CreateBudgetRequest = components['schemas']['CreateBudgetRequest'];
-export type BudgetListResponse = components['schemas']['BudgetListResponse'];
 export type BudgetWithCategory = components['schemas']['BudgetWithCategory'];
 export type BudgetSummaryItem = components['schemas']['BudgetSummaryItem'];
 export type BudgetSummaryResponse = components['schemas']['BudgetSummaryResponse'];
@@ -134,10 +132,6 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-export async function fetchHealth(): Promise<HealthResponse> {
-  return request<HealthResponse>('/health');
-}
-
 export async function fetchCategories(type?: 'income' | 'expense'): Promise<Category[]> {
   const query = type ? `?type=${encodeURIComponent(type)}` : '';
   return request<Category[]>(`/api/categories${query}`);
@@ -183,10 +177,6 @@ export async function fetchTransactions(params?: {
   return request<TransactionListResponse>(`/api/transactions${query}`);
 }
 
-export async function fetchTransaction(id: string): Promise<Transaction> {
-  return request<Transaction>(`/api/transactions/${id}`);
-}
-
 export async function createTransaction(
   payload: CreateTransactionRequest,
 ): Promise<Transaction> {
@@ -221,14 +211,6 @@ export async function fetchSummary(
   if (month !== undefined) qs.set('month', String(month));
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<SummaryResponse>(`/api/summary${query}`);
-}
-
-export async function fetchBudgets(year?: number, month?: number): Promise<BudgetListResponse> {
-  const qs = new URLSearchParams();
-  if (year !== undefined) qs.set('year', String(year));
-  if (month !== undefined) qs.set('month', String(month));
-  const query = qs.toString() ? `?${qs.toString()}` : '';
-  return request<BudgetListResponse>(`/api/budgets${query}`);
 }
 
 export async function createBudget(payload: CreateBudgetRequest): Promise<BudgetWithCategory> {
@@ -283,10 +265,6 @@ export async function fetchTrends(months?: number): Promise<TrendsResponse> {
   if (months !== undefined) qs.set('months', String(months));
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<TrendsResponse>(`/api/reports/trends${query}`);
-}
-
-export async function fetchAccounts(): Promise<Account[]> {
-  return request<Account[]>('/api/ledger/accounts');
 }
 
 export async function fetchAccountsWithBalance(): Promise<AccountWithBalance[]> {
@@ -379,6 +357,34 @@ export async function fetchMe(token: string): Promise<{ id: string; email: strin
   return request<{ id: string; email: string; role: string }>('/api/auth/me', {
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+// --- Audit ---
+
+export interface AuditEvent {
+  id: number;
+  aggregate_id: string;
+  aggregate_type: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  occurred_at: string;
+}
+
+export async function fetchAuditEvents(
+  token: string | null,
+  params?: { event_type?: string; page?: number; page_size?: number },
+): Promise<{ items: AuditEvent[]; page: number; page_size: number }> {
+  const qs = new URLSearchParams();
+  if (params?.event_type) qs.set('event_type', params.event_type);
+  if (params?.page !== undefined) qs.set('page', String(params.page));
+  if (params?.page_size !== undefined) qs.set('page_size', String(params.page_size));
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return request<{ items: AuditEvent[]; page: number; page_size: number }>(
+    `/api/audit/events${query}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 // --- Receipts ---

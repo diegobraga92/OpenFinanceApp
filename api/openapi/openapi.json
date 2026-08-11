@@ -655,30 +655,6 @@
         }
       }
     },
-    "/api/ledger/accounts": {
-      "get": {
-        "tags": [
-          "Ledger"
-        ],
-        "summary": "Lists all accounts in the chart of accounts.",
-        "operationId": "list_ledger_accounts",
-        "responses": {
-          "200": {
-            "description": "List of accounts",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Account"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/ledger/transactions": {
       "get": {
         "tags": [

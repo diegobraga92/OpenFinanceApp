@@ -275,6 +275,17 @@ pub async fn list_receipts(
         item_count: i64,
     }
 
+    #[derive(sqlx::FromRow, serde::Serialize)]
+    struct ReceiptItemRow {
+        id: Uuid,
+        receipt_id: Uuid,
+        description: String,
+        quantity: Decimal,
+        unit_price: Decimal,
+        total_price: Decimal,
+        normalized_product_id: Option<Uuid>,
+    }
+
     let rows: Vec<ReceiptRow> = sqlx::query_as(
         "SELECT r.id, r.store_id, s.name AS store_name, r.total_amount, r.receipt_date,
                 (SELECT COUNT(*) FROM receipt_items ri WHERE ri.receipt_id = r.id) AS item_count
@@ -295,10 +306,36 @@ pub async fn list_receipts(
         )
     })?;
 
+    // Fetch items for the visible receipts in one batch so the UI can expose
+    // normalized product ids for price-history and product-merge features.
+    let receipt_ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
+    let items: Vec<ReceiptItemRow> = if receipt_ids.is_empty() {
+        Vec::new()
+    } else {
+        sqlx::query_as(
+            "SELECT id, receipt_id, description, quantity, unit_price, total_price,
+                    normalized_product_id
+             FROM receipt_items
+             WHERE receipt_id = ANY($1)
+             ORDER BY description",
+        )
+        .bind(&receipt_ids)
+        .fetch_all(&state.pg_pool)
+        .await
+        .map_err(|e| {
+            error!("receipt items fetch failed: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to list receipt items" })),
+            )
+        })?
+    };
+
     Ok(Json(json!({
         "items": rows,
         "page": page,
         "page_size": page_size,
+        "items_by_receipt": items,
     })))
 }
 
