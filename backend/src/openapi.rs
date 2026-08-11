@@ -2,15 +2,17 @@ use utoipa::OpenApi;
 
 use crate::health;
 use crate::models::{
-    Account, Budget, BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse,
-    BudgetWithCategory, Category, CategoryBreakdownItem, CategoryBreakdownResponse,
-    CategorySummary, CreateBudgetRequest, CreateCategoryRequest, CreateLedgerTransactionRequest,
-    CreateLedgerTransactionResponse, CreateTransactionRequest, LedgerEntry, LedgerEntryRequest,
-    LedgerTransaction, MigrationResponse, MonthlyReportItem, MonthlyReportResponse,
-    ReconciliationItem, ReconciliationUploadRequest, ReconciliationUploadResponse, StatementLine,
-    SummaryResponse, Transaction, TransactionListParams, TransactionListResponse, TrendPoint,
-    TrendsResponse, UpdateTransactionRequest,
+    Account, AccountWithBalance, Budget, BudgetListResponse, BudgetSummaryItem,
+    BudgetSummaryResponse, BudgetWithCategory, Category, CategoryBreakdownItem,
+    CategoryBreakdownResponse, CategorySummary, CreateAccountRequest, CreateBudgetRequest,
+    CreateCategoryRequest, CreateLedgerTransactionRequest, CreateLedgerTransactionResponse,
+    CreateTransactionRequest, LedgerEntry, LedgerEntryRequest, LedgerTransaction,
+    MigrationResponse, MonthlyReportItem, MonthlyReportResponse, ReconciliationItem,
+    ReconciliationUploadRequest, ReconciliationUploadResponse, StatementLine, SummaryResponse,
+    Transaction, TransactionListParams, TransactionListResponse, TrendPoint, TrendsResponse,
+    UpdateAccountRequest, UpdateCategoryRequest, UpdateTransactionRequest,
 };
+use crate::routes::accounts;
 use crate::routes::audit;
 use crate::routes::auth::{self, LoginRequest, RefreshRequest, RegisterRequest};
 use crate::routes::budgets;
@@ -34,7 +36,10 @@ use crate::routes::transactions;
         health::health_handler,
         health::metrics_handler_doc,
         categories::list_categories,
+        categories::get_category,
         categories::create_category,
+        categories::update_category,
+        categories::delete_category,
         transactions::list_transactions,
         transactions::create_transaction,
         transactions::get_transaction,
@@ -48,6 +53,11 @@ use crate::routes::transactions;
         reports::monthly_report,
         reports::category_breakdown,
         reports::trends,
+        accounts::list_accounts,
+        accounts::get_account,
+        accounts::create_account,
+        accounts::update_account,
+        accounts::delete_account,
         ledger::create_ledger_transaction,
         ledger::list_ledger_transactions,
         ledger::list_accounts,
@@ -76,6 +86,9 @@ use crate::routes::transactions;
         MergeProductsRequest,
         PriceHistoryParams,
         Account,
+        AccountWithBalance,
+        CreateAccountRequest,
+        UpdateAccountRequest,
         CreateLedgerTransactionRequest,
         CreateLedgerTransactionResponse,
         LedgerEntry,
@@ -88,6 +101,7 @@ use crate::routes::transactions;
         StatementLine,
         Category,
         CreateCategoryRequest,
+        UpdateCategoryRequest,
         CategoryListParams,
         Transaction,
         CreateTransactionRequest,

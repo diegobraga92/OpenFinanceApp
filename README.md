@@ -82,6 +82,36 @@ npm install
 npx expo start
 ```
 
+### Mobile: Push Notification Capture
+
+PudimFinance can auto-capture transactions from bank/payment push notifications
+(Nubank, Itaú, Banco do Brasil, PicPay, PIX, …):
+
+1. Open **Notification Capture** from the drawer menu.
+2. Toggle **Auto-capture transactions** on and grant notification access.
+3. Pick the apps to monitor (or leave empty to watch all) and choose a capture
+   mode:
+   - **Ask before creating** — a confirmation dialog appears with the parsed
+     amount/description before anything is saved.
+   - **Auto-create** — transactions are saved immediately (Snackbar confirms).
+4. Optionally pick a **default category** used when the merchant can't be
+   matched to an existing category.
+
+The parser understands common Brazilian alert formats:
+
+```
+Compra aprovada R$ 49,90 em IFOOD        → expense 49.90 · IFOOD
+Pix recebido R$ 500,00 de MARIA SANTOS   → income 500.00 · MARIA SANTOS
+Cartão final 1234 R$ 100,00 às 14:30     → expense 100.00
+Boleto pago R$ 85,75                     → expense 85.75
+```
+
+> **Note:** iOS only allows foreground notifications to be observed. For
+> reliable capture while the app is backgrounded on Android, a native
+> `NotificationListenerService` module is required (out of scope for the
+> managed Expo workflow).
+
+
 ---
 
 ## LAN Server Deployment
@@ -239,6 +269,14 @@ Internal container-to-container communication (`postgres:5432`, `backend:3000`,
 | `GET` | `/health` | Health check (API + database status) |
 | `GET` | `/api/categories` | List categories (filter by `?type=income\|expense`) |
 | `POST` | `/api/categories` | Create category |
+| `GET` | `/api/categories/{id}` | Get single category |
+| `PUT` | `/api/categories/{id}` | Update category |
+| `DELETE` | `/api/categories/{id}` | Delete category (409 if in use) |
+| `GET` | `/api/accounts` | List chart-of-accounts with computed balances |
+| `POST` | `/api/accounts` | Create account (asset/liability/equity/income/expense) |
+| `GET` | `/api/accounts/{id}` | Get single account with balance |
+| `PUT` | `/api/accounts/{id}` | Update account |
+| `DELETE` | `/api/accounts/{id}` | Delete account (409 if in use) |
 | `GET` | `/api/transactions` | Paginated list with filters (category, type, date range) |
 | `POST` | `/api/transactions` | Create transaction |
 | `GET` | `/api/transactions/{id}` | Get single transaction |

@@ -47,6 +47,22 @@ pub struct CreateCategoryRequest {
     pub color: Option<String>,
 }
 
+/// Payload for updating an existing category.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateCategoryRequest {
+    /// Display name (e.g., "Food & Groceries").
+    pub name: String,
+    /// `income` or `expense`.
+    #[schema(example = "expense")]
+    pub r#type: String,
+    /// Optional parent category for subcategories.
+    pub parent_id: Option<Uuid>,
+    /// Icon identifier used by the web/mobile UIs.
+    pub icon: Option<String>,
+    /// Hex color code (e.g., `#ef4444`).
+    pub color: Option<String>,
+}
+
 /// A single income or expense transaction.
 #[derive(Debug, Clone, Serialize, FromRow, ToSchema)]
 pub struct Transaction {
@@ -396,6 +412,59 @@ pub struct Account {
     pub parent_id: Option<Uuid>,
     /// Row creation timestamp.
     pub created_at: DateTime<Utc>,
+}
+
+/// Payload for creating a new account.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateAccountRequest {
+    /// Account display name (e.g., "Nubank Credit Card").
+    pub name: String,
+    /// `asset`, `liability`, `equity`, `income`, or `expense`.
+    #[schema(example = "liability")]
+    pub r#type: String,
+    /// Optional parent account.
+    pub parent_id: Option<Uuid>,
+}
+
+/// Payload for updating an existing account.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateAccountRequest {
+    /// Account display name.
+    pub name: String,
+    /// `asset`, `liability`, `equity`, `income`, or `expense`.
+    #[schema(example = "liability")]
+    pub r#type: String,
+    /// Optional parent account.
+    pub parent_id: Option<Uuid>,
+}
+
+/// Account joined with its current computed balance from ledger entries.
+#[derive(Debug, Serialize, FromRow, ToSchema)]
+pub struct AccountWithBalance {
+    /// Unique account identifier.
+    pub id: Uuid,
+    /// Account display name (e.g., "Credit Card").
+    pub name: String,
+    /// `asset`, `liability`, `equity`, `income`, or `expense`.
+    pub r#type: String,
+    /// Optional parent account.
+    pub parent_id: Option<Uuid>,
+    /// Row creation timestamp.
+    pub created_at: DateTime<Utc>,
+    /// Balance = SUM(debit_amount) − SUM(credit_amount) across ledger entries.
+    /// Positive for asset/expense accounts, negative for liability/income/equity
+    /// under standard double-entry semantics.
+    #[schema(value_type = String)]
+    pub balance: Decimal,
+    /// Total number of ledger entries posting to this account.
+    pub transaction_count: i64,
+}
+
+const ACCOUNT_TYPES: [&str; 5] = ["asset", "liability", "equity", "income", "expense"];
+
+/// Returns true if `t` is a valid chart-of-accounts type.
+pub fn is_valid_account_type(t: &str) -> bool {
+    ACCOUNT_TYPES.contains(&t)
 }
 
 /// Payload for creating a ledger transaction (double-entry).

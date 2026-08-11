@@ -2,6 +2,7 @@
 //!
 //! Group handlers by resource (categories, transactions, summary)
 
+pub mod accounts;
 pub mod audit;
 pub mod auth;
 pub mod budgets;
@@ -25,6 +26,7 @@ pub fn api_router() -> Router<AppState> {
         .merge(budgets::router())
         .merge(reports::router())
         .merge(ledger::router())
+        .merge(accounts::router())
         .merge(auth::router())
         .merge(audit::router())
         .merge(receipts::router())

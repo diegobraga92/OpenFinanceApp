@@ -4,6 +4,54 @@
  */
 
 export interface paths {
+    "/api/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists all accounts with their computed balances. */
+        get: operations["list_accounts"];
+        put?: never;
+        /**
+         * Creates a new account.
+         * @description Returns `400` if the payload is invalid (missing name, invalid type,
+         *     non-existent parent).
+         */
+        post: operations["create_account"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetches a single account with its computed balance. */
+        get: operations["get_account"];
+        /**
+         * Updates an existing account.
+         * @description Returns `404` if the account does not exist, `400` for invalid payloads.
+         */
+        put: operations["update_account"];
+        post?: never;
+        /**
+         * Deletes an account.
+         * @description Returns `409` if ledger entries or sub-accounts reference it,
+         *     `404` if the account does not exist.
+         */
+        delete: operations["delete_account"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit/events": {
         parameters: {
             query?: never;
@@ -166,6 +214,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetches a single category by id. */
+        get: operations["get_category"];
+        /**
+         * Updates an existing category.
+         * @description Returns `404` if the category does not exist, `400` for invalid payloads.
+         */
+        put: operations["update_category"];
+        post?: never;
+        /**
+         * Deletes a category.
+         * @description Returns `409` if the category is referenced by transactions or subcategories,
+         *     `404` if the category does not exist.
+         */
+        delete: operations["delete_category"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ledger/accounts": {
         parameters: {
             query?: never;
@@ -174,7 +248,7 @@ export interface paths {
             cookie?: never;
         };
         /** Lists all accounts in the chart of accounts. */
-        get: operations["list_accounts"];
+        get: operations["list_ledger_accounts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,6 +552,39 @@ export interface components {
             /** @description `asset`, `liability`, `equity`, `income`, or `expense`. */
             type: string;
         };
+        /** @description Account joined with its current computed balance from ledger entries. */
+        AccountWithBalance: {
+            /**
+             * @description Balance = SUM(debit_amount) − SUM(credit_amount) across ledger entries.
+             *     Positive for asset/expense accounts, negative for liability/income/equity
+             *     under standard double-entry semantics.
+             */
+            balance: string;
+            /**
+             * Format: date-time
+             * @description Row creation timestamp.
+             */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description Unique account identifier.
+             */
+            id: string;
+            /** @description Account display name (e.g., "Credit Card"). */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Optional parent account.
+             */
+            parent_id?: string | null;
+            /**
+             * Format: int64
+             * @description Total number of ledger entries posting to this account.
+             */
+            transaction_count: number;
+            /** @description `asset`, `liability`, `equity`, `income`, or `expense`. */
+            type: string;
+        };
         /** @description A monthly budget limit for a category. */
         Budget: {
             /** @description Maximum spend limit for the month. */
@@ -678,6 +785,21 @@ export interface components {
             icon?: string | null;
             /** @description Total amount for this category. */
             total: string;
+        };
+        /** @description Payload for creating a new account. */
+        CreateAccountRequest: {
+            /** @description Account display name (e.g., "Nubank Credit Card"). */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Optional parent account.
+             */
+            parent_id?: string | null;
+            /**
+             * @description `asset`, `liability`, `equity`, `income`, or `expense`.
+             * @example liability
+             */
+            type: string;
         };
         /** @description Payload for creating or updating a budget (upsert). */
         CreateBudgetRequest: {
@@ -1218,6 +1340,40 @@ export interface components {
             /** @description Monthly points, chronological order. */
             trends: components["schemas"]["TrendPoint"][];
         };
+        /** @description Payload for updating an existing account. */
+        UpdateAccountRequest: {
+            /** @description Account display name. */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Optional parent account.
+             */
+            parent_id?: string | null;
+            /**
+             * @description `asset`, `liability`, `equity`, `income`, or `expense`.
+             * @example liability
+             */
+            type: string;
+        };
+        /** @description Payload for updating an existing category. */
+        UpdateCategoryRequest: {
+            /** @description Hex color code (e.g., `#ef4444`). */
+            color?: string | null;
+            /** @description Icon identifier used by the web/mobile UIs. */
+            icon?: string | null;
+            /** @description Display name (e.g., "Food & Groceries"). */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Optional parent category for subcategories.
+             */
+            parent_id?: string | null;
+            /**
+             * @description `income` or `expense`.
+             * @example expense
+             */
+            type: string;
+        };
         /** @description Payload for updating an existing transaction. */
         UpdateTransactionRequest: {
             /**
@@ -1255,6 +1411,163 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_accounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of accounts with balances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountWithBalance"][];
+                };
+            };
+        };
+    };
+    create_account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Account created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description Invalid account payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountWithBalance"];
+                };
+            };
+            /** @description Account not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Account updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description Invalid account payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Account not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Account not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Account is in use */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_audit_events: {
         parameters: {
             query?: never;
@@ -1592,7 +1905,113 @@ export interface operations {
             };
         };
     };
-    list_accounts: {
+    get_category: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Category UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Category found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            /** @description Category not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_category: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Category UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Category updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            /** @description Invalid category payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Category not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_category: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Category UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Category deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Category not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Category is in use */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_ledger_accounts: {
         parameters: {
             query?: never;
             header?: never;

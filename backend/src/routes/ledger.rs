@@ -45,6 +45,7 @@ pub fn router() -> Router<AppState> {
     get,
     path = "/api/ledger/accounts",
     tag = "Ledger",
+    operation_id = "list_ledger_accounts",
     responses(
         (status = 200, description = "List of accounts", body = [crate::models::Account]),
     ),

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { useAuth } from './auth/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
 import {
+  AccountWithBalance,
   Category,
   createTransaction,
+  fetchAccountsWithBalance,
   fetchBudgetSummary,
   fetchCategories,
   fetchSummary,
@@ -15,6 +17,7 @@ import {
 } from './api';
 import { TransactionForm } from './components/TransactionForm';
 import { CategoryManager } from './components/CategoryManager';
+import { AccountManager } from './components/AccountManager';
 import { TransactionTable } from './components/TransactionTable';
 import { AuditDashboard } from './components/AuditDashboard';
 import { BudgetManager } from './components/BudgetManager';
@@ -25,11 +28,12 @@ import { EmptyState } from './components/EmptyState';
 import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
 
 const TABS: Tab[] = [
   'dashboard',
   'transactions',
+  'accounts',
   'budgets',
   'reports',
   'reconciliation',
@@ -46,6 +50,7 @@ const MONTH_NAMES = [
 const NAV_ITEMS: [Tab, string][] = [
   ['dashboard', 'Dashboard'],
   ['transactions', 'Transactions'],
+  ['accounts', 'Accounts'],
   ['budgets', 'Budgets'],
   ['reports', 'Reports'],
   ['reconciliation', 'Reconciliation'],
@@ -57,6 +62,7 @@ const NAV_ITEMS: [Tab, string][] = [
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<AccountWithBalance[]>([]);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [trends, setTrends] = useState<TrendsResponse | null>(null);
@@ -81,6 +87,17 @@ export default function App() {
     }
   }, []);
 
+  const loadAccounts = useCallback(async () => {
+    try {
+      const data = await fetchAccountsWithBalance();
+      setAccounts(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load accounts');
+      return [];
+    }
+  }, []);
+
   const loadTransactions = useCallback(async () => {
     try {
       const data = await fetchTransactions({ page_size: 50 });
@@ -96,16 +113,18 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [cats, summ, txns, trnds] = await Promise.all([
+      const [cats, summ, txns, trnds, accnts] = await Promise.all([
         loadCategories(),
         fetchSummary(),
         loadTransactions(),
         fetchTrends(6).catch(() => null),
+        fetchAccountsWithBalance().catch(() => [] as AccountWithBalance[]),
       ]);
       setCategories(cats);
       setSummary(summ);
       setTransactions(txns);
       setTrends(trnds);
+      setAccounts(accnts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -538,6 +557,11 @@ export default function App() {
           <ReceiptScanner formatMoney={formatMoney} />
         ) : tab === 'audit' ? (
           <AuditDashboard token={authToken} />
+        ) : tab === 'accounts' ? (
+          <AccountManager
+            accounts={accounts}
+            onAccountsChanged={loadAccounts}
+          />
         ) : tab === 'transactions' ? (
           <div>
             <div style={styles.pageHeader}>

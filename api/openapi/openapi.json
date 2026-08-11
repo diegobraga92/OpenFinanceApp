@@ -15,6 +15,178 @@
     }
   ],
   "paths": {
+    "/api/accounts": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Lists all accounts with their computed balances.",
+        "operationId": "list_accounts",
+        "responses": {
+          "200": {
+            "description": "List of accounts with balances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountWithBalance"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Creates a new account.",
+        "description": "Returns `400` if the payload is invalid (missing name, invalid type,\nnon-existent parent).",
+        "operationId": "create_account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid account payload"
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Fetches a single account with its computed balance.",
+        "operationId": "get_account",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountWithBalance"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Updates an existing account.",
+        "description": "Returns `404` if the account does not exist, `400` for invalid payloads.",
+        "operationId": "update_account",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Account updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid account payload"
+          },
+          "404": {
+            "description": "Account not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Deletes an account.",
+        "description": "Returns `409` if ledger entries or sub-accounts reference it,\n`404` if the account does not exist.",
+        "operationId": "delete_account",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Account deleted"
+          },
+          "404": {
+            "description": "Account not found"
+          },
+          "409": {
+            "description": "Account is in use"
+          }
+        }
+      }
+    },
     "/api/audit/events": {
       "get": {
         "tags": [
@@ -368,13 +540,128 @@
         }
       }
     },
+    "/api/categories/{id}": {
+      "get": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "Fetches a single category by id.",
+        "operationId": "get_category",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Category UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Category not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "Updates an existing category.",
+        "description": "Returns `404` if the category does not exist, `400` for invalid payloads.",
+        "operationId": "update_category",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Category UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Category updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid category payload"
+          },
+          "404": {
+            "description": "Category not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "Deletes a category.",
+        "description": "Returns `409` if the category is referenced by transactions or subcategories,\n`404` if the category does not exist.",
+        "operationId": "delete_category",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Category UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Category deleted"
+          },
+          "404": {
+            "description": "Category not found"
+          },
+          "409": {
+            "description": "Category is in use"
+          }
+        }
+      }
+    },
     "/api/ledger/accounts": {
       "get": {
         "tags": [
           "Ledger"
         ],
         "summary": "Lists all accounts in the chart of accounts.",
-        "operationId": "list_accounts",
+        "operationId": "list_ledger_accounts",
         "responses": {
           "200": {
             "description": "List of accounts",
@@ -1114,6 +1401,55 @@
           }
         }
       },
+      "AccountWithBalance": {
+        "type": "object",
+        "description": "Account joined with its current computed balance from ledger entries.",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "created_at",
+          "balance",
+          "transaction_count"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string",
+            "description": "Balance = SUM(debit_amount) − SUM(credit_amount) across ledger entries.\nPositive for asset/expense accounts, negative for liability/income/equity\nunder standard double-entry semantics."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Row creation timestamp."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique account identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "Account display name (e.g., \"Credit Card\")."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Optional parent account."
+          },
+          "transaction_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of ledger entries posting to this account."
+          },
+          "type": {
+            "type": "string",
+            "description": "`asset`, `liability`, `equity`, `income`, or `expense`."
+          }
+        }
+      },
       "Budget": {
         "type": "object",
         "description": "A monthly budget limit for a category.",
@@ -1504,6 +1840,33 @@
           "total": {
             "type": "string",
             "description": "Total amount for this category."
+          }
+        }
+      },
+      "CreateAccountRequest": {
+        "type": "object",
+        "description": "Payload for creating a new account.",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Account display name (e.g., \"Nubank Credit Card\")."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Optional parent account."
+          },
+          "type": {
+            "type": "string",
+            "description": "`asset`, `liability`, `equity`, `income`, or `expense`.",
+            "example": "liability"
           }
         }
       },
@@ -2544,6 +2907,74 @@
               "$ref": "#/components/schemas/TrendPoint"
             },
             "description": "Monthly points, chronological order."
+          }
+        }
+      },
+      "UpdateAccountRequest": {
+        "type": "object",
+        "description": "Payload for updating an existing account.",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Account display name."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Optional parent account."
+          },
+          "type": {
+            "type": "string",
+            "description": "`asset`, `liability`, `equity`, `income`, or `expense`.",
+            "example": "liability"
+          }
+        }
+      },
+      "UpdateCategoryRequest": {
+        "type": "object",
+        "description": "Payload for updating an existing category.",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hex color code (e.g., `#ef4444`)."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Icon identifier used by the web/mobile UIs."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name (e.g., \"Food & Groceries\")."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Optional parent category for subcategories."
+          },
+          "type": {
+            "type": "string",
+            "description": "`income` or `expense`.",
+            "example": "expense"
           }
         }
       },

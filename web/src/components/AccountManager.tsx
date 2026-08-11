@@ -1,54 +1,38 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
-import type { Category, CreateCategoryRequest } from '../api';
-import { createCategory, deleteCategory, updateCategory } from '../api';
+import type { AccountWithBalance } from '../api';
+import { createAccount, deleteAccount, updateAccount } from '../api';
 import { useToast } from './Toast';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 
 interface Props {
-  categories: Category[];
-  onCategoriesChanged: () => Promise<Category[]>;
+  accounts: AccountWithBalance[];
+  onAccountsChanged: () => Promise<AccountWithBalance[]>;
 }
 
-const ICONS = [
-  'briefcase', 'laptop', 'trending-up', 'gift', 'plus-circle',
-  'shopping-cart', 'home', 'car', 'zap', 'film', 'heart', 'book',
-  'shopping-bag', 'plane', 'repeat', 'shield', 'more-horizontal',
-];
+type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
 
-const COLORS = [
-  '#22c55e', '#16a34a', '#15803d', '#a3e635', '#86efac',
-  '#ef4444', '#dc2626', '#b91c1c', '#f97316', '#eab308',
-  '#ec4899', '#8b5cf6', '#6366f1', '#3b82f6', '#06b6d4',
-  '#14b8a6', '#84cc16', '#6b7280',
+const ACCOUNT_TYPES: { key: AccountType; label: string; icon: string; blurb: string }[] = [
+  { key: 'asset', label: 'Assets', icon: '💰', blurb: 'Cash, bank accounts and savings' },
+  { key: 'liability', label: 'Liabilities & Credit Cards', icon: '💳', blurb: 'Credit cards, loans and debts' },
+  { key: 'equity', label: 'Equity', icon: '🏛️', blurb: 'Net worth and capital' },
+  { key: 'income', label: 'Income', icon: '📥', blurb: 'Salary and earnings sources' },
+  { key: 'expense', label: 'Expense', icon: '📤', blurb: 'Spending categories' },
 ];
 
 interface FormState {
   name: string;
-  type: 'income' | 'expense';
-  icon: string;
-  color: string;
+  type: AccountType;
 }
 
-const DEFAULT_EXPENSE_ICON = 'shopping-cart';
-const DEFAULT_INCOME_ICON = 'briefcase';
-const DEFAULT_COLOR = '#6366f1';
+const EMPTY_FORM: FormState = { name: '', type: 'asset' };
 
-const EMPTY_FORM: FormState = {
-  name: '',
-  type: 'expense',
-  icon: DEFAULT_EXPENSE_ICON,
-  color: DEFAULT_COLOR,
-};
-
-
-export function CategoryManager({ categories, onCategoriesChanged }: Props) {
-  const [tab, setTab] = useState<'expense' | 'income'>('expense');
+export function AccountManager({ accounts, onAccountsChanged }: Props) {
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [deleting, setDeleting] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState<AccountWithBalance | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { push: pushToast } = useToast();
@@ -63,26 +47,16 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [showForm]);
 
-  const openCreate = (type: 'income' | 'expense') => {
+  const openCreate = (type: AccountType) => {
     setEditingId(null);
-    setForm({
-      name: '',
-      type,
-      icon: type === 'expense' ? DEFAULT_EXPENSE_ICON : DEFAULT_INCOME_ICON,
-      color: DEFAULT_COLOR,
-    });
+    setForm({ name: '', type });
     setError(null);
     setShowForm(true);
   };
 
-  const openEdit = (c: Category) => {
-    setEditingId(c.id);
-    setForm({
-      name: c.name,
-      type: c.type as 'income' | 'expense',
-      icon: c.icon || (c.type === 'expense' ? DEFAULT_EXPENSE_ICON : DEFAULT_INCOME_ICON),
-      color: c.color || DEFAULT_COLOR,
-    });
+  const openEdit = (a: AccountWithBalance) => {
+    setEditingId(a.id);
+    setForm({ name: a.name, type: a.type as AccountType });
     setError(null);
     setShowForm(true);
   };
@@ -96,24 +70,19 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
     }
     setSaving(true);
     setError(null);
-    const payload: CreateCategoryRequest = {
-      name,
-      type: form.type,
-      icon: form.icon,
-      color: form.color,
-    };
+    const payload = { name, type: form.type };
     try {
       if (editingId) {
-        await updateCategory(editingId, payload);
-        pushToast({ message: `Category "${name}" updated` });
+        await updateAccount(editingId, payload);
+        pushToast({ message: `Account "${name}" updated` });
       } else {
-        await createCategory(payload);
-        pushToast({ message: `Category "${name}" created` });
+        await createAccount(payload);
+        pushToast({ message: `Account "${name}" created` });
       }
       setShowForm(false);
-      await onCategoriesChanged();
+      await onAccountsChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save category');
+      setError(err instanceof Error ? err.message : 'Failed to save account');
     } finally {
       setSaving(false);
     }
@@ -122,70 +91,69 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
   const handleDelete = async () => {
     if (!deleting) return;
     try {
-      await deleteCategory(deleting.id);
-      pushToast({ message: `Category "${deleting.name}" deleted` });
+      await deleteAccount(deleting.id);
+      pushToast({ message: `Account "${deleting.name}" deleted` });
       setDeleting(null);
-      await onCategoriesChanged();
+      await onAccountsChanged();
     } catch (err) {
       setDeleting(null);
       pushToast({
-        message: err instanceof Error ? err.message : 'Failed to delete category',
+        message: err instanceof Error ? err.message : 'Failed to delete account',
       });
     }
   };
 
-  const expenseCategories = useMemo(
-    () => categories.filter((c) => c.type === 'expense'),
-    [categories],
-  );
-  const incomeCategories = useMemo(
-    () => categories.filter((c) => c.type === 'income'),
-    [categories],
-  );
-
   const visible = useMemo(() => {
-    const source = tab === 'expense' ? expenseCategories : incomeCategories;
     const q = query.trim().toLowerCase();
-    if (!q) return source;
-    return source.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.icon || '').toLowerCase().includes(q),
+    if (!q) return accounts;
+    return accounts.filter(
+      (a) => a.name.toLowerCase().includes(q) || a.type.toLowerCase().includes(q),
     );
-  }, [tab, query, expenseCategories, incomeCategories]);
+  }, [query, accounts]);
 
+  const formatBalance = (a: AccountWithBalance) => {
+    const n = Math.abs(parseFloat(a.balance));
+    return n.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+  };
 
-  const renderCategoryCard = (c: Category) => {
-    const childCount = categories.filter((x) => x.parent_id === c.id).length;
+  const renderAccountCard = (a: AccountWithBalance) => {
+    const isDebt = a.type === 'liability';
+    const isIncomeOrExpense = a.type === 'income' || a.type === 'expense';
     return (
-      <div key={c.id} style={styles.card}>
+      <div key={a.id} style={styles.card}>
         <div
           style={{
-            ...styles.swatch,
-            backgroundColor: c.color || 'var(--color-border)',
+            ...styles.accountIcon,
+            backgroundColor: isDebt
+              ? 'rgba(239, 68, 68, 0.15)'
+              : isIncomeOrExpense
+                ? 'rgba(34, 197, 94, 0.12)'
+                : 'rgba(59, 130, 246, 0.12)',
           }}
           aria-hidden="true"
         >
-          <span style={styles.swatchIcon}>{c.icon || '•'}</span>
+          {isDebt ? '💳' : isIncomeOrExpense ? '📊' : '🏦'}
         </div>
         <div style={styles.cardInfo}>
-          <p style={styles.cardName}>{c.name}</p>
-          {c.parent_id ? (
-            <p style={styles.cardParent}>Subcategory</p>
-          ) : (
-            <p style={styles.cardCount}>
-              {childCount > 0
-                ? `${childCount} subcategor${childCount === 1 ? 'y' : 'ies'}`
-                : 'Top-level'}
-            </p>
-          )}
+          <p style={styles.cardName}>{a.name}</p>
+          <p style={styles.cardMeta}>
+            {a.transaction_count} ledger entr{a.transaction_count === 1 ? 'y' : 'ies'}
+          </p>
+        </div>
+        <div style={styles.balanceWrap}>
+          <span style={isDebt ? styles.balanceDebt : styles.balanceNormal}>
+            {formatBalance(a)}
+          </span>
         </div>
         <div style={styles.cardActions}>
           <button
             type="button"
             style={styles.iconAction}
-            onClick={() => openEdit(c)}
-            aria-label={`Edit ${c.name}`}
+            onClick={() => openEdit(a)}
+            aria-label={`Edit ${a.name}`}
             title="Edit"
           >
             ✏️
@@ -193,8 +161,8 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
           <button
             type="button"
             style={styles.iconActionDanger}
-            onClick={() => setDeleting(c)}
-            aria-label={`Delete ${c.name}`}
+            onClick={() => setDeleting(a)}
+            aria-label={`Delete ${a.name}`}
             title="Delete"
           >
             🗑️
@@ -204,18 +172,45 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
     );
   };
 
+  const renderGroup = (group: (typeof ACCOUNT_TYPES)[number]) => {
+    const items = visible.filter((a) => a.type === group.key);
+    return (
+      <div key={group.key} style={styles.group}>
+        <div style={styles.groupHeader}>
+          <span style={styles.groupIcon} aria-hidden="true">
+            {group.icon}
+          </span>
+          <div style={styles.groupHeaderText}>
+            <h4 style={styles.groupTitle}>{group.label}</h4>
+            <p style={styles.groupBlurb}>{group.blurb}</p>
+          </div>
+          <span style={styles.groupBadge}>{items.length}</span>
+          <button
+            type="button"
+            style={styles.groupAdd}
+            onClick={() => openCreate(group.key)}
+            aria-label={`Add ${group.label}`}
+            title="Add account"
+          >
+            +
+          </button>
+        </div>
+        {items.length > 0 ? (
+          <div style={styles.list}>{items.map(renderAccountCard)}</div>
+        ) : (
+          <p style={styles.groupEmpty}>No {group.label.toLowerCase()} yet.</p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
       <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>Categories</h2>
-        <div style={styles.pageActions}>
-          <button type="button" style={styles.secondaryButton} onClick={() => openCreate('income')}>
-            + Income
-          </button>
-          <button type="button" style={styles.primaryButton} onClick={() => openCreate('expense')}>
-            + Expense
-          </button>
-        </div>
+        <h2 style={styles.pageTitle}>Accounts</h2>
+        <button type="button" style={styles.primaryButton} onClick={() => openCreate('asset')}>
+          + New Account
+        </button>
       </div>
 
       <div style={styles.toolbar}>
@@ -224,8 +219,8 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
             style={styles.searchInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search categories…"
-            aria-label="Search categories"
+            placeholder="Search accounts…"
+            aria-label="Search accounts"
           />
           {query && (
             <button
@@ -240,48 +235,41 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
         </div>
       </div>
 
-      <div style={styles.tabs} role="tablist" aria-label="Category type">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'expense'}
-          style={tab === 'expense' ? styles.tabActive : styles.tab}
-          onClick={() => setTab('expense')}
-        >
-          Expenses
-          <span style={styles.tabBadge}>{expenseCategories.length}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'income'}
-          style={tab === 'income' ? styles.tabActive : styles.tab}
-          onClick={() => setTab('income')}
-        >
-          Income
-          <span style={styles.tabBadge}>{incomeCategories.length}</span>
-        </button>
-      </div>
+      {accounts.length === 0 ? (
+        <EmptyState
+          icon="🏦"
+          title="No accounts yet"
+          description="Create your first account — a checking account, credit card or savings — to start tracking balances."
+          actionLabel="+ New Account"
+          onAction={() => openCreate('asset')}
+        />
+      ) : (
+        <div style={styles.summaryBar}>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>💰 Total assets</span>
+            <span style={styles.summaryValue}>
+              {accounts
+                .filter((a) => a.type === 'asset')
+                .reduce((sum, a) => sum + parseFloat(a.balance), 0)
+                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </span>
+          </div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>💳 Total debt</span>
+            <span style={{ ...styles.summaryValue, ...styles.summaryDebt }}>
+              {accounts
+                .filter((a) => a.type === 'liability')
+                .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0)
+                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </span>
+          </div>
+        </div>
+      )}
 
-      <div style={styles.group}>
-        {visible.length > 0 ? (
-          <div style={styles.list}>{visible.map(renderCategoryCard)}</div>
-        ) : (
-          <EmptyState
-            icon={tab === 'expense' ? '🛒' : '💰'}
-            title={query ? 'No matching categories' : `No ${tab} categories yet`}
-            description={
-              query
-                ? `Nothing matched "${query}". Try a different search term.`
-                : `Create your first ${tab} category to start organizing your ${
-                    tab === 'expense' ? 'spending' : 'earnings'
-                  }.`
-            }
-            actionLabel="+ New Category"
-            onAction={() => openCreate(tab)}
-          />
-        )}
-      </div>
+      {accounts.length > 0 && (
+        <div style={styles.groups}>{ACCOUNT_TYPES.map(renderGroup)}</div>
+      )}
+
 
       {showForm && (
         <div
@@ -293,12 +281,12 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
             style={styles.modal}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="category-form-title"
+            aria-labelledby="account-form-title"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div style={styles.modalHeader}>
-              <h3 id="category-form-title" style={styles.modalTitle}>
-                {editingId ? 'Edit Category' : 'New Category'}
+              <h3 id="account-form-title" style={styles.modalTitle}>
+                {editingId ? 'Edit Account' : 'New Account'}
               </h3>
               <button
                 type="button"
@@ -323,7 +311,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
                   style={styles.input}
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Pets"
+                  placeholder="e.g. Nubank Credit Card"
                   required
                   autoFocus
                 />
@@ -331,58 +319,18 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
 
               <label style={styles.label}>
                 Type
-                <div style={styles.typeToggle}>
-                  {(['expense', 'income'] as const).map((t) => (
+                <div style={styles.typeGrid}>
+                  {ACCOUNT_TYPES.map((t) => (
                     <button
-                      key={t}
+                      key={t.key}
                       type="button"
-                      style={form.type === t ? styles.typeActive : styles.typeButton}
-                      onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          type: t,
-                          icon: t === 'expense' ? DEFAULT_EXPENSE_ICON : DEFAULT_INCOME_ICON,
-                        }))
+                      style={
+                        form.type === t.key ? styles.typeButtonActive : styles.typeButton
                       }
+                      onClick={() => setForm((f) => ({ ...f, type: t.key }))}
                     >
-                      {t === 'expense' ? 'Expense' : 'Income'}
+                      {t.icon} {t.label}
                     </button>
-                  ))}
-                </div>
-              </label>
-
-              <label style={styles.label}>
-                Icon
-                <div style={styles.iconGrid}>
-                  {ICONS.map((ic) => (
-                    <button
-                      key={ic}
-                      type="button"
-                      style={form.icon === ic ? styles.iconButtonActive : styles.iconButton}
-                      onClick={() => setForm((f) => ({ ...f, icon: ic }))}
-                      aria-label={`Icon ${ic}`}
-                    >
-                      {ic}
-                    </button>
-                  ))}
-                </div>
-              </label>
-
-              <label style={styles.label}>
-                Color
-                <div style={styles.colorGrid}>
-                  {COLORS.map((col) => (
-                    <button
-                      key={col}
-                      type="button"
-                      style={{
-                        ...styles.colorButton,
-                        backgroundColor: col,
-                        ...(form.color === col ? styles.colorButtonActive : {}),
-                      }}
-                      onClick={() => setForm((f) => ({ ...f, color: col }))}
-                      aria-label={`Color ${col}`}
-                    />
                   ))}
                 </div>
               </label>
@@ -397,7 +345,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
                   Cancel
                 </button>
                 <button type="submit" style={styles.submitButton} disabled={saving}>
-                  {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create category'}
+                  {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create account'}
                 </button>
               </div>
             </form>
@@ -408,7 +356,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
       <ConfirmDialog
         open={deleting !== null}
         title={`Delete "${deleting?.name}"?`}
-        message="This will permanently remove the category. It can only be deleted if no transactions use it."
+        message="This will permanently remove the account. It can only be deleted if no ledger entries or sub-accounts reference it."
         confirmLabel="Delete"
         onConfirm={handleDelete}
         onCancel={() => setDeleting(null)}
@@ -430,12 +378,35 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     margin: 0,
   },
-  pageActions: {
-    display: 'flex',
-    gap: '0.5rem',
-  },
   toolbar: {
-    marginBottom: '1rem',
+    marginBottom: '1.5rem',
+  },
+  summaryBar: {
+    display: 'flex',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+  },
+  summaryItem: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+    backgroundColor: 'var(--color-surface)',
+    borderRadius: '0.75rem',
+    padding: '0.875rem 1.125rem',
+    border: '1px solid var(--color-border)',
+  },
+  summaryLabel: {
+    fontSize: '0.75rem',
+    color: 'var(--color-text-dim)',
+  },
+  summaryValue: {
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    color: 'var(--color-text)',
+  },
+  summaryDebt: {
+    color: 'var(--color-danger-text)',
   },
   searchWrap: {
     position: 'relative',
@@ -462,46 +433,41 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '0.75rem',
     padding: '0.25rem',
   },
-  tabs: {
+  groups: {
     display: 'flex',
-    gap: '0.375rem',
-    marginBottom: '1rem',
+    flexDirection: 'column',
+    gap: '1.25rem',
+  },
+  group: {
     backgroundColor: 'var(--color-surface)',
+    borderRadius: '1rem',
+    padding: '1.25rem',
     border: '1px solid var(--color-border)',
-    borderRadius: '0.75rem',
-    padding: '0.25rem',
   },
-  tab: {
-    flex: 1,
+  groupHeader: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    padding: '0.625rem 1rem',
-    borderRadius: '0.5rem',
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--color-text-muted)',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
+    gap: '0.75rem',
+    marginBottom: '0.75rem',
   },
-  tabActive: {
+  groupIcon: {
+    fontSize: '1.25rem',
+  },
+  groupHeaderText: {
     flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    padding: '0.625rem 1rem',
-    borderRadius: '0.5rem',
-    border: 'none',
-    backgroundColor: 'var(--color-surface-hover)',
-    color: 'var(--color-text)',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
+    minWidth: 0,
   },
-  tabBadge: {
+  groupTitle: {
+    margin: 0,
+    fontSize: '1rem',
+    fontWeight: 600,
+  },
+  groupBlurb: {
+    margin: '0.125rem 0 0 0',
+    fontSize: '0.75rem',
+    color: 'var(--color-text-dim)',
+  },
+  groupBadge: {
     backgroundColor: 'var(--color-surface-hover)',
     color: 'var(--color-text-muted)',
     borderRadius: '9999px',
@@ -509,11 +475,24 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '0.75rem',
     fontWeight: 600,
   },
-  group: {
-    backgroundColor: 'var(--color-surface)',
-    borderRadius: '1rem',
-    padding: '1rem',
+  groupAdd: {
+    width: '1.75rem',
+    height: '1.75rem',
+    borderRadius: '0.5rem',
     border: '1px solid var(--color-border)',
+    background: 'transparent',
+    color: 'var(--color-text-muted)',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupEmpty: {
+    color: 'var(--color-text-dim)',
+    fontSize: '0.875rem',
+    margin: 0,
+    padding: '0.25rem 0',
   },
   list: {
     display: 'flex',
@@ -529,7 +508,7 @@ const styles: Record<string, CSSProperties> = {
     backgroundColor: 'var(--color-bg)',
     border: '1px solid var(--color-border)',
   },
-  swatch: {
+  accountIcon: {
     width: '2.25rem',
     height: '2.25rem',
     borderRadius: '0.625rem',
@@ -537,11 +516,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-  },
-  swatchIcon: {
-    fontSize: '1rem',
-    color: 'rgba(255,255,255,0.9)',
-    textShadow: '0 1px 2px rgba(0,0,0,0.35)',
+    fontSize: '1.125rem',
   },
   cardInfo: {
     flex: 1,
@@ -556,15 +531,24 @@ const styles: Record<string, CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
-  cardParent: {
+  cardMeta: {
     margin: 0,
     fontSize: '0.75rem',
     color: 'var(--color-text-dim)',
   },
-  cardCount: {
-    margin: 0,
-    fontSize: '0.75rem',
-    color: 'var(--color-text-dim)',
+  balanceWrap: {
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  balanceNormal: {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    color: 'var(--color-text)',
+  },
+  balanceDebt: {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    color: 'var(--color-danger-text)',
   },
   cardActions: {
     display: 'flex',
@@ -605,10 +589,6 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     gap: '1rem',
   },
-  formRow: {
-    display: 'flex',
-    gap: '1rem',
-  },
   label: {
     display: 'flex',
     flexDirection: 'column',
@@ -627,70 +607,32 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
     boxSizing: 'border-box',
   },
-  typeToggle: {
-    display: 'flex',
+  typeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
     gap: '0.375rem',
   },
   typeButton: {
-    flex: 1,
     padding: '0.5rem',
     borderRadius: '0.375rem',
     border: '1px solid var(--color-border)',
     background: 'transparent',
     color: 'var(--color-text-muted)',
-    fontSize: '0.8125rem',
+    fontSize: '0.75rem',
     fontWeight: 600,
     cursor: 'pointer',
+    textAlign: 'left',
   },
-  typeActive: {
-    flex: 1,
+  typeButtonActive: {
     padding: '0.5rem',
     borderRadius: '0.375rem',
     border: '1px solid var(--color-primary)',
     backgroundColor: 'var(--color-primary)',
     color: 'var(--color-primary-text)',
-    fontSize: '0.8125rem',
+    fontSize: '0.75rem',
     fontWeight: 600,
     cursor: 'pointer',
-  },
-  iconGrid: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.375rem',
-  },
-  iconButton: {
-    backgroundColor: 'var(--color-input-bg)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '0.375rem',
-    padding: '0.25rem 0.5rem',
-    color: 'var(--color-text-muted)',
-    fontSize: '0.75rem',
-    cursor: 'pointer',
-  },
-  iconButtonActive: {
-    backgroundColor: 'var(--color-surface-hover)',
-    border: '1px solid var(--color-primary)',
-    color: 'var(--color-text)',
-    borderRadius: '0.375rem',
-    padding: '0.25rem 0.5rem',
-    fontSize: '0.75rem',
-    cursor: 'pointer',
-  },
-  colorGrid: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.375rem',
-  },
-  colorButton: {
-    width: '1.75rem',
-    height: '1.75rem',
-    borderRadius: '0.5rem',
-    border: '2px solid transparent',
-    cursor: 'pointer',
-  },
-  colorButtonActive: {
-    borderColor: 'var(--color-text)',
-    boxShadow: '0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-border-strong)',
+    textAlign: 'left',
   },
   submitButton: {
     alignSelf: 'flex-end',
@@ -726,7 +668,7 @@ const styles: Record<string, CSSProperties> = {
     backgroundColor: 'var(--color-surface)',
     borderRadius: '1rem',
     padding: '1.5rem',
-    maxWidth: 520,
+    maxWidth: 560,
     width: '100%',
     maxHeight: '90vh',
     overflowY: 'auto',
@@ -762,16 +704,6 @@ const styles: Record<string, CSSProperties> = {
     backgroundColor: 'var(--color-primary)',
     color: 'var(--color-primary-text)',
     border: 'none',
-    padding: '0.625rem 1.25rem',
-    borderRadius: '0.5rem',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    color: 'var(--color-text-muted)',
-    border: '1px solid var(--color-border)',
     padding: '0.625rem 1.25rem',
     borderRadius: '0.5rem',
     fontSize: '0.875rem',

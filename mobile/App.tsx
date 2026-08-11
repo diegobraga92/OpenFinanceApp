@@ -10,11 +10,13 @@ import {
   View,
 } from 'react-native';
 import {
+  AccountWithBalance,
   Category,
   Transaction,
   SummaryResponse,
   createTransaction,
   deleteTransaction,
+  fetchAccountsWithBalance,
   fetchCategories,
   fetchSummary,
   fetchTransactions,
@@ -29,11 +31,14 @@ import { AuthGate, useAuthUser } from './src/auth/AuthGate';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
+import { AccountsScreen } from './src/screens/AccountsScreen';
+import { NotificationSettingsScreen } from './src/screens/NotificationSettingsScreen';
 import { BudgetsScreen } from './src/screens/BudgetsScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
+import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 
-type Screen = 'dashboard' | 'transactions' | 'budgets' | 'reports' | 'reconciliation' | 'categories';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications';
 
 const DRAWER_ITEMS: {
   key: Screen;
@@ -42,22 +47,26 @@ const DRAWER_ITEMS: {
 }[] = [
   { key: 'dashboard', icon: 'stats-chart-outline', label: 'Dashboard' },
   { key: 'transactions', icon: 'swap-horizontal-outline', label: 'Transactions' },
+  { key: 'accounts', icon: 'wallet-outline', label: 'Accounts' },
   { key: 'budgets', icon: 'pie-chart-outline', label: 'Budgets' },
   { key: 'reports', icon: 'trending-up-outline', label: 'Reports' },
   { key: 'reconciliation', icon: 'sync-outline', label: 'Reconciliation' },
   { key: 'categories', icon: 'pricetags-outline', label: 'Categories' },
+  { key: 'notifications', icon: 'notifications-outline', label: 'Notification Capture' },
 ];
 
 export default function App() {
   return (
     <SnackbarProvider>
-      <AuthGate>
-        <BiometricLock>
-          <OnboardingGate>
-            <AppContent />
-          </OnboardingGate>
-        </BiometricLock>
-      </AuthGate>
+      <NotificationCaptureProvider>
+        <AuthGate>
+          <BiometricLock>
+            <OnboardingGate>
+              <AppContent />
+            </OnboardingGate>
+          </BiometricLock>
+        </AuthGate>
+      </NotificationCaptureProvider>
     </SnackbarProvider>
   );
 }
@@ -71,6 +80,7 @@ function AppContent() {
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<AccountWithBalance[]>([]);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,14 +107,16 @@ function AppContent() {
     setLoading(true);
     setError(null);
     try {
-      const [cats, summ, txns] = await Promise.all([
+      const [cats, summ, txns, accnts] = await Promise.all([
         fetchCategories(),
         fetchSummary(),
         fetchTransactions({ page_size: 50 }),
+        fetchAccountsWithBalance().catch(() => [] as AccountWithBalance[]),
       ]);
       setCategories(cats);
       setSummary(summ);
       setTransactions(txns.items);
+      setAccounts(accnts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -249,12 +261,18 @@ function AppContent() {
             <BudgetsScreen categories={categories} formatMoney={formatMoney} />
           )}
           {screen === 'reports' && <ReportsScreen formatMoney={formatMoney} />}
+          {screen === 'accounts' && (
+            <AccountsScreen accounts={accounts} onChanged={loadData} />
+          )}
           {screen === 'categories' && (
             <CategoriesScreen
               expenseCategories={expenseCategories}
               incomeCategories={incomeCategories}
               onCreated={loadData}
             />
+          )}
+          {screen === 'notifications' && (
+            <NotificationSettingsScreen categories={categories} />
           )}
           {screen === 'reconciliation' && <ReconciliationScreen formatMoney={formatMoney} />}
           {showAddForm && (

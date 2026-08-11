@@ -10,6 +10,7 @@ let refreshPromise: Promise<string | null> | null = null;
 export type HealthResponse = components['schemas']['HealthResponse'];
 export type Category = components['schemas']['Category'];
 export type CreateCategoryRequest = components['schemas']['CreateCategoryRequest'];
+export type UpdateCategoryRequest = components['schemas']['UpdateCategoryRequest'];
 export type Transaction = components['schemas']['Transaction'];
 export type CreateTransactionRequest = components['schemas']['CreateTransactionRequest'];
 export type UpdateTransactionRequest = components['schemas']['UpdateTransactionRequest'];
@@ -28,6 +29,9 @@ export type CategoryBreakdownResponse = components['schemas']['CategoryBreakdown
 export type TrendPoint = components['schemas']['TrendPoint'];
 export type TrendsResponse = components['schemas']['TrendsResponse'];
 export type Account = components['schemas']['Account'];
+export type AccountWithBalance = components['schemas']['AccountWithBalance'];
+export type CreateAccountRequest = components['schemas']['CreateAccountRequest'];
+export type UpdateAccountRequest = components['schemas']['UpdateAccountRequest'];
 export type CreateLedgerTransactionRequest = components['schemas']['CreateLedgerTransactionRequest'];
 export type CreateLedgerTransactionResponse = components['schemas']['CreateLedgerTransactionResponse'];
 export type LedgerEntry = components['schemas']['LedgerEntry'];
@@ -143,6 +147,19 @@ export async function createCategory(payload: CreateCategoryRequest): Promise<Ca
   return request<Category>('/api/categories', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export async function updateCategory(id: string, payload: UpdateCategoryRequest): Promise<Category> {
+  return request<Category>(`/api/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  return request<void>(`/api/categories/${id}`, {
+    method: 'DELETE',
   });
 }
 
@@ -270,6 +287,33 @@ export async function fetchTrends(months?: number): Promise<TrendsResponse> {
 
 export async function fetchAccounts(): Promise<Account[]> {
   return request<Account[]>('/api/ledger/accounts');
+}
+
+export async function fetchAccountsWithBalance(): Promise<AccountWithBalance[]> {
+  return request<AccountWithBalance[]>('/api/accounts');
+}
+
+export async function createAccount(payload: CreateAccountRequest): Promise<Account> {
+  return request<Account>('/api/accounts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAccount(
+  id: string,
+  payload: UpdateAccountRequest,
+): Promise<Account> {
+  return request<Account>(`/api/accounts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAccount(id: string): Promise<void> {
+  return request<void>(`/api/accounts/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function createLedgerTransaction(

@@ -1,6 +1,6 @@
 //! Category CRUD endpoints
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
@@ -9,8 +9,9 @@ use serde::Deserialize;
 use serde_json::json;
 use tracing::error;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
-use crate::models::{Category, CreateCategoryRequest};
+use crate::models::{Category, CreateCategoryRequest, UpdateCategoryRequest};
 use crate::state::AppState;
 
 /// Query parameters for filtering the category list.
@@ -22,10 +23,17 @@ pub struct CategoryListParams {
 
 /// Returns a sub-router with all category routes mounted under `/api/categories`.
 pub fn router() -> Router<AppState> {
-    Router::new().route(
-        "/api/categories",
-        get(list_categories).post(create_category),
-    )
+    Router::new()
+        .route(
+            "/api/categories",
+            get(list_categories).post(create_category),
+        )
+        .route(
+            "/api/categories/{id}",
+            get(get_category)
+                .put(update_category)
+                .delete(delete_category),
+        )
 }
 
 /// Lists categories, optionally filtered by type.
@@ -165,4 +173,237 @@ pub async fn create_category(
     })?;
 
     Ok((StatusCode::CREATED, Json(category)))
+}
+
+/// Fetches a single category by id.
+#[utoipa::path(
+    get,
+    path = "/api/categories/{id}",
+    tag = "Categories",
+    params(
+        ("id" = Uuid, Path, description = "Category UUID"),
+    ),
+    responses(
+        (status = 200, description = "Category found", body = Category),
+        (status = 404, description = "Category not found"),
+    ),
+)]
+pub async fn get_category(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Category>, (StatusCode, Json<serde_json::Value>)> {
+    let category = sqlx::query_as::<_, Category>(
+        "SELECT id, name, type, parent_id, icon, color, created_at, updated_at
+         FROM categories WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to fetch category: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to fetch category" })),
+        )
+    })?;
+
+    match category {
+        Some(cat) => Ok(Json(cat)),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Category not found" })),
+        )),
+    }
+}
+
+/// Updates an existing category.
+///
+/// Returns `404` if the category does not exist, `400` for invalid payloads.
+#[utoipa::path(
+    put,
+    path = "/api/categories/{id}",
+    tag = "Categories",
+    params(
+        ("id" = Uuid, Path, description = "Category UUID"),
+    ),
+    request_body = UpdateCategoryRequest,
+    responses(
+        (status = 200, description = "Category updated", body = Category),
+        (status = 400, description = "Invalid category payload"),
+        (status = 404, description = "Category not found"),
+    ),
+)]
+pub async fn update_category(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateCategoryRequest>,
+) -> Result<Json<Category>, (StatusCode, Json<serde_json::Value>)> {
+    let name = payload.name.trim();
+    if name.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "name must not be empty" })),
+        ));
+    }
+
+    if payload.r#type != "income" && payload.r#type != "expense" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "type must be 'income' or 'expense'" })),
+        ));
+    }
+
+    // Validate parent_id if provided (and it's not self-referencing)
+    if let Some(pid) = payload.parent_id {
+        if pid == id {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "parent_id cannot reference the category itself" })),
+            ));
+        }
+        let exists: Option<Uuid> = sqlx::query_scalar("SELECT id FROM categories WHERE id = $1")
+            .bind(pid)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                error!("Failed to check parent category: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to validate parent category" })),
+                )
+            })?;
+
+        if exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "parent_id does not reference an existing category" })),
+            ));
+        }
+    }
+
+    let result = sqlx::query_as::<_, Category>(
+        "UPDATE categories
+         SET name = $1, type = $2, parent_id = $3, icon = $4, color = $5, updated_at = NOW()
+         WHERE id = $6
+         RETURNING id, name, type, parent_id, icon, color, created_at, updated_at",
+    )
+    .bind(name)
+    .bind(&payload.r#type)
+    .bind(payload.parent_id)
+    .bind(&payload.icon)
+    .bind(&payload.color)
+    .bind(id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to update category: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to update category" })),
+        )
+    })?;
+
+    match result {
+        Some(cat) => Ok(Json(cat)),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Category not found" })),
+        )),
+    }
+}
+
+/// Deletes a category.
+///
+/// Returns `409` if the category is referenced by transactions or subcategories,
+/// `404` if the category does not exist.
+#[utoipa::path(
+    delete,
+    path = "/api/categories/{id}",
+    tag = "Categories",
+    params(
+        ("id" = Uuid, Path, description = "Category UUID"),
+    ),
+    responses(
+        (status = 204, description = "Category deleted"),
+        (status = 404, description = "Category not found"),
+        (status = 409, description = "Category is in use"),
+    ),
+)]
+pub async fn delete_category(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    // Refuse to delete if transactions reference it.
+    let tx_count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM transactions WHERE category_id = $1")
+            .bind(id)
+            .fetch_one(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                error!("Failed to check transaction references: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to check category usage" })),
+                )
+            })?;
+
+    if tx_count.0 > 0 {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!(
+                    "Category is used by {} transaction(s). Reassign or delete them first.",
+                    tx_count.0
+                )
+            })),
+        ));
+    }
+
+    // Refuse to delete if it is a parent of other categories.
+    let child_count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM categories WHERE parent_id = $1")
+            .bind(id)
+            .fetch_one(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                error!("Failed to check subcategory references: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to check subcategory usage" })),
+                )
+            })?;
+
+    if child_count.0 > 0 {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!(
+                    "Category has {} subcategor{} that depend on it. Remove them first.",
+                    child_count.0,
+                    if child_count.0 == 1 { "y" } else { "ies" }
+                )
+            })),
+        ));
+    }
+
+    let result = sqlx::query("DELETE FROM categories WHERE id = $1")
+        .bind(id)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to delete category: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to delete category" })),
+            )
+        })?;
+
+    if result.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Category not found" })),
+        ));
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
