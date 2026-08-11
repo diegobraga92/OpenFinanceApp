@@ -1,7 +1,6 @@
 import type { components } from './api-types';
 import { clearAuthSession, getAccessToken, getRefreshToken, setAuthSession } from './auth';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+import { getApiBaseUrl } from './config/server';
 
 // Single-flight refresh: concurrent 401s share one refresh request instead of
 // hammering the backend.
@@ -56,8 +55,9 @@ async function request<T>(path: string, options?: {
   // caller-supplied Authorization header (stale tokens from callers would
   // otherwise defeat the automatic refresh below).
   const doFetch = async () => {
+    const base = await getApiBaseUrl();
     const token = await getAccessToken();
-    return fetch(`${API_BASE_URL}${path}`, {
+    return fetch(`${base}${path}`, {
       method: options?.method,
       headers: {
         'Content-Type': 'application/json',
@@ -113,7 +113,8 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        const base = await getApiBaseUrl();
+        const response = await fetch(`${base}/api/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken }),

@@ -82,6 +82,24 @@ npm install
 npx expo start
 ```
 
+### Mobile: Configuring the backend server (in-app)
+
+The mobile app's backend address is **configured on the device** — not baked
+into the APK — so you can point the app at any PudimFinance server without
+rebuilding:
+
+- **First launch / sign-in screen**: there is a "Server" field at the top of
+  the login form. Enter your server's LAN address (e.g. `http://192.168.1.100:3000`)
+  before signing in — it is saved automatically.
+- **Already signed in**: open the drawer → **Server** to view, change, test
+  (`/health` ping) and save the address. Changes take effect immediately.
+- If no address is configured, the app falls back to `EXPO_PUBLIC_API_BASE_URL`
+  (if baked in at build time) and finally `http://localhost:3000`.
+
+> Android: the APK is built with `usesCleartextTraffic` enabled
+> (`expo-build-properties` plugin), so plain `http://` LAN addresses work.
+
+
 ### Installing on an Android phone (CI-built APK)
 
 Every push to `main` touching `mobile/**` triggers the **Mobile APK Build**

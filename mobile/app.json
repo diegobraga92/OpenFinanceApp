@@ -30,6 +30,14 @@
         {
           "faceIDPermission": "Allow PudimFinance to use Face ID to unlock your finances."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ]
   }

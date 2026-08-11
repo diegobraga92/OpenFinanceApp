@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { loginUser, registerUser } from '../api';
 import { setAuthSession, type AuthUser } from '../auth';
+import { getApiBaseUrl, setApiBaseUrl } from '../config/server';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 
 type Mode = 'login' | 'register';
@@ -25,8 +26,17 @@ export function LoginScreen({ onAuthenticated }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [serverUrl, setServerUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Load the configured server address so users can adjust it before signing in.
+  useEffect(() => {
+    void (async () => {
+      const url = await getApiBaseUrl();
+      setServerUrl(url);
+    })();
+  }, []);
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -38,6 +48,8 @@ export function LoginScreen({ onAuthenticated }: Props) {
     setError(null);
     setBusy(true);
     try {
+      // Persist the server address (if changed) so the auth call below hits it.
+      await setApiBaseUrl(serverUrl);
       if (mode === 'login') {
         const res = await loginUser({ email: email.trim(), password });
         await setAuthSession(res.access_token, res.refresh_token, res.user);
@@ -77,6 +89,17 @@ export function LoginScreen({ onAuthenticated }: Props) {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
+
+        <TextInput
+          style={styles.serverInput}
+          value={serverUrl}
+          onChangeText={setServerUrl}
+          placeholder="Server (e.g. http://192.168.1.100:3000)"
+          placeholderTextColor={colors.textDim}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+        />
 
         {mode === 'register' && (
           <TextInput
@@ -188,6 +211,19 @@ const styles = StyleSheet.create({
     color: colors.dangerText,
     fontSize: typography.sm,
     textAlign: 'left',
+  },
+  serverInput: {
+    width: '100%',
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    color: colors.text,
+    fontSize: typography.sm,
+    marginBottom: spacing.md,
+    fontFamily: 'monospace',
   },
   input: {
     width: '100%',

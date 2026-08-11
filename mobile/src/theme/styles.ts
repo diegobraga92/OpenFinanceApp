@@ -1159,6 +1159,20 @@ export const styles = StyleSheet.create({
   ledgerAccountChipTextActive: {
     color: colors.text,
   },
+  // --- Server (ServerScreen) ---
+  serverCurrent: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+    backgroundColor: colors.bg,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+  },
   trendRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -33,6 +33,7 @@ import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { AccountsScreen } from './src/screens/AccountsScreen';
 import { NotificationSettingsScreen } from './src/screens/NotificationSettingsScreen';
+import { ServerScreen } from './src/screens/ServerScreen';
 import { ReceiptsScreen } from './src/screens/ReceiptsScreen';
 import { AuditScreen } from './src/screens/AuditScreen';
 import { LedgerScreen } from './src/screens/LedgerScreen';
@@ -41,7 +42,7 @@ import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 
-type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
 
 const DRAWER_ITEMS: {
   key: Screen;
@@ -59,6 +60,7 @@ const DRAWER_ITEMS: {
   { key: 'receipts', icon: 'receipt-outline', label: 'Receipts' },
   { key: 'audit', icon: 'list-outline', label: 'Audit Log' },
   { key: 'notifications', icon: 'notifications-outline', label: 'Notification Capture' },
+  { key: 'server', icon: 'server-outline', label: 'Server' },
 ];
 
 export default function App() {
@@ -283,6 +285,7 @@ function AppContent() {
           {screen === 'receipts' && <ReceiptsScreen formatMoney={formatMoney} />}
           {screen === 'audit' && <AuditScreen />}
           {screen === 'ledger' && <LedgerScreen formatMoney={formatMoney} />}
+          {screen === 'server' && <ServerScreen />}
           {screen === 'reconciliation' && <ReconciliationScreen formatMoney={formatMoney} />}
           {showAddForm && (
             <AddTransactionForm
