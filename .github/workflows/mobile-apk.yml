@@ -1,0 +1,71 @@
+name: Mobile APK Build
+
+# Builds an installable Android debug APK from the managed Expo project and
+# uploads it as a workflow artifact so you can download and sideload it on a
+# phone. Triggered on mobile changes to main, or manually from the Actions tab.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-apk.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      # Check latest: https://github.com/actions/checkout/releases
+      - uses: actions/checkout@v7
+
+      # Check latest: https://github.com/actions/setup-node/releases
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      # React Native 0.74 / Expo 51 requires Java 17 for Gradle.
+      # Check latest: https://github.com/actions/setup-java/releases
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Check latest: https://github.com/android-actions/setup-android
+      - uses: android-actions/setup-android@v4
+
+      # Gradle dependency cache (speeds up repeat builds).
+      # Check latest: https://github.com/gradle/actions
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        # Check latest: https://github.com/actions/upload-artifact/releases
+        uses: actions/upload-artifact@v5
+        with:
+          name: pudimfinance-debug
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

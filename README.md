@@ -82,6 +82,24 @@ npm install
 npx expo start
 ```
 
+### Installing on an Android phone (CI-built APK)
+
+Every push to `main` touching `mobile/**` triggers the **Mobile APK Build**
+workflow (`.github/workflows/mobile-apk.yml`), which produces an installable
+debug APK:
+
+1. Open the **Actions** tab on GitHub → select **Mobile APK Build**.
+2. Pick the latest run (green check) → **Artifacts** → download
+   `pudimfinance-debug`.
+3. Unzip → transfer `app-debug.apk` to your phone (USB, Drive, or direct
+   download) and tap it to install.
+
+You can also trigger a build anytime by opening the workflow and clicking
+**Run workflow** (the `workflow_dispatch` trigger) — no push required.
+Debug APKs are signed with the debug keystore and support sideloading; enable
+*"Install unknown apps"* for the source app if your phone prompts you.
+
+
 ### Mobile: Push Notification Capture
 
 PudimFinance can auto-capture transactions from bank/payment push notifications
