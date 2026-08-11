@@ -1,9 +1,20 @@
 import type { components, operations } from './api-types';
+import {
+  clearAuthSession,
+  getAccessToken,
+  getRefreshToken,
+  notifyAuthChanged,
+  setAuthSession,
+} from './auth/tokenStorage';
 
 // When VITE_API_BASE_URL is set (e.g. http://192.168.1.100:3000) the app calls the
 // backend directly. When unset/empty it uses relative URLs — in Docker the nginx
 // proxy forwards them to the backend; in dev the Vite proxy does the same.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+// Single-flight refresh: concurrent 401s share one refresh request instead of
+// hammering the backend.
+let refreshPromise: Promise<string | null> | null = null;
 
 export type HealthResponse = components['schemas']['HealthResponse'];
 export type HealthError = components['schemas']['HealthError'];
@@ -51,13 +62,36 @@ interface RequestOptions {
 }
 
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
+  // Build the request ourselves so the session token always wins over any
+  // caller-supplied Authorization header (stale tokens from callers would
+  // otherwise defeat the automatic refresh below).
+  const doFetch = () => {
+    const token = getAccessToken();
+    return fetch(`${API_BASE_URL}${path}`, {
+      method: options?.method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: options?.body,
+    });
+  };
+
+  let response = await doFetch();
+
+  // Access token expired — try to refresh once, then retry the request.
+  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await doFetch();
+    } else {
+      // Refresh failed (missing/expired refresh token): drop the session so
+      // the UI can show the login screen.
+      clearAuthSession();
+      notifyAuthChanged();
+    }
+  }
 
   if (!response.ok) {
     let detail: string;
@@ -75,6 +109,39 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+/**
+ * Exchanges the stored refresh token for a fresh pair of tokens.
+ *
+ * Uses a module-level single-flight promise so concurrent 401s share one
+ * refresh round-trip. Returns the new access token, or `null` on failure.
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken } satisfies RefreshRequest),
+        });
+        if (!response.ok) return null;
+        const data = (await response.json()) as AuthResponse;
+        setAuthSession(data.access_token, data.refresh_token, data.user);
+        notifyAuthChanged();
+        return data.access_token;
+      } catch {
+        return null;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+  }
+  return refreshPromise;
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -296,7 +363,7 @@ export interface AuditEvent {
 }
 
 export async function fetchAuditEvents(
-  token: string,
+  token: string | null,
   params?: { event_type?: string; page?: number; page_size?: number },
 ): Promise<{ items: AuditEvent[]; page: number; page_size: number }> {
   const qs = new URLSearchParams();

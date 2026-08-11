@@ -1,6 +1,11 @@
 import type { components } from './api-types';
+import { clearAuthSession, getAccessToken, getRefreshToken, setAuthSession } from './auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+
+// Single-flight refresh: concurrent 401s share one refresh request instead of
+// hammering the backend.
+let refreshPromise: Promise<string | null> | null = null;
 
 export type HealthResponse = components['schemas']['HealthResponse'];
 export type Category = components['schemas']['Category'];
@@ -45,13 +50,35 @@ async function request<T>(path: string, options?: {
   headers?: Record<string, string>;
   body?: string;
 }): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
+  // Build the request ourselves so the session token always wins over any
+  // caller-supplied Authorization header (stale tokens from callers would
+  // otherwise defeat the automatic refresh below).
+  const doFetch = async () => {
+    const token = await getAccessToken();
+    return fetch(`${API_BASE_URL}${path}`, {
+      method: options?.method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: options?.body,
+    });
+  };
+
+  let response = await doFetch();
+
+  // Access token expired — try to refresh once, then retry the request.
+  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await doFetch();
+    } else {
+      // Refresh failed (missing/expired refresh token): drop the session so
+      // the UI can show the login screen.
+      await clearAuthSession();
+    }
+  }
 
   if (!response.ok) {
     let detail: string;
@@ -69,6 +96,38 @@ async function request<T>(path: string, options?: {
   }
 
   return response.json() as Promise<T>;
+}
+
+/**
+ * Exchanges the stored refresh token for a fresh pair of tokens.
+ *
+ * Uses a module-level single-flight promise so concurrent 401s share one
+ * refresh round-trip. Returns the new access token, or `null` on failure.
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) return null;
+
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        await setAuthSession(data.access_token, data.refresh_token, data.user);
+        return data.access_token;
+      } catch {
+        return null;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+  }
+  return refreshPromise;
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {

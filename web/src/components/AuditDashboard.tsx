@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { AuditEvent, fetchAuditEvents } from '../api';
 
 interface Props {
-  token: string;
+  token: string | null;
 }
 
 export function AuditDashboard({ token }: Props) {

@@ -50,6 +50,11 @@ docker compose up --build
 #   Web UI:       http://localhost:5173
 ```
 
+> **Auth:** the API requires a JWT on every `/api/*` route except `/api/auth/*`.
+> On first launch the web UI shows a registration form — create an account
+> there and subsequent visits keep you signed in (tokens live in `localStorage`,
+> auto-refreshed for 7 days).
+
 Running on a shared LAN server where Docker ports may conflict? See
 [LAN Server Deployment](#lan-server-deployment).
 
@@ -203,11 +208,16 @@ curl -s http://192.168.1.100:4200/api/categories
 
 Then open `http://192.168.1.100:4200` in a browser on the LAN device.
 
+The app now requires authentication: the first browser session shows a
+**Create account** form (the backend auto-creates the `users` table on startup).
+Any subsequent device just signs in with the same credentials.
+
 ### Configuration reference
 
 | Variable | Default | Host port / role |
 |----------|---------|------------------|
 | `PUBLIC_HOST` | — | Server LAN IP/hostname (documentation only) |
+| `JWT_SECRET` | `dev-secret-change-me-in-production` | Signs JWTs — override in production (`openssl rand -hex 32`); changing it signs everyone out |
 | `PG_PORT` | `5432` | PostgreSQL |
 | `RABBIT_PORT` | `5672` | RabbitMQ AMQP |
 | `RABBIT_MGMT_PORT` | `15672` | RabbitMQ management UI |

@@ -42,6 +42,9 @@ services:
       RABBITMQ_URL: amqp://pudim:pudim@rabbitmq:5672
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: 3000
+      # JWT signing secret. Override with a long random value in production.
+      # Changing it invalidates all existing sessions.
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production}
       RUST_LOG: backend=debug,tower_http=debug
     depends_on:
       postgres:

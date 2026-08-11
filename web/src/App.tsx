@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useAuth } from './auth/AuthContext';
+import { LoginScreen } from './components/LoginScreen';
 import {
   Category,
   createTransaction,
@@ -272,8 +274,28 @@ export default function App() {
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  // Auth token for admin-only features (populated when a login flow saves it).
-  const authToken = localStorage.getItem('pudim_token') || '';
+  // Auth session: user + token come from AuthContext; the API layer attaches
+  // the Bearer token automatically and refreshes it on expiry.
+  const { user, token: authToken, isLoading, logout } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div style={styles.container}>
+        <div aria-label="Loading" aria-busy="true" style={styles.loadingScreen}>
+          <div className="skeleton" style={{ height: 180, marginBottom: '2rem' }} />
+          <div className="skeleton" style={{ height: 220 }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div style={styles.container}>
+        <LoginScreen />
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -326,15 +348,28 @@ export default function App() {
               </span>
             ))}
           </nav>
-          <button
-            type="button"
-            style={styles.themeToggle}
-            onClick={toggleTheme}
-            aria-label={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            title={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-          >
-            {themeMode === 'light' ? '🌙' : '☀️'}
-          </button>
+          <div style={styles.headerActions}>
+            {user && (
+              <button
+                type="button"
+                style={styles.logoutButton}
+                onClick={logout}
+                title={`Signed in as ${user.email} — click to sign out`}
+              >
+                <span style={styles.logoutEmail}>{user.email}</span>
+                <span aria-hidden="true">⏻</span>
+              </button>
+            )}
+            <button
+              type="button"
+              style={styles.themeToggle}
+              onClick={toggleTheme}
+              aria-label={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              title={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            >
+              {themeMode === 'light' ? '🌙' : '☀️'}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -681,6 +716,29 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1,
     cursor: 'pointer',
   },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  logoutButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    background: 'transparent',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
+    borderRadius: '0.5rem',
+    padding: '0.375rem 0.625rem',
+    fontSize: '0.8125rem',
+    cursor: 'pointer',
+    maxWidth: 220,
+  },
+  logoutEmail: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
   main: {
     flex: 1,
     maxWidth: 1200,
@@ -742,6 +800,9 @@ const styles: Record<string, CSSProperties> = {
     textAlign: 'center',
     padding: '3rem 0',
     color: 'var(--color-text-dim)',
+  },
+  loadingScreen: {
+    padding: '2rem',
   },
   balanceCard: {
     backgroundColor: 'var(--color-surface)',

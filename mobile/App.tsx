@@ -25,6 +25,7 @@ import { styles, DRAWER_WIDTH } from './src/theme/styles';
 import { SnackbarProvider, useSnackbar } from './src/components/Snackbar';
 import { BiometricLock } from './src/components/BiometricLock';
 import { OnboardingGate } from './src/screens/OnboardingScreen';
+import { AuthGate, useAuthUser } from './src/auth/AuthGate';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
@@ -50,17 +51,20 @@ const DRAWER_ITEMS: {
 export default function App() {
   return (
     <SnackbarProvider>
-      <BiometricLock>
-        <OnboardingGate>
-          <AppContent />
-        </OnboardingGate>
-      </BiometricLock>
+      <AuthGate>
+        <BiometricLock>
+          <OnboardingGate>
+            <AppContent />
+          </OnboardingGate>
+        </BiometricLock>
+      </AuthGate>
     </SnackbarProvider>
   );
 }
 
 function AppContent() {
   const { show: showSnackbar } = useSnackbar();
+  const { user, logout } = useAuthUser();
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
@@ -325,6 +329,25 @@ function AppContent() {
                 </TouchableOpacity>
               );
             })}
+
+            <View style={styles.drawerFooter}>
+              <View style={styles.drawerUser}>
+                <Text style={styles.drawerUserEmail} numberOfLines={1}>
+                  {user?.email}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.drawerItem}
+                onPress={() => {
+                  setDrawerOpen(false);
+                  logout();
+                }}
+                accessibilityRole="button"
+              >
+                <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+                <Text style={[styles.drawerItemText, { color: colors.danger }]}>Sign out</Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </TouchableOpacity>
       )}

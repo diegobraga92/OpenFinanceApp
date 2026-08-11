@@ -525,6 +525,21 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
+  drawerFooter: {
+    marginTop: 'auto',
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceHover,
+    paddingTop: 8,
+  },
+  drawerUser: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  drawerUserEmail: {
+    color: colors.textDim,
+    fontSize: 12,
+  },
   monthNav: {
     flexDirection: 'row',
     alignItems: 'center',
