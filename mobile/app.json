@@ -25,6 +25,7 @@
     "plugins": [
       "expo-secure-store",
       "expo-notifications",
+      "expo-image-picker",
       [
         "expo-local-authentication",
         {

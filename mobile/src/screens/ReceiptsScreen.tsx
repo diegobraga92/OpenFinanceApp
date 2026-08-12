@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { fetchReceipts, saveReceipt, scanReceipt } from '../api';
+import * as ImagePicker from 'expo-image-picker';
+import TextRecognition, { TextRecognitionScript } from '@react-native-ml-kit/text-recognition';
+import { fetchReceipts, saveReceipt, scanReceipt, scanReceiptOcr } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useSnackbar } from '../components/Snackbar';
@@ -51,6 +53,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
   const [reviewItems, setReviewItems] = useState<EditableItem[]>([]);
   const [gallery, setGallery] = useState<GalleryReceipt[]>([]);
   const [loading, setLoading] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadGallery = useCallback(async () => {
@@ -66,34 +69,64 @@ export function ReceiptsScreen({ formatMoney }: Props) {
     void loadGallery();
   }, [loadGallery]);
 
+  // Shared: populate the parsed receipt + review items from a structured scan.
+  const applyParsedReceipt = (receipt: ParsedReceipt) => {
+    setParsed(receipt);
+    if (receipt.items && receipt.items.length > 0) {
+      setReviewItems(
+        receipt.items.map((i) => ({
+          description: i.description ?? 'Item',
+          quantity: i.quantity ?? '1',
+          unit_price: i.unit_price ?? '',
+          total_price: i.total_price ?? '',
+        })),
+      );
+    } else {
+      setReviewItems([
+        { description: 'Receipt', quantity: '1', unit_price: '', total_price: receipt.total ?? '' },
+      ]);
+    }
+  };
+
   const parseQr = async () => {
     if (!qrData.trim()) return;
     setLoading(true);
     setParsed(null);
     try {
       const res = await scanReceipt(qrData);
-      const receipt = res as ParsedReceipt;
-      setParsed(receipt);
-      // Pre-fill the review list from parsed items, or fall back to a single
-      // "Receipt" line with the total (current behavior).
-      if (receipt.items && receipt.items.length > 0) {
-        setReviewItems(
-          receipt.items.map((i) => ({
-            description: i.description ?? 'Item',
-            quantity: i.quantity ?? '1',
-            unit_price: i.unit_price ?? '',
-            total_price: i.total_price ?? '',
-          })),
-        );
-      } else {
-        setReviewItems([
-          { description: 'Receipt', quantity: '1', unit_price: '', total_price: receipt.total ?? '' },
-        ]);
-      }
+      applyParsedReceipt(res as ParsedReceipt);
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to parse QR');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Runs on-device OCR (ML Kit) on a photo, then parses the text via the backend.
+  const handleOcr = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    const source =
+      permission.granted || !permission.canAskAgain
+        ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+
+    if (source.canceled || !source.assets?.length) return;
+
+    const uri = source.assets[0].uri;
+    setOcrLoading(true);
+    try {
+      const result = await TextRecognition.recognize(uri, TextRecognitionScript.LATIN);
+      const rawText = result.text;
+      if (!rawText.trim()) {
+        Alert.alert('OCR', 'No text recognized. Try a clearer, better-lit photo.');
+        return;
+      }
+      const res = await scanReceiptOcr(rawText);
+      applyParsedReceipt(res as ParsedReceipt);
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'OCR failed');
+    } finally {
+      setOcrLoading(false);
     }
   };
 
@@ -164,6 +197,24 @@ export function ReceiptsScreen({ formatMoney }: Props) {
             <ActivityIndicator color={colors.primaryText} />
           ) : (
             <Text style={styles.submitButtonText}>Scan QR</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Scan Receipt Photo (OCR)</Text>
+        <Text style={styles.receiptHint}>
+          No QR code handy? Take a photo of the receipt and the text will be read on-device.
+        </Text>
+        <TouchableOpacity
+          style={[styles.submitButton, ocrLoading && styles.submitButtonDisabled]}
+          onPress={handleOcr}
+          disabled={ocrLoading}
+        >
+          {ocrLoading ? (
+            <ActivityIndicator color={colors.primaryText} />
+          ) : (
+            <Text style={styles.submitButtonText}>📷 Read Receipt</Text>
           )}
         </TouchableOpacity>
       </View>

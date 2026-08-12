@@ -1092,6 +1092,34 @@
         }
       }
     },
+    "/api/receipts/ocr": {
+      "post": {
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "Parses raw OCR text from a receipt photo into structured data.",
+        "description": "The OCR engine runs on the client (ML Kit on mobile, tesseract.js on web);\nthis endpoint turns the resulting text into the same structured shape the\nQR scan returns, so the save/review flow is identical for both sources.",
+        "operationId": "ocr",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OcrRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Parsed receipt from OCR text"
+          },
+          "400": {
+            "description": "Empty OCR text"
+          }
+        }
+      }
+    },
     "/api/receipts/price-history": {
       "get": {
         "tags": [
@@ -3137,6 +3165,19 @@
               "$ref": "#/components/schemas/MonthlyReportItem"
             },
             "description": "One entry per month in the requested range (chronological order)."
+          }
+        }
+      },
+      "OcrRequest": {
+        "type": "object",
+        "description": "Request: parse raw OCR text from a receipt photo.",
+        "required": [
+          "raw_text"
+        ],
+        "properties": {
+          "raw_text": {
+            "type": "string",
+            "description": "Raw text extracted by the OCR engine (ML Kit / tesseract.js)."
           }
         }
       },

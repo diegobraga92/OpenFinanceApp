@@ -414,6 +414,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/receipts/ocr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parses raw OCR text from a receipt photo into structured data.
+         * @description The OCR engine runs on the client (ML Kit on mobile, tesseract.js on web);
+         *     this endpoint turns the resulting text into the same structured shape the
+         *     QR scan returns, so the save/review flow is identical for both sources.
+         */
+        post: operations["ocr"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/receipts/price-history": {
         parameters: {
             query?: never;
@@ -1438,6 +1460,11 @@ export interface components {
         MonthlyReportResponse: {
             /** @description One entry per month in the requested range (chronological order). */
             months: components["schemas"]["MonthlyReportItem"][];
+        };
+        /** @description Request: parse raw OCR text from a receipt photo. */
+        OcrRequest: {
+            /** @description Raw text extracted by the OCR engine (ML Kit / tesseract.js). */
+            raw_text: string;
         };
         /** @description Response for the pay endpoint. */
         PayInstallmentResponse: {
@@ -2846,6 +2873,35 @@ export interface operations {
                 content?: never;
             };
             /** @description Invalid receipt payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ocr: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OcrRequest"];
+            };
+        };
+        responses: {
+            /** @description Parsed receipt from OCR text */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Empty OCR text */
             400: {
                 headers: {
                     [name: string]: unknown;

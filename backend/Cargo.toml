@@ -37,6 +37,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 csv = "1"
+regex = "1"
 
 # RabbitMQ / AMQP
 lapin = { version = "2", features = ["rustls"] }

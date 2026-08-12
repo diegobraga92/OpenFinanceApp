@@ -23,8 +23,8 @@ use crate::routes::categories::{self, CategoryListParams};
 use crate::routes::installments;
 use crate::routes::ledger;
 use crate::routes::receipts::{
-    self, MergeProductsRequest, PriceHistoryParams, ReceiptItemInput, SaveReceiptRequest,
-    ScanRequest,
+    self, MergeProductsRequest, OcrRequest, PriceHistoryParams, ReceiptItemInput,
+    SaveReceiptRequest, ScanRequest,
 };
 use crate::routes::reports;
 use crate::routes::summary::{self, SummaryParams};
@@ -78,6 +78,7 @@ use crate::routes::transactions;
         auth::me,
         audit::list_audit_events,
         receipts::scan,
+        receipts::ocr,
         receipts::save_receipt,
         receipts::list_receipts,
         receipts::price_history,
@@ -98,6 +99,7 @@ use crate::routes::transactions;
         LoginRequest,
         RefreshRequest,
         ScanRequest,
+        OcrRequest,
         SaveReceiptRequest,
         ReceiptItemInput,
         MergeProductsRequest,

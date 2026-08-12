@@ -54,6 +54,7 @@ export type RegisterRequest = components['schemas']['RegisterRequest'];
 export type LoginRequest = components['schemas']['LoginRequest'];
 export type RefreshRequest = components['schemas']['RefreshRequest'];
 export type ScanRequest = components['schemas']['ScanRequest'];
+export type OcrRequest = components['schemas']['OcrRequest'];
 export type SaveReceiptRequest = components['schemas']['SaveReceiptRequest'];
 export type ReceiptItemInput = components['schemas']['ReceiptItemInput'];
 export type MergeProductsRequest = components['schemas']['MergeProductsRequest'];
@@ -678,6 +679,14 @@ export async function scanReceipt(qrData: string): Promise<Record<string, unknow
   return request<Record<string, unknown>>('/api/receipts/scan', {
     method: 'POST',
     body: JSON.stringify({ qr_data: qrData } satisfies ScanRequest),
+  });
+}
+
+// Sends raw OCR text (from on-device ML Kit) to the backend for structured parsing.
+export async function scanReceiptOcr(rawText: string): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>('/api/receipts/ocr', {
+    method: 'POST',
+    body: JSON.stringify({ raw_text: rawText } satisfies OcrRequest),
   });
 }
 

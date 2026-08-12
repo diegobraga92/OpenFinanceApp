@@ -15,6 +15,7 @@ use serde_json::json;
 use tracing::error;
 use uuid::Uuid;
 
+use crate::receipt_ocr;
 use crate::receipt_scanner;
 use crate::state::AppState;
 
@@ -23,6 +24,13 @@ use crate::state::AppState;
 pub struct ScanRequest {
     /// Raw QR code content (URL or `p=` payload).
     pub qr_data: String,
+}
+
+/// Request: parse raw OCR text from a receipt photo.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct OcrRequest {
+    /// Raw text extracted by the OCR engine (ML Kit / tesseract.js).
+    pub raw_text: String,
 }
 
 /// Query params for receipt list.
@@ -56,6 +64,7 @@ pub struct MergeProductsRequest {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/receipts/scan", axum::routing::post(scan))
+        .route("/api/receipts/ocr", axum::routing::post(ocr))
         .route(
             "/api/receipts",
             axum::routing::get(list_receipts).post(save_receipt),
@@ -100,6 +109,50 @@ pub async fn scan(
         "cnpj": parsed.cnpj,
         "store_name": parsed.store_name,
         "version": parsed.version,
+        "items": parsed.items.iter().map(|i| {
+            json!({
+                "description": i.description,
+                "quantity": i.quantity.map(|q| q.to_string()),
+                "unit_price": i.unit_price.map(|p| p.to_string()),
+                "total_price": i.total_price.map(|p| p.to_string()),
+            })
+        }).collect::<Vec<_>>(),
+    })))
+}
+
+/// Parses raw OCR text from a receipt photo into structured data.
+///
+/// The OCR engine runs on the client (ML Kit on mobile, tesseract.js on web);
+/// this endpoint turns the resulting text into the same structured shape the
+/// QR scan returns, so the save/review flow is identical for both sources.
+#[utoipa::path(
+    post,
+    path = "/api/receipts/ocr",
+    tag = "Receipts",
+    request_body = OcrRequest,
+    responses(
+        (status = 200, description = "Parsed receipt from OCR text"),
+        (status = 400, description = "Empty OCR text"),
+    ),
+)]
+pub async fn ocr(
+    Json(payload): Json<OcrRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    if payload.raw_text.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "raw_text must not be empty" })),
+        ));
+    }
+
+    let parsed = receipt_ocr::parse_receipt_text(&payload.raw_text);
+
+    Ok(Json(json!({
+        "access_key": parsed.access_key,
+        "total": parsed.total.map(|t| t.to_string()),
+        "date": parsed.date,
+        "cnpj": parsed.cnpj,
+        "store_name": parsed.store_name,
         "items": parsed.items.iter().map(|i| {
             json!({
                 "description": i.description,

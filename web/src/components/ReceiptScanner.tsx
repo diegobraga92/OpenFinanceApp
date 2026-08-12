@@ -1,6 +1,7 @@
 import { useState, useEffect, type CSSProperties, type ChangeEvent } from 'react';
 import {
   scanReceipt,
+  scanReceiptOcr,
   saveReceipt,
   fetchReceipts,
   fetchPriceHistory,
@@ -58,6 +59,8 @@ export function ReceiptScanner({ formatMoney }: Props) {
   const [qrData, setQrData] = useState('');
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
   const [reviewItems, setReviewItems] = useState<EditableItem[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -124,29 +127,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
     setLoading(true);
     try {
       const res = await scanReceipt(qrData);
-      const receipt = res as ParsedReceipt;
-      setParsed(receipt);
-      // Pre-fill the review list from parsed items, or fall back to a single
-      // "Receipt" line with the total (current behavior).
-      if (receipt.items && receipt.items.length > 0) {
-        setReviewItems(
-          receipt.items.map((i) => ({
-            description: i.description ?? 'Item',
-            quantity: i.quantity ?? '1',
-            unit_price: i.unit_price ?? '',
-            total_price: i.total_price ?? '',
-          })),
-        );
-      } else {
-        setReviewItems([
-          {
-            description: 'Receipt',
-            quantity: '1',
-            unit_price: '',
-            total_price: receipt.total ?? '',
-          },
-        ]);
-      }
+      applyParsedReceipt(res as ParsedReceipt);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse QR');
     } finally {
@@ -156,6 +137,66 @@ export function ReceiptScanner({ formatMoney }: Props) {
 
   const updateReviewItem = (idx: number, patch: Partial<EditableItem>) => {
     setReviewItems((items) => items.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
+  };
+
+  // Shared: populate the parsed receipt + review items from a structured scan.
+  const applyParsedReceipt = (receipt: ParsedReceipt) => {
+    setParsed(receipt);
+    if (receipt.items && receipt.items.length > 0) {
+      setReviewItems(
+        receipt.items.map((i) => ({
+          description: i.description ?? 'Item',
+          quantity: i.quantity ?? '1',
+          unit_price: i.unit_price ?? '',
+          total_price: i.total_price ?? '',
+        })),
+      );
+    } else {
+      setReviewItems([
+        {
+          description: 'Receipt',
+          quantity: '1',
+          unit_price: '',
+          total_price: receipt.total ?? '',
+        },
+      ]);
+    }
+  };
+
+  // Runs OCR on the selected receipt image and parses the text via the backend.
+  const handleOcr = async () => {
+    if (!selectedImage) return;
+    setError(null);
+    setOcrLoading(true);
+    try {
+      // Lazy-load tesseract.js so the initial bundle stays small.
+      const Tesseract = (await import('tesseract.js')).default;
+      const result = await Tesseract.recognize(selectedImage, 'por', {
+        logger: () => {},
+      });
+      const rawText = result.data.text;
+      if (!rawText.trim()) {
+        setError('OCR found no text in this image. Try a clearer photo.');
+        return;
+      }
+      const res = await scanReceiptOcr(rawText);
+      applyParsedReceipt(res as ParsedReceipt);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'OCR failed');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setSelectedImage(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setSelectedImage(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const save = async () => {
@@ -213,6 +254,33 @@ export function ReceiptScanner({ formatMoney }: Props) {
         <button type="button" style={styles.button} onClick={parseQr} disabled={loading || !qrData.trim()}>
           {loading ? 'Parsing…' : 'Scan QR'}
         </button>
+      </div>
+
+      <div style={styles.section}>
+        <h3 style={styles.sectionTitle}>Scan Receipt Photo (OCR)</h3>
+        <p style={styles.sectionHint}>
+          No QR code handy? Upload a photo of the receipt and the text will be read automatically.
+        </p>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          style={styles.fileInput}
+        />
+        {selectedImage && (
+          <div style={styles.imagePreviewWrap}>
+            <img src={selectedImage} alt="Receipt preview" style={styles.imagePreview} />
+          </div>
+        )}
+        <button
+          type="button"
+          style={styles.button}
+          onClick={handleOcr}
+          disabled={ocrLoading || !selectedImage}
+        >
+          {ocrLoading ? 'Reading receipt…' : 'Read Receipt'}
+        </button>
+        {ocrLoading && <p style={styles.sectionHint}>Running OCR in your browser…</p>}
       </div>
 
       {parsed && (
@@ -430,6 +498,10 @@ const styles: Record<string, CSSProperties> = {
   errorBox: { backgroundColor: 'var(--color-danger-bg)', border: '1px solid var(--color-danger-border)', color: 'var(--color-danger-text)', padding: '0.75rem 1rem', borderRadius: '0.5rem', marginBottom: '1rem' },
   label: { display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem' },
   input: { backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '0.5rem', padding: '0.75rem', color: 'var(--color-text)', fontSize: '0.8125rem', fontFamily: 'monospace', minHeight: '6rem', resize: 'vertical', width: '100%', boxSizing: 'border-box' },
+  fileInput: { color: 'var(--color-text)', fontSize: '0.875rem', marginBottom: '0.75rem' },
+  sectionHint: { color: 'var(--color-text-muted)', fontSize: '0.8125rem', margin: '0 0 0.75rem 0' },
+  imagePreviewWrap: { marginBottom: '0.75rem' },
+  imagePreview: { maxWidth: '100%', maxHeight: '18rem', borderRadius: '0.5rem', border: '1px solid var(--color-border)' },
   button: { backgroundColor: 'var(--color-primary)', color: 'var(--color-primary-text)', border: 'none', padding: '0.625rem 1.5rem', borderRadius: '0.5rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' },
   fieldGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1rem' },
   fieldLabel: { color: 'var(--color-text-muted)', fontSize: '0.75rem', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.05em' },
