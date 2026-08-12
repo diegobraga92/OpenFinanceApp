@@ -741,17 +741,13 @@ pub async fn upload_reconciliation(
     let mut format: Option<String> = None;
     let mut auto_create = false;
 
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| {
-            error!("Failed to read multipart field: {}", e);
-            (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "Failed to read upload" })),
-            )
-        })?
-    {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error!("Failed to read multipart field: {}", e);
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Failed to read upload" })),
+        )
+    })? {
         let name = field.name().unwrap_or("").to_string();
         match name.as_str() {
             "file" => {
@@ -769,14 +765,7 @@ pub async fn upload_reconciliation(
                 file_bytes = Some(data.to_vec());
             }
             "statement_name" => {
-                statement_name = Some(
-                    field
-                        .text()
-                        .await
-                        .unwrap_or_default()
-                        .trim()
-                        .to_string(),
-                );
+                statement_name = Some(field.text().await.unwrap_or_default().trim().to_string());
             }
             "format" => {
                 format = Some(field.text().await.unwrap_or_default().trim().to_lowercase());

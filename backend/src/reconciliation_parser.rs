@@ -60,25 +60,39 @@ fn parse_csv(raw: &str) -> Result<Vec<StatementLine>> {
     }
 
     // Locate columns by common header names (en + pt-BR).
-    let find_col = |names: &[&str]| {
-        headers
-            .iter()
-            .position(|h| names.contains(&h.as_str()))
-    };
+    let find_col = |names: &[&str]| headers.iter().position(|h| names.contains(&h.as_str()));
 
     let date_col = find_col(&[
-        "date", "data", "data_lancamento", "date_lancamento", "data pagamento", "data_pagamento",
+        "date",
+        "data",
+        "data_lancamento",
+        "date_lancamento",
+        "data pagamento",
+        "data_pagamento",
     ])
     .ok_or_else(|| anyhow!("CSV is missing a date column"))?;
 
     let desc_col = find_col(&[
-        "description", "descricao", "descrição", "memo", "historico", "histórico",
-        "lançamento", "lancamento", "estabelecimento", "favorito",
+        "description",
+        "descricao",
+        "descrição",
+        "memo",
+        "historico",
+        "histórico",
+        "lançamento",
+        "lancamento",
+        "estabelecimento",
+        "favorito",
     ])
     .ok_or_else(|| anyhow!("CSV is missing a description column"))?;
 
     let amount_col = find_col(&[
-        "amount", "valor", "value", "saldo_lancamento", "valor_lancamento", "lancto",
+        "amount",
+        "valor",
+        "value",
+        "saldo_lancamento",
+        "valor_lancamento",
+        "lancto",
     ])
     .ok_or_else(|| anyhow!("CSV is missing an amount column"))?;
 
@@ -195,14 +209,17 @@ fn extract_tags(block: &str) -> HashMap<String, String> {
 
 /// Parses an OFX date: `YYYYMMDDHHMMSS[.XXX]` or `YYYYMMDD`.
 fn parse_ofx_date(raw: &str) -> Result<NaiveDate> {
-    let clean: String = raw.trim().chars().filter(|c| c.is_ascii_digit()).take(8).collect();
+    let clean: String = raw
+        .trim()
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .take(8)
+        .collect();
     if clean.len() < 8 {
         return Err(anyhow!("Invalid OFX date: {}", raw));
     }
-    NaiveDate::parse_from_str(&clean, "%Y%m%d")
-        .map_err(|_| anyhow!("Invalid OFX date: {}", raw))
+    NaiveDate::parse_from_str(&clean, "%Y%m%d").map_err(|_| anyhow!("Invalid OFX date: {}", raw))
 }
-
 
 // ---------------------------------------------------------------------------
 // Shared value parsers
@@ -256,9 +273,7 @@ fn parse_br_amount(raw: &str) -> Result<Decimal> {
         // otherwise leave as-is (decimal dot).
     }
 
-    let dec: Decimal = s
-        .parse()
-        .map_err(|_| anyhow!("Invalid amount: {}", raw))?;
+    let dec: Decimal = s.parse().map_err(|_| anyhow!("Invalid amount: {}", raw))?;
     Ok(if negative { -dec } else { dec })
 }
 
@@ -284,7 +299,5 @@ fn parse_date(raw: &str) -> Result<NaiveDate> {
                 .map_err(|_| anyhow!("Invalid date: {}", raw));
         }
     }
-    NaiveDate::parse_from_str(&raw, "%Y-%m-%d")
-        .map_err(|_| anyhow!("Invalid date: {}", raw))
+    NaiveDate::parse_from_str(&raw, "%Y-%m-%d").map_err(|_| anyhow!("Invalid date: {}", raw))
 }
-

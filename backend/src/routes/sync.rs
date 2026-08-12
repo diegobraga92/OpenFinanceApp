@@ -136,7 +136,10 @@ async fn apply_operation(
         ("category", "delete") => apply_category_delete(state, op).await,
         _ => Err((
             StatusCode::BAD_REQUEST,
-            format!("Unsupported sync operation: {}/{}", op.entity_type, op.operation_type),
+            format!(
+                "Unsupported sync operation: {}/{}",
+                op.entity_type, op.operation_type
+            ),
         )),
     }
 }
@@ -146,13 +149,17 @@ async fn apply_transaction_create(
     op: &SyncOperation,
 ) -> Result<Option<Uuid>, (StatusCode, String)> {
     // Idempotency: a previous attempt may have already created this transaction.
-    let existing: Option<Uuid> = sqlx::query_scalar(
-        "SELECT id FROM transactions WHERE idempotency_key = $1",
-    )
-    .bind(&op.client_id)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Idempotency check failed: {e}")))?;
+    let existing: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM transactions WHERE idempotency_key = $1")
+            .bind(&op.client_id)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Idempotency check failed: {e}"),
+                )
+            })?;
 
     if let Some(id) = existing {
         return Ok(Some(id));
@@ -211,7 +218,12 @@ async fn apply_transaction_create(
     .bind(&op.client_id)
     .fetch_one(&state.pg_pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Create transaction failed: {e}")))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Create transaction failed: {e}"),
+        )
+    })?;
 
     Ok(Some(tx.id))
 }
@@ -220,9 +232,12 @@ async fn apply_transaction_update(
     state: &AppState,
     op: &SyncOperation,
 ) -> Result<Option<Uuid>, (StatusCode, String)> {
-    let server_id = op
-        .server_id
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "server_id required for update".to_string()))?;
+    let server_id = op.server_id.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "server_id required for update".to_string(),
+        )
+    })?;
 
     let description = op
         .payload
@@ -274,7 +289,12 @@ async fn apply_transaction_update(
     .bind(server_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Update transaction failed: {e}")))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Update transaction failed: {e}"),
+        )
+    })?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "Transaction not found".to_string()));
@@ -282,20 +302,27 @@ async fn apply_transaction_update(
     Ok(Some(server_id))
 }
 
-
 async fn apply_transaction_delete(
     state: &AppState,
     op: &SyncOperation,
 ) -> Result<Option<Uuid>, (StatusCode, String)> {
-    let server_id = op
-        .server_id
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "server_id required for delete".to_string()))?;
+    let server_id = op.server_id.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "server_id required for delete".to_string(),
+        )
+    })?;
 
     let result = sqlx::query("DELETE FROM transactions WHERE id = $1")
         .bind(server_id)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Delete transaction failed: {e}")))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Delete transaction failed: {e}"),
+            )
+        })?;
 
     if result.rows_affected() == 0 {
         // Deleting an already-deleted row is idempotent for sync purposes.
@@ -343,7 +370,12 @@ async fn apply_category_create(
     .bind(color)
     .fetch_one(&state.pg_pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Create category failed: {e}")))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Create category failed: {e}"),
+        )
+    })?;
 
     Ok(Some(cat.id))
 }
@@ -352,9 +384,12 @@ async fn apply_category_update(
     state: &AppState,
     op: &SyncOperation,
 ) -> Result<Option<Uuid>, (StatusCode, String)> {
-    let server_id = op
-        .server_id
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "server_id required for update".to_string()))?;
+    let server_id = op.server_id.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "server_id required for update".to_string(),
+        )
+    })?;
 
     let name = op
         .payload
@@ -391,7 +426,12 @@ async fn apply_category_update(
     .bind(server_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Update category failed: {e}")))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Update category failed: {e}"),
+        )
+    })?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "Category not found".to_string()));
@@ -403,15 +443,23 @@ async fn apply_category_delete(
     state: &AppState,
     op: &SyncOperation,
 ) -> Result<Option<Uuid>, (StatusCode, String)> {
-    let server_id = op
-        .server_id
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "server_id required for delete".to_string()))?;
+    let server_id = op.server_id.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "server_id required for delete".to_string(),
+        )
+    })?;
 
     let result = sqlx::query("DELETE FROM categories WHERE id = $1")
         .bind(server_id)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Delete category failed: {e}")))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Delete category failed: {e}"),
+            )
+        })?;
 
     if result.rows_affected() == 0 {
         // Idempotent — the category is already gone.
@@ -419,4 +467,3 @@ async fn apply_category_delete(
     }
     Ok(Some(server_id))
 }
-

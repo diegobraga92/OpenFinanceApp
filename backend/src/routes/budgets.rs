@@ -317,18 +317,17 @@ pub async fn list_budget_alerts(
         )
     })?;
 
-    let unacknowledged_count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM budget_alerts WHERE acknowledged = false",
-    )
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        error!("Failed to count budget alerts: {}", e);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Failed to count budget alerts" })),
-        )
-    })?;
+    let unacknowledged_count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM budget_alerts WHERE acknowledged = false")
+            .fetch_one(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                error!("Failed to count budget alerts: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to count budget alerts" })),
+                )
+            })?;
 
     Ok(Json(BudgetAlertListResponse {
         items,

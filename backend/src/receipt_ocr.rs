@@ -50,21 +50,14 @@ static RE_ACCESS_KEY: LazyLock<Regex> = LazyLock::new(|| {
 static RE_CNPJ_LABELED: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)cnpj[:.\s]*(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}|\d{14})").unwrap()
 });
-static RE_CNPJ_BARE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}").unwrap()
-});
-static RE_DATE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\d{2}/\d{2}/\d{4}").unwrap()
-});
-static RE_QTY_UNIT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"([\d.,]+)\s*[xX×]\s*([\d.,]+)").unwrap()
-});
-static RE_LEADING_CODE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*\d{1,6}\s+").unwrap()
-});
-static RE_TRAILING_AMOUNT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"([\d.,]+)\s*$").unwrap()
-});
+static RE_CNPJ_BARE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}").unwrap());
+static RE_DATE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d{2}/\d{2}/\d{4}").unwrap());
+static RE_QTY_UNIT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([\d.,]+)\s*[xX×]\s*([\d.,]+)").unwrap());
+static RE_LEADING_CODE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*\d{1,6}\s+").unwrap());
+static RE_TRAILING_AMOUNT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([\d.,]+)\s*$").unwrap());
 
 /// Parses raw OCR text into a structured receipt.
 pub fn parse_receipt_text(raw: &str) -> ReceiptOcrResult {
@@ -224,15 +217,14 @@ fn extract_items(lines: &[&str]) -> Vec<ReceiptOcrItem> {
         let before = &line[..m.start()];
 
         // A "qty x unit" segment may precede the total.
-        let (quantity, unit_price, desc_raw) =
-            if let Some(qc) = RE_QTY_UNIT.captures(before) {
-                let q = parse_decimal(&qc[1]);
-                let u = parse_decimal(&qc[2]);
-                let desc = before[..qc.get(0).unwrap().start()].trim().to_string();
-                (q, u, desc)
-            } else {
-                (None, None, before.trim().to_string())
-            };
+        let (quantity, unit_price, desc_raw) = if let Some(qc) = RE_QTY_UNIT.captures(before) {
+            let q = parse_decimal(&qc[1]);
+            let u = parse_decimal(&qc[2]);
+            let desc = before[..qc.get(0).unwrap().start()].trim().to_string();
+            (q, u, desc)
+        } else {
+            (None, None, before.trim().to_string())
+        };
 
         // Strip a leading numeric product code.
         let description = RE_LEADING_CODE.replace(&desc_raw, "").trim().to_string();
@@ -278,7 +270,6 @@ fn last_amount(line: &str) -> Option<Decimal> {
         None
     }
 }
-
 
 #[cfg(test)]
 mod tests {

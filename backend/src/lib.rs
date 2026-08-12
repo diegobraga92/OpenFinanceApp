@@ -26,10 +26,10 @@ pub mod middleware;
 pub mod models;
 /// OpenAPI 3.1 spec generation via utoipa.
 pub mod openapi;
-/// NFC-e QR code parsing for receipt scanning.
-pub mod receipt_scanner;
 /// Receipt text parsing for OCR-assisted scanning.
 pub mod receipt_ocr;
+/// NFC-e QR code parsing for receipt scanning.
+pub mod receipt_scanner;
 /// Bank statement parsing (CSV/OFX) for reconciliation.
 pub mod reconciliation_parser;
 /// HTTP route handlers for categories, transactions, summary, budgets, reports, and ledger.

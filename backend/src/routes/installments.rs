@@ -381,10 +381,12 @@ pub async fn delete_installment_plan(
     // The FK from transactions.installment_plan_id has no ON DELETE CASCADE, so
     // clear the link on any generated transactions first, then delete the plan
     // (cascades to installment_transactions).
-    let _ = sqlx::query("UPDATE transactions SET installment_plan_id = NULL WHERE installment_plan_id = $1")
-        .bind(id)
-        .execute(&state.pg_pool)
-        .await;
+    let _ = sqlx::query(
+        "UPDATE transactions SET installment_plan_id = NULL WHERE installment_plan_id = $1",
+    )
+    .bind(id)
+    .execute(&state.pg_pool)
+    .await;
 
     let result = sqlx::query("DELETE FROM installment_plans WHERE id = $1")
         .bind(id)
@@ -466,14 +468,13 @@ pub async fn generate_installments(
 
     for row in pending {
         // Check if a transaction already exists for this installment row.
-        let existing: Option<Uuid> = sqlx::query_scalar(
-            "SELECT transaction_id FROM installment_transactions WHERE id = $1",
-        )
-        .bind(row.id)
-        .fetch_one(&state.pg_pool)
-        .await
-        .ok()
-        .flatten();
+        let existing: Option<Uuid> =
+            sqlx::query_scalar("SELECT transaction_id FROM installment_transactions WHERE id = $1")
+                .bind(row.id)
+                .fetch_one(&state.pg_pool)
+                .await
+                .ok()
+                .flatten();
 
         if existing.is_some() {
             already_generated += 1;
@@ -697,4 +698,3 @@ pub async fn pay_installment(
         created,
     }))
 }
-

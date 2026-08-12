@@ -148,7 +148,11 @@ pub fn parse_qr(qr: &str) -> Result<NfcePayload> {
 
 /// Parses item groups from the fields that follow the standard NFC-e header.
 fn parse_items(rest: &[&str]) -> Vec<NfceItem> {
-    let rest: Vec<&str> = rest.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let rest: Vec<&str> = rest
+        .iter()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
     if rest.is_empty() {
         return Vec::new();
     }
@@ -162,7 +166,9 @@ fn parse_items(rest: &[&str]) -> Vec<NfceItem> {
 
     let mut items = Vec::new();
     let groups = if let Some(n) = count_hint {
-        rest[start..start + n * 4].chunks_exact(4).collect::<Vec<_>>()
+        rest[start..start + n * 4]
+            .chunks_exact(4)
+            .collect::<Vec<_>>()
     } else if rest.len().is_multiple_of(4) {
         rest.chunks_exact(4).collect::<Vec<_>>()
     } else {
