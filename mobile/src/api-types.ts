@@ -155,6 +155,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/budgets/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists budget alerts with optional period and acknowledgement filters. */
+        get: operations["list_budget_alerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/budgets/alerts/acknowledge-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledges all unacknowledged alerts for a given period (or all periods). */
+        post: operations["acknowledge_all_alerts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/budgets/alerts/{id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledges a single budget alert by ID. */
+        post: operations["acknowledge_alert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/budgets/summary": {
         parameters: {
             query?: never;
@@ -235,6 +286,76 @@ export interface paths {
          *     `404` if the category does not exist.
          */
         delete: operations["delete_category"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/installments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists all installment plans with computed progress. */
+        get: operations["list_installment_plans"];
+        put?: never;
+        /** Creates a new installment plan (no transactions are created yet). */
+        post: operations["create_installment_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/installments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a single installment plan with all its installment rows. */
+        get: operations["get_installment_plan"];
+        put?: never;
+        post?: never;
+        /** Deletes an installment plan (and any transactions it generated). */
+        delete: operations["delete_installment_plan"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/installments/{id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generates transaction rows for all pending installments with due_date <= today. */
+        post: operations["generate_installments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/installments/{id}/installment/{number}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marks a single installment as paid, creating the transaction if needed. */
+        post: operations["pay_installment"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -355,6 +476,40 @@ export interface paths {
         put?: never;
         /** Reconciles uploaded statement lines against existing transactions. */
         post: operations["reconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reconciliation/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists past reconciliations with their match statistics. */
+        get: operations["reconciliation_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reconciliation/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Uploads a raw CSV/OFX statement file and runs reconciliation on its rows. */
+        post: operations["upload_reconciliation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -568,6 +723,14 @@ export interface components {
             /** @description `asset`, `liability`, `equity`, `income`, or `expense`. */
             type: string;
         };
+        /** @description Response for the bulk acknowledge endpoint. */
+        AcknowledgeAlertsResponse: {
+            /**
+             * Format: int64
+             * @description Number of alerts acknowledged.
+             */
+            acknowledged: number;
+        };
         /** @description A monthly budget limit for a category. */
         Budget: {
             /** @description Maximum spend limit for the month. */
@@ -602,6 +765,63 @@ export interface components {
              * @description Year.
              */
             year: number;
+        };
+        /** @description A single budget alert (triggered when spending crosses a threshold). */
+        BudgetAlert: {
+            /** @description Whether the user acknowledged this alert. */
+            acknowledged: boolean;
+            /** @description Actual spending when the alert triggered. */
+            actual_spent: string;
+            /** @description Budget amount limit (joined). */
+            amount_limit: string;
+            /**
+             * Format: uuid
+             * @description Budget this alert belongs to.
+             */
+            budget_id: string;
+            /** @description Category hex color (joined). */
+            category_color?: string | null;
+            /** @description Category icon identifier (joined). */
+            category_icon?: string | null;
+            /**
+             * Format: uuid
+             * @description Denormalized category id (set at trigger time).
+             */
+            category_id?: string | null;
+            /** @description Category name (joined). */
+            category_name: string;
+            /**
+             * Format: uuid
+             * @description Unique alert identifier.
+             */
+            id: string;
+            /**
+             * Format: int32
+             * @description Month of the budget period (1-12).
+             */
+            month: number;
+            /** @description Threshold percentage that triggered this alert (e.g. 80.00). */
+            threshold: string;
+            /**
+             * Format: date-time
+             * @description Alert trigger timestamp.
+             */
+            triggered_at: string;
+            /**
+             * Format: int32
+             * @description Year of the budget period.
+             */
+            year: number;
+        };
+        /** @description Response for the budget alerts listing endpoint. */
+        BudgetAlertListResponse: {
+            /** @description Alerts matching the filters, newest first. */
+            items: components["schemas"]["BudgetAlert"][];
+            /**
+             * Format: int64
+             * @description Total count of unacknowledged alerts across all periods.
+             */
+            unacknowledged_count: number;
         };
         /** @description Response for a paginated/period budget list. */
         BudgetListResponse: {
@@ -826,6 +1046,31 @@ export interface components {
              */
             type: string;
         };
+        /** @description Payload for creating a new installment plan. */
+        CreateInstallmentPlanRequest: {
+            /**
+             * Format: uuid
+             * @description Optional expense category.
+             */
+            category_id?: string | null;
+            /** @description Purchase description. */
+            description: string;
+            /**
+             * Format: int32
+             * @description Number of installments (2-60).
+             */
+            installments: number;
+            /**
+             * Format: date
+             * @description First installment due date.
+             */
+            start_date: string;
+            /**
+             * @description Total purchase amount (must be > 0).
+             * @example 1200.00
+             */
+            total_amount: string;
+        };
         /** @description Payload for creating a ledger transaction (double-entry). */
         CreateLedgerTransactionRequest: {
             /**
@@ -871,6 +1116,11 @@ export interface components {
             date: string;
             /** @description Human-readable description (e.g., "Lunch at Restaurante X"). */
             description: string;
+            /**
+             * Format: uuid
+             * @description Installment plan this transaction belongs to (optional).
+             */
+            installment_plan_id?: string | null;
             /** @description Optional free-form notes. */
             notes?: string | null;
             /**
@@ -878,6 +1128,19 @@ export interface components {
              * @example expense
              */
             type: string;
+        };
+        /** @description Response for the installment generate endpoint. */
+        GenerateInstallmentsResponse: {
+            /**
+             * Format: int64
+             * @description Number of installments already generated (skipped).
+             */
+            already_generated: number;
+            /**
+             * Format: int64
+             * @description Number of new transactions created.
+             */
+            generated: number;
         };
         /** @description Failed health check payload returned with HTTP 503. */
         HealthError: {
@@ -900,6 +1163,107 @@ export interface components {
             status: string;
             /** @description Backend crate version from `CARGO_PKG_VERSION`. */
             version: string;
+        };
+        /** @description An installment plan: a purchase split into N monthly payments. */
+        InstallmentPlan: {
+            /** @description Category hex color (joined, optional). */
+            category_color?: string | null;
+            /** @description Category icon (joined, optional). */
+            category_icon?: string | null;
+            /**
+             * Format: uuid
+             * @description Category this purchase belongs to (optional).
+             */
+            category_id?: string | null;
+            /** @description Category name (joined, optional). */
+            category_name?: string | null;
+            /**
+             * Format: date-time
+             * @description Plan creation timestamp.
+             */
+            created_at: string;
+            /** @description Purchase description (e.g., "TV 55\" Samsung"). */
+            description: string;
+            /**
+             * Format: uuid
+             * @description Unique plan identifier.
+             */
+            id: string;
+            /** @description Value of each installment (total / installments). */
+            installment_amount: string;
+            /**
+             * Format: int32
+             * @description Number of monthly installments.
+             */
+            installments: number;
+            /** @description Computed progress (paid/pending/total). */
+            progress: components["schemas"]["InstallmentProgress"];
+            /**
+             * Format: date
+             * @description First installment due date.
+             */
+            start_date: string;
+            /** @description Total purchase amount. */
+            total_amount: string;
+        };
+        /** @description Detail view of a plan including all its installment rows. */
+        InstallmentPlanDetail: {
+            /** @description All installment rows, ordered by number. */
+            installments: components["schemas"]["InstallmentTransaction"][];
+            /** @description The plan header with progress. */
+            plan: components["schemas"]["InstallmentPlan"];
+        };
+        /** @description Progress summary computed for an installment plan. */
+        InstallmentProgress: {
+            /** @description Sum of paid installment amounts. */
+            paid_amount: string;
+            /**
+             * Format: int64
+             * @description Number of installments marked as paid.
+             */
+            paid_count: number;
+            /**
+             * Format: int64
+             * @description Number of installments still pending or generated.
+             */
+            pending_count: number;
+            /** @description Remaining amount to be paid. */
+            remaining_amount: string;
+            /**
+             * Format: int64
+             * @description Total number of installments in the plan.
+             */
+            total_count: number;
+        };
+        /** @description A single installment row within a plan. */
+        InstallmentTransaction: {
+            /**
+             * Format: date
+             * @description Due date for this installment.
+             */
+            due_date: string;
+            /**
+             * Format: uuid
+             * @description Unique installment row identifier.
+             */
+            id: string;
+            /**
+             * Format: int32
+             * @description 1-based installment number.
+             */
+            installment_number: number;
+            /**
+             * Format: uuid
+             * @description Parent plan identifier.
+             */
+            plan_id: string;
+            /** @description `pending`, `generated`, or `paid`. */
+            status: string;
+            /**
+             * Format: uuid
+             * @description Linked simple transaction id (NULL until generated/paid).
+             */
+            transaction_id?: string | null;
         };
         /** @description A single ledger entry. */
         LedgerEntry: {
@@ -1041,6 +1405,13 @@ export interface components {
             /** @description One entry per month in the requested range (chronological order). */
             months: components["schemas"]["MonthlyReportItem"][];
         };
+        /** @description Response for the pay endpoint. */
+        PayInstallmentResponse: {
+            /** @description Whether a new transaction was created or an existing one reused. */
+            created: boolean;
+            /** @description The linked transaction (created if one didn't exist). */
+            transaction: components["schemas"]["Transaction"];
+        };
         /** @description Query params for price history. */
         PriceHistoryParams: {
             /**
@@ -1098,6 +1469,11 @@ export interface components {
         };
         /** @description Payload containing all CSV statement lines for reconciliation. */
         ReconciliationUploadRequest: {
+            /**
+             * @description When true, unmatched rows are automatically converted into new expense
+             *     transactions (category "Uncategorized"). Defaults to false.
+             */
+            auto_create_unmatched?: boolean | null;
             /** @description Statement lines parsed from the uploaded CSV. */
             lines: components["schemas"]["StatementLine"][];
             /** @description Name to identify this statement/reconciliation. */
@@ -1235,6 +1611,11 @@ export interface components {
              * @description Unique transaction identifier.
              */
             id: string;
+            /**
+             * Format: uuid
+             * @description Installment plan this transaction belongs to (NULL for regular transactions).
+             */
+            installment_plan_id?: string | null;
             /** @description Optional free-form notes. */
             notes?: string | null;
             /** @description `income` or `expense`. */
@@ -1377,6 +1758,11 @@ export interface components {
             date: string;
             /** @description Human-readable description (e.g., "Lunch at Restaurante X"). */
             description: string;
+            /**
+             * Format: uuid
+             * @description Installment plan this transaction belongs to (optional).
+             */
+            installment_plan_id?: string | null;
             /** @description Optional free-form notes. */
             notes?: string | null;
             /**
@@ -1767,6 +2153,92 @@ export interface operations {
             };
         };
     };
+    list_budget_alerts: {
+        parameters: {
+            query?: {
+                /** @description Year (default: current) */
+                year?: number;
+                /** @description Month 1-12 (default: current) */
+                month?: number;
+                /** @description Filter by acknowledgement state (default: false) */
+                acknowledged?: boolean;
+                /** @description Page offset (default 0) */
+                page?: number;
+                /** @description Page size (default 50, max 200) */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of budget alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetAlertListResponse"];
+                };
+            };
+            /** @description Invalid month parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    acknowledge_all_alerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alerts acknowledged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcknowledgeAlertsResponse"];
+                };
+            };
+        };
+    };
+    acknowledge_alert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Budget alert UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alert acknowledged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Alert not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     budget_summary: {
         parameters: {
             query?: {
@@ -1987,6 +2459,177 @@ export interface operations {
             };
             /** @description Category is in use */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_installment_plans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of installment plans */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallmentPlan"][];
+                };
+            };
+        };
+    };
+    create_installment_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInstallmentPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description Installment plan created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallmentPlan"];
+                };
+            };
+            /** @description Invalid installment payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_installment_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Installment plan UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Installment plan detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallmentPlanDetail"];
+                };
+            };
+            /** @description Installment plan not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_installment_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Installment plan UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Installment plan deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Installment plan not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    generate_installments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Installment plan UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Installments generated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateInstallmentsResponse"];
+                };
+            };
+            /** @description Installment plan not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pay_installment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Installment plan UUID */
+                id: string;
+                /** @description 1-based installment number */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Installment paid */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayInstallmentResponse"];
+                };
+            };
+            /** @description Installment not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2216,6 +2859,56 @@ export interface operations {
                 };
             };
             /** @description Invalid upload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reconciliation_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of past reconciliations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upload_reconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description multipart/form-data with `file`, optional `statement_name`, `format` (csv|ofx), and `auto_create_unmatched` */
+        requestBody: {
+            content: {
+                "text/plain": string;
+            };
+        };
+        responses: {
+            /** @description Reconciliation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationUploadResponse"];
+                };
+            };
+            /** @description Invalid file or unsupported format */
             400: {
                 headers: {
                     [name: string]: unknown;

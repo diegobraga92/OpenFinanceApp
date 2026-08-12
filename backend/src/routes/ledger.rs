@@ -20,7 +20,7 @@ use crate::metrics;
 use crate::models::{
     CreateLedgerTransactionRequest, CreateLedgerTransactionResponse, LedgerEntry,
     LedgerTransaction, MigrationResponse, ReconciliationItem, ReconciliationUploadRequest,
-    ReconciliationUploadResponse,
+    ReconciliationUploadResponse, StatementLine,
 };
 use crate::state::AppState;
 
@@ -37,6 +37,14 @@ pub fn router() -> Router<AppState> {
             axum::routing::post(migrate_single_to_double),
         )
         .route("/api/reconciliation", axum::routing::post(reconcile))
+        .route(
+            "/api/reconciliation/upload",
+            axum::routing::post(upload_reconciliation),
+        )
+        .route(
+            "/api/reconciliation/history",
+            axum::routing::get(reconciliation_history),
+        )
 }
 
 /// Lists ledger transactions (grouped by transaction_id) with their entries.
@@ -562,16 +570,29 @@ pub async fn reconcile(
         ));
     }
 
+    let auto_create = payload.auto_create_unmatched.unwrap_or(false);
+    run_reconciliation(&state, &payload.statement_name, &payload.lines, auto_create).await
+}
+
+/// Shared reconciliation engine: creates the summary record, matches each line
+/// against existing transactions (optionally auto-creating for unmatched rows),
+/// and persists per-row results.
+async fn run_reconciliation(
+    state: &AppState,
+    statement_name: &str,
+    lines: &[StatementLine],
+    auto_create: bool,
+) -> Result<Json<ReconciliationUploadResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let total_rows = lines.len() as i32;
+
     // Create reconciliation record
     let recon_id = Uuid::new_v4();
-    let total_rows = payload.lines.len() as i32;
-
     sqlx::query(
         "INSERT INTO reconciliations (id, statement_name, total_rows, status)
          VALUES ($1, $2, $3, 'completed')",
     )
     .bind(recon_id)
-    .bind(&payload.statement_name)
+    .bind(statement_name)
     .bind(total_rows)
     .execute(&state.pg_pool)
     .await
@@ -585,9 +606,9 @@ pub async fn reconcile(
 
     let mut matched_rows: i64 = 0;
     let mut unmatched_rows: i64 = 0;
-    let mut items = Vec::with_capacity(payload.lines.len());
+    let mut items = Vec::with_capacity(lines.len());
 
-    for line in &payload.lines {
+    for line in lines {
         // Match against simple transactions:
         // exact amount (ignoring sign) within ±1 day date tolerance
         let signed_amount = line.amount;
@@ -612,6 +633,33 @@ pub async fn reconcile(
         })?;
 
         let matched_tx_id = match_result.map(|(id,)| id);
+
+        // If no match found and auto-create is enabled, create a new expense
+        // transaction from the statement line. The category stays NULL
+        // ("Uncategorized") — the user can categorize it later.
+        let matched_tx_id = if matched_tx_id.is_none() && auto_create {
+            let new_tx: Option<(Uuid,)> = sqlx::query_as(
+                "INSERT INTO transactions (description, amount, type, date)
+                 VALUES ($1, $2, 'expense', $3)
+                 RETURNING id",
+            )
+            .bind(line.description.trim())
+            .bind(abs_amount)
+            .bind(line.date)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                error!("Failed to auto-create transaction from statement: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to auto-create transaction" })),
+                )
+            })?;
+            new_tx.map(|(id,)| id)
+        } else {
+            matched_tx_id
+        };
+
         let match_status = if matched_tx_id.is_some() {
             matched_rows += 1;
             "matched"
@@ -664,11 +712,151 @@ pub async fn reconcile(
 
     Ok(Json(ReconciliationUploadResponse {
         reconciliation_id: recon_id,
-        total_rows: payload.lines.len() as i64,
+        total_rows: lines.len() as i64,
         matched_rows,
         unmatched_rows,
         items,
     }))
+}
+
+/// Uploads a raw CSV/OFX statement file and runs reconciliation on its rows.
+#[utoipa::path(
+    post,
+    path = "/api/reconciliation/upload",
+    tag = "Ledger",
+    request_body(content = String, description = "multipart/form-data with `file`, optional `statement_name`, `format` (csv|ofx), and `auto_create_unmatched`"),
+    responses(
+        (status = 200, description = "Reconciliation completed", body = ReconciliationUploadResponse),
+        (status = 400, description = "Invalid file or unsupported format"),
+    ),
+)]
+pub async fn upload_reconciliation(
+    State(state): State<AppState>,
+    mut multipart: axum::extract::Multipart,
+) -> Result<Json<ReconciliationUploadResponse>, (StatusCode, Json<serde_json::Value>)> {
+    use crate::reconciliation_parser::{self, StatementFormat};
+
+    let mut file_bytes: Option<Vec<u8>> = None;
+    let mut statement_name: Option<String> = None;
+    let mut format: Option<String> = None;
+    let mut auto_create = false;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| {
+            error!("Failed to read multipart field: {}", e);
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Failed to read upload" })),
+            )
+        })?
+    {
+        let name = field.name().unwrap_or("").to_string();
+        match name.as_str() {
+            "file" => {
+                let filename = field.file_name().map(|s| s.to_string());
+                let data = field.bytes().await.map_err(|e| {
+                    error!("Failed to read file bytes: {}", e);
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": "Failed to read uploaded file" })),
+                    )
+                })?;
+                if statement_name.is_none() {
+                    statement_name = filename;
+                }
+                file_bytes = Some(data.to_vec());
+            }
+            "statement_name" => {
+                statement_name = Some(
+                    field
+                        .text()
+                        .await
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string(),
+                );
+            }
+            "format" => {
+                format = Some(field.text().await.unwrap_or_default().trim().to_lowercase());
+            }
+            "auto_create_unmatched" => {
+                let v = field.text().await.unwrap_or_default().trim().to_lowercase();
+                auto_create = v == "true" || v == "1" || v == "yes";
+            }
+            _ => {}
+        }
+    }
+
+    let data = file_bytes.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No file provided (field name: file)" })),
+        )
+    })?;
+
+    let raw = String::from_utf8_lossy(&data).to_string();
+    let fmt = match format.as_deref() {
+        Some("csv") => StatementFormat::Csv,
+        Some("ofx") => StatementFormat::Ofx,
+        _ => reconciliation_parser::detect_format(&raw),
+    };
+
+    let lines = reconciliation_parser::parse_statement(&raw, fmt).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Failed to parse statement: {}", e) })),
+        )
+    })?;
+
+    let name = statement_name
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Statement upload".to_string());
+
+    run_reconciliation(&state, &name, &lines, auto_create).await
+}
+
+/// Lists past reconciliations with their match statistics.
+#[utoipa::path(
+    get,
+    path = "/api/reconciliation/history",
+    tag = "Ledger",
+    responses(
+        (status = 200, description = "List of past reconciliations"),
+    ),
+)]
+pub async fn reconciliation_history(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    #[derive(sqlx::FromRow, serde::Serialize)]
+    struct HistoryRow {
+        id: Uuid,
+        statement_name: String,
+        uploaded_at: chrono::DateTime<Utc>,
+        total_rows: i32,
+        matched_rows: i32,
+        unmatched_rows: i32,
+        status: String,
+    }
+
+    let rows: Vec<HistoryRow> = sqlx::query_as(
+        "SELECT id, statement_name, uploaded_at, total_rows, matched_rows, unmatched_rows, status
+         FROM reconciliations
+         ORDER BY uploaded_at DESC
+         LIMIT 100",
+    )
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to fetch reconciliation history: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to fetch reconciliation history" })),
+        )
+    })?;
+
+    Ok(Json(json!({ "items": rows })))
 }
 
 /// Fetches all ledger entries from the DB.

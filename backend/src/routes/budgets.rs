@@ -13,8 +13,8 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::models::{
-    BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse, BudgetWithCategory,
-    CreateBudgetRequest,
+    AcknowledgeAlertsResponse, BudgetAlert, BudgetAlertListResponse, BudgetListResponse,
+    BudgetSummaryItem, BudgetSummaryResponse, BudgetWithCategory, CreateBudgetRequest,
 };
 use crate::state::AppState;
 
@@ -27,11 +27,35 @@ pub struct BudgetParams {
     pub month: Option<i32>,
 }
 
+/// Query parameters for the budget alerts listing.
+#[derive(Debug, Default, Deserialize)]
+pub struct BudgetAlertParams {
+    /// Year (default: current year).
+    pub year: Option<i32>,
+    /// Month 1-12 (default: current month).
+    pub month: Option<i32>,
+    /// Filter by acknowledgement state (default: false = unacknowledged only).
+    pub acknowledged: Option<bool>,
+    /// Page offset (default 0).
+    pub page: Option<u32>,
+    /// Page size (default 50, max 200).
+    pub page_size: Option<u32>,
+}
+
 /// Returns a sub-router with all budget routes mounted under `/api/budgets`.
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/budgets", get(list_budgets).post(create_budget))
         .route("/api/budgets/summary", get(budget_summary))
+        .route("/api/budgets/alerts", get(list_budget_alerts))
+        .route(
+            "/api/budgets/alerts/acknowledge-all",
+            axum::routing::post(acknowledge_all_alerts),
+        )
+        .route(
+            "/api/budgets/alerts/{id}/acknowledge",
+            axum::routing::post(acknowledge_alert),
+        )
         .route("/api/budgets/{id}", axum::routing::delete(delete_budget))
 }
 
@@ -227,6 +251,178 @@ pub async fn create_budget(
     Ok((status, Json(budget)))
 }
 
+/// Lists budget alerts with optional period and acknowledgement filters.
+#[utoipa::path(
+    get,
+    path = "/api/budgets/alerts",
+    tag = "Budgets",
+    params(
+        ("year" = Option<i32>, Query, description = "Year (default: current)"),
+        ("month" = Option<i32>, Query, description = "Month 1-12 (default: current)"),
+        ("acknowledged" = Option<bool>, Query, description = "Filter by acknowledgement state (default: false)"),
+        ("page" = Option<u32>, Query, description = "Page offset (default 0)"),
+        ("page_size" = Option<u32>, Query, description = "Page size (default 50, max 200)"),
+    ),
+    responses(
+        (status = 200, description = "List of budget alerts", body = BudgetAlertListResponse),
+        (status = 400, description = "Invalid month parameter"),
+    ),
+)]
+pub async fn list_budget_alerts(
+    State(state): State<AppState>,
+    Query(params): Query<BudgetAlertParams>,
+) -> Result<Json<BudgetAlertListResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let now = Utc::now();
+    let year = params.year.unwrap_or_else(|| now.year());
+    let month = params.month.unwrap_or_else(|| now.month() as i32);
+
+    if !(1..=12).contains(&month) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "month must be between 1 and 12" })),
+        ));
+    }
+
+    let acknowledged = params.acknowledged.unwrap_or(false);
+    let page_size = params.page_size.unwrap_or(50).clamp(1, 200);
+    let offset = params.page.unwrap_or(0).saturating_mul(page_size);
+
+    let items: Vec<BudgetAlert> = sqlx::query_as(
+        "SELECT ba.id, ba.budget_id, ba.category_id,
+                c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
+                b.amount_limit, ba.actual_spent, ba.threshold,
+                ba.triggered_at, ba.acknowledged,
+                COALESCE(ba.year, b.year)::int AS year, COALESCE(ba.month, b.month)::int AS month
+         FROM budget_alerts ba
+         JOIN budgets b ON b.id = ba.budget_id
+         LEFT JOIN categories c ON c.id = COALESCE(ba.category_id, b.category_id)
+         WHERE (ba.year IS NULL OR ba.year = $1)
+           AND (ba.month IS NULL OR ba.month = $2)
+           AND ba.acknowledged = $3
+         ORDER BY ba.triggered_at DESC
+         LIMIT $4 OFFSET $5",
+    )
+    .bind(year)
+    .bind(month)
+    .bind(acknowledged)
+    .bind(page_size as i64)
+    .bind(offset as i64)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to list budget alerts: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to fetch budget alerts" })),
+        )
+    })?;
+
+    let unacknowledged_count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM budget_alerts WHERE acknowledged = false",
+    )
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to count budget alerts: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to count budget alerts" })),
+        )
+    })?;
+
+    Ok(Json(BudgetAlertListResponse {
+        items,
+        unacknowledged_count: unacknowledged_count.0,
+    }))
+}
+
+/// Acknowledges a single budget alert by ID.
+#[utoipa::path(
+    post,
+    path = "/api/budgets/alerts/{id}/acknowledge",
+    tag = "Budgets",
+    params(
+        ("id" = Uuid, Path, description = "Budget alert UUID"),
+    ),
+    responses(
+        (status = 200, description = "Alert acknowledged"),
+        (status = 404, description = "Alert not found"),
+    ),
+)]
+pub async fn acknowledge_alert(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let result = sqlx::query("UPDATE budget_alerts SET acknowledged = true WHERE id = $1")
+        .bind(id)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to acknowledge alert {}: {}", id, e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to acknowledge alert" })),
+            )
+        })?;
+
+    if result.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Budget alert not found" })),
+        ));
+    }
+
+    Ok(Json(json!({ "id": id, "acknowledged": true })))
+}
+
+/// Acknowledges all unacknowledged alerts for a given period (or all periods).
+#[utoipa::path(
+    post,
+    path = "/api/budgets/alerts/acknowledge-all",
+    tag = "Budgets",
+    responses(
+        (status = 200, description = "Alerts acknowledged", body = AcknowledgeAlertsResponse),
+    ),
+)]
+pub async fn acknowledge_all_alerts(
+    State(state): State<AppState>,
+    Query(params): Query<BudgetAlertParams>,
+) -> Result<Json<AcknowledgeAlertsResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let now = Utc::now();
+    let year = params.year.unwrap_or_else(|| now.year());
+    let month = params.month.unwrap_or_else(|| now.month() as i32);
+
+    if !(1..=12).contains(&month) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "month must be between 1 and 12" })),
+        ));
+    }
+
+    let result = sqlx::query(
+        "UPDATE budget_alerts
+         SET acknowledged = true
+         WHERE acknowledged = false
+           AND (year IS NULL OR year = $1)
+           AND (month IS NULL OR month = $2)",
+    )
+    .bind(year)
+    .bind(month)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to acknowledge all alerts: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to acknowledge alerts" })),
+        )
+    })?;
+
+    Ok(Json(AcknowledgeAlertsResponse {
+        acknowledged: result.rows_affected() as i64,
+    }))
+}
+
 /// Returns budget vs actual spending for a given month/year.
 #[utoipa::path(
     get,
@@ -318,6 +514,43 @@ pub async fn budget_summary(
             percentage,
             remaining,
         });
+    }
+
+    // Generate budget alerts for budgets that crossed the 80% threshold and
+    // don't already have an unacknowledged alert for this period.
+    for item in &items {
+        if item.percentage >= Decimal::from(80) {
+            let budget_id = item.budget.id;
+            // Only insert when no unacknowledged alert exists for this budget.
+            let existing: Option<Uuid> = sqlx::query_scalar(
+                "SELECT id FROM budget_alerts
+                 WHERE budget_id = $1 AND acknowledged = false
+                 LIMIT 1",
+            )
+            .bind(budget_id)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .ok()
+            .flatten();
+
+            if existing.is_none() {
+                let _ = sqlx::query(
+                    "INSERT INTO budget_alerts
+                        (budget_id, actual_spent, threshold, acknowledged,
+                         category_id, year, month)
+                     VALUES ($1, $2, $3, false, $4, $5, $6)",
+                )
+                .bind(budget_id)
+                .bind(item.actual_spent)
+                .bind(Decimal::from(80))
+                .bind(item.budget.category_id)
+                .bind(year)
+                .bind(month)
+                .execute(&state.pg_pool)
+                .await
+                .map_err(|e| error!("Failed to insert budget alert: {}", e));
+            }
+        }
     }
 
     Ok(Json(BudgetSummaryResponse {

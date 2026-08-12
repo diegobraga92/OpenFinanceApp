@@ -7,6 +7,7 @@ pub mod audit;
 pub mod auth;
 pub mod budgets;
 pub mod categories;
+pub mod installments;
 pub mod ledger;
 pub mod receipts;
 pub mod reports;
@@ -30,4 +31,5 @@ pub fn api_router() -> Router<AppState> {
         .merge(auth::router())
         .merge(audit::router())
         .merge(receipts::router())
+        .merge(installments::router())
 }

@@ -393,6 +393,133 @@
         }
       }
     },
+    "/api/budgets/alerts": {
+      "get": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Lists budget alerts with optional period and acknowledgement filters.",
+        "operationId": "list_budget_alerts",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Year (default: current)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "Month 1-12 (default: current)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "acknowledged",
+            "in": "query",
+            "description": "Filter by acknowledgement state (default: false)",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page offset (default 0)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Page size (default 50, max 200)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of budget alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAlertListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid month parameter"
+          }
+        }
+      }
+    },
+    "/api/budgets/alerts/acknowledge-all": {
+      "post": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Acknowledges all unacknowledged alerts for a given period (or all periods).",
+        "operationId": "acknowledge_all_alerts",
+        "responses": {
+          "200": {
+            "description": "Alerts acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcknowledgeAlertsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budgets/alerts/{id}/acknowledge": {
+      "post": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Acknowledges a single budget alert by ID.",
+        "operationId": "acknowledge_alert",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Budget alert UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert acknowledged"
+          },
+          "404": {
+            "description": "Alert not found"
+          }
+        }
+      }
+    },
     "/api/budgets/summary": {
       "get": {
         "tags": [
@@ -655,6 +782,207 @@
         }
       }
     },
+    "/api/installments": {
+      "get": {
+        "tags": [
+          "Installments"
+        ],
+        "summary": "Lists all installment plans with computed progress.",
+        "operationId": "list_installment_plans",
+        "responses": {
+          "200": {
+            "description": "List of installment plans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstallmentPlan"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Installments"
+        ],
+        "summary": "Creates a new installment plan (no transactions are created yet).",
+        "operationId": "create_installment_plan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInstallmentPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Installment plan created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallmentPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid installment payload"
+          }
+        }
+      }
+    },
+    "/api/installments/{id}": {
+      "get": {
+        "tags": [
+          "Installments"
+        ],
+        "summary": "Returns a single installment plan with all its installment rows.",
+        "operationId": "get_installment_plan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Installment plan UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Installment plan detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallmentPlanDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Installment plan not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Installments"
+        ],
+        "summary": "Deletes an installment plan (and any transactions it generated).",
+        "operationId": "delete_installment_plan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Installment plan UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Installment plan deleted"
+          },
+          "404": {
+            "description": "Installment plan not found"
+          }
+        }
+      }
+    },
+    "/api/installments/{id}/generate": {
+      "post": {
+        "tags": [
+          "Installments"
+        ],
+        "summary": "Generates transaction rows for all pending installments with due_date <= today.",
+        "operationId": "generate_installments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Installment plan UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Installments generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateInstallmentsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Installment plan not found"
+          }
+        }
+      }
+    },
+    "/api/installments/{id}/installment/{number}/pay": {
+      "post": {
+        "tags": [
+          "Installments"
+        ],
+        "summary": "Marks a single installment as paid, creating the transaction if needed.",
+        "operationId": "pay_installment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Installment plan UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "description": "1-based installment number",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Installment paid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayInstallmentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Installment not found"
+          }
+        }
+      }
+    },
     "/api/ledger/transactions": {
       "get": {
         "tags": [
@@ -862,6 +1190,55 @@
           },
           "400": {
             "description": "Invalid upload"
+          }
+        }
+      }
+    },
+    "/api/reconciliation/history": {
+      "get": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Lists past reconciliations with their match statistics.",
+        "operationId": "reconciliation_history",
+        "responses": {
+          "200": {
+            "description": "List of past reconciliations"
+          }
+        }
+      }
+    },
+    "/api/reconciliation/upload": {
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Uploads a raw CSV/OFX statement file and runs reconciliation on its rows.",
+        "operationId": "upload_reconciliation",
+        "requestBody": {
+          "description": "multipart/form-data with `file`, optional `statement_name`, `format` (csv|ofx), and `auto_create_unmatched`",
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file or unsupported format"
           }
         }
       }
@@ -1426,6 +1803,20 @@
           }
         }
       },
+      "AcknowledgeAlertsResponse": {
+        "type": "object",
+        "description": "Response for the bulk acknowledge endpoint.",
+        "required": [
+          "acknowledged"
+        ],
+        "properties": {
+          "acknowledged": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of alerts acknowledged."
+          }
+        }
+      },
       "Budget": {
         "type": "object",
         "description": "A monthly budget limit for a category.",
@@ -1472,6 +1863,113 @@
             "type": "integer",
             "format": "int32",
             "description": "Year."
+          }
+        }
+      },
+      "BudgetAlert": {
+        "type": "object",
+        "description": "A single budget alert (triggered when spending crosses a threshold).",
+        "required": [
+          "id",
+          "budget_id",
+          "category_name",
+          "amount_limit",
+          "actual_spent",
+          "threshold",
+          "triggered_at",
+          "acknowledged",
+          "year",
+          "month"
+        ],
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether the user acknowledged this alert."
+          },
+          "actual_spent": {
+            "type": "string",
+            "description": "Actual spending when the alert triggered."
+          },
+          "amount_limit": {
+            "type": "string",
+            "description": "Budget amount limit (joined)."
+          },
+          "budget_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Budget this alert belongs to."
+          },
+          "category_color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category hex color (joined)."
+          },
+          "category_icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category icon identifier (joined)."
+          },
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Denormalized category id (set at trigger time)."
+          },
+          "category_name": {
+            "type": "string",
+            "description": "Category name (joined)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique alert identifier."
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Month of the budget period (1-12)."
+          },
+          "threshold": {
+            "type": "string",
+            "description": "Threshold percentage that triggered this alert (e.g. 80.00)."
+          },
+          "triggered_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Alert trigger timestamp."
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Year of the budget period."
+          }
+        }
+      },
+      "BudgetAlertListResponse": {
+        "type": "object",
+        "description": "Response for the budget alerts listing endpoint.",
+        "required": [
+          "items",
+          "unacknowledged_count"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetAlert"
+            },
+            "description": "Alerts matching the filters, newest first."
+          },
+          "unacknowledged_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total count of unacknowledged alerts across all periods."
           }
         }
       },
@@ -1921,6 +2419,47 @@
           }
         }
       },
+      "CreateInstallmentPlanRequest": {
+        "type": "object",
+        "description": "Payload for creating a new installment plan.",
+        "required": [
+          "description",
+          "total_amount",
+          "installments",
+          "start_date"
+        ],
+        "properties": {
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Optional expense category."
+          },
+          "description": {
+            "type": "string",
+            "description": "Purchase description."
+          },
+          "installments": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of installments (2-60).",
+            "maximum": 60,
+            "minimum": 2
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "First installment due date."
+          },
+          "total_amount": {
+            "type": "string",
+            "description": "Total purchase amount (must be > 0).",
+            "example": "1200.00"
+          }
+        }
+      },
       "CreateLedgerTransactionRequest": {
         "type": "object",
         "description": "Payload for creating a ledger transaction (double-entry).",
@@ -2009,6 +2548,14 @@
             "type": "string",
             "description": "Human-readable description (e.g., \"Lunch at Restaurante X\")."
           },
+          "installment_plan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Installment plan this transaction belongs to (optional)."
+          },
           "notes": {
             "type": [
               "string",
@@ -2020,6 +2567,26 @@
             "type": "string",
             "description": "`income` or `expense`.",
             "example": "expense"
+          }
+        }
+      },
+      "GenerateInstallmentsResponse": {
+        "type": "object",
+        "description": "Response for the installment generate endpoint.",
+        "required": [
+          "generated",
+          "already_generated"
+        ],
+        "properties": {
+          "already_generated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of installments already generated (skipped)."
+          },
+          "generated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of new transactions created."
           }
         }
       },
@@ -2076,6 +2643,189 @@
           "version": {
             "type": "string",
             "description": "Backend crate version from `CARGO_PKG_VERSION`."
+          }
+        }
+      },
+      "InstallmentPlan": {
+        "type": "object",
+        "description": "An installment plan: a purchase split into N monthly payments.",
+        "required": [
+          "id",
+          "description",
+          "total_amount",
+          "installments",
+          "installment_amount",
+          "start_date",
+          "created_at",
+          "progress"
+        ],
+        "properties": {
+          "category_color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category hex color (joined, optional)."
+          },
+          "category_icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category icon (joined, optional)."
+          },
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Category this purchase belongs to (optional)."
+          },
+          "category_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category name (joined, optional)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Plan creation timestamp."
+          },
+          "description": {
+            "type": "string",
+            "description": "Purchase description (e.g., \"TV 55\\\" Samsung\")."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique plan identifier."
+          },
+          "installment_amount": {
+            "type": "string",
+            "description": "Value of each installment (total / installments)."
+          },
+          "installments": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of monthly installments."
+          },
+          "progress": {
+            "$ref": "#/components/schemas/InstallmentProgress",
+            "description": "Computed progress (paid/pending/total)."
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "First installment due date."
+          },
+          "total_amount": {
+            "type": "string",
+            "description": "Total purchase amount."
+          }
+        }
+      },
+      "InstallmentPlanDetail": {
+        "type": "object",
+        "description": "Detail view of a plan including all its installment rows.",
+        "required": [
+          "plan",
+          "installments"
+        ],
+        "properties": {
+          "installments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstallmentTransaction"
+            },
+            "description": "All installment rows, ordered by number."
+          },
+          "plan": {
+            "$ref": "#/components/schemas/InstallmentPlan",
+            "description": "The plan header with progress."
+          }
+        }
+      },
+      "InstallmentProgress": {
+        "type": "object",
+        "description": "Progress summary computed for an installment plan.",
+        "required": [
+          "paid_count",
+          "pending_count",
+          "total_count",
+          "paid_amount",
+          "remaining_amount"
+        ],
+        "properties": {
+          "paid_amount": {
+            "type": "string",
+            "description": "Sum of paid installment amounts."
+          },
+          "paid_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of installments marked as paid."
+          },
+          "pending_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of installments still pending or generated."
+          },
+          "remaining_amount": {
+            "type": "string",
+            "description": "Remaining amount to be paid."
+          },
+          "total_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of installments in the plan."
+          }
+        }
+      },
+      "InstallmentTransaction": {
+        "type": "object",
+        "description": "A single installment row within a plan.",
+        "required": [
+          "id",
+          "plan_id",
+          "installment_number",
+          "due_date",
+          "status"
+        ],
+        "properties": {
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Due date for this installment."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique installment row identifier."
+          },
+          "installment_number": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-based installment number."
+          },
+          "plan_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Parent plan identifier."
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `generated`, or `paid`."
+          },
+          "transaction_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Linked simple transaction id (NULL until generated/paid)."
           }
         }
       },
@@ -2328,6 +3078,24 @@
           }
         }
       },
+      "PayInstallmentResponse": {
+        "type": "object",
+        "description": "Response for the pay endpoint.",
+        "required": [
+          "transaction",
+          "created"
+        ],
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "Whether a new transaction was created or an existing one reused."
+          },
+          "transaction": {
+            "$ref": "#/components/schemas/Transaction",
+            "description": "The linked transaction (created if one didn't exist)."
+          }
+        }
+      },
       "PriceHistoryParams": {
         "type": "object",
         "description": "Query params for price history.",
@@ -2448,6 +3216,13 @@
           "lines"
         ],
         "properties": {
+          "auto_create_unmatched": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "When true, unmatched rows are automatically converted into new expense\ntransactions (category \"Uncategorized\"). Defaults to false."
+          },
           "lines": {
             "type": "array",
             "items": {
@@ -2726,6 +3501,14 @@
             "format": "uuid",
             "description": "Unique transaction identifier."
           },
+          "installment_plan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Installment plan this transaction belongs to (NULL for regular transactions)."
+          },
           "notes": {
             "type": [
               "string",
@@ -2986,6 +3769,14 @@
           "description": {
             "type": "string",
             "description": "Human-readable description (e.g., \"Lunch at Restaurante X\")."
+          },
+          "installment_plan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Installment plan this transaction belongs to (optional)."
           },
           "notes": {
             "type": [

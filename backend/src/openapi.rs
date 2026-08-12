@@ -2,21 +2,24 @@ use utoipa::OpenApi;
 
 use crate::health;
 use crate::models::{
-    Account, AccountWithBalance, Budget, BudgetListResponse, BudgetSummaryItem,
-    BudgetSummaryResponse, BudgetWithCategory, Category, CategoryBreakdownItem,
-    CategoryBreakdownResponse, CategorySummary, CreateAccountRequest, CreateBudgetRequest,
-    CreateCategoryRequest, CreateLedgerTransactionRequest, CreateLedgerTransactionResponse,
-    CreateTransactionRequest, LedgerEntry, LedgerEntryRequest, LedgerTransaction,
-    MigrationResponse, MonthlyReportItem, MonthlyReportResponse, ReconciliationItem,
-    ReconciliationUploadRequest, ReconciliationUploadResponse, StatementLine, SummaryResponse,
-    Transaction, TransactionListParams, TransactionListResponse, TrendPoint, TrendsResponse,
-    UpdateAccountRequest, UpdateCategoryRequest, UpdateTransactionRequest,
+    Account, AccountWithBalance, AcknowledgeAlertsResponse, Budget, BudgetAlert,
+    BudgetAlertListResponse, BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse,
+    BudgetWithCategory, Category, CategoryBreakdownItem, CategoryBreakdownResponse, CategorySummary,
+    CreateAccountRequest, CreateBudgetRequest, CreateCategoryRequest,
+    CreateInstallmentPlanRequest, CreateLedgerTransactionRequest, CreateLedgerTransactionResponse,
+    CreateTransactionRequest, GenerateInstallmentsResponse, InstallmentPlan, InstallmentPlanDetail,
+    InstallmentProgress, InstallmentTransaction, LedgerEntry, LedgerEntryRequest, LedgerTransaction,
+    MigrationResponse, MonthlyReportItem, MonthlyReportResponse, PayInstallmentResponse,
+    ReconciliationItem, ReconciliationUploadRequest, ReconciliationUploadResponse, StatementLine,
+    SummaryResponse, Transaction, TransactionListParams, TransactionListResponse, TrendPoint,
+    TrendsResponse, UpdateAccountRequest, UpdateCategoryRequest, UpdateTransactionRequest,
 };
 use crate::routes::accounts;
 use crate::routes::audit;
 use crate::routes::auth::{self, LoginRequest, RefreshRequest, RegisterRequest};
 use crate::routes::budgets;
 use crate::routes::categories::{self, CategoryListParams};
+use crate::routes::installments;
 use crate::routes::ledger;
 use crate::routes::receipts::{
     self, MergeProductsRequest, PriceHistoryParams, ReceiptItemInput, SaveReceiptRequest,
@@ -50,6 +53,9 @@ use crate::routes::transactions;
         budgets::create_budget,
         budgets::budget_summary,
         budgets::delete_budget,
+        budgets::list_budget_alerts,
+        budgets::acknowledge_alert,
+        budgets::acknowledge_all_alerts,
         reports::monthly_report,
         reports::category_breakdown,
         reports::trends,
@@ -62,6 +68,8 @@ use crate::routes::transactions;
         ledger::list_ledger_transactions,
         ledger::migrate_single_to_double,
         ledger::reconcile,
+        ledger::upload_reconciliation,
+        ledger::reconciliation_history,
         auth::register,
         auth::login,
         auth::refresh,
@@ -72,6 +80,12 @@ use crate::routes::transactions;
         receipts::list_receipts,
         receipts::price_history,
         receipts::merge_products,
+        installments::list_installment_plans,
+        installments::create_installment_plan,
+        installments::get_installment_plan,
+        installments::delete_installment_plan,
+        installments::generate_installments,
+        installments::pay_installment,
     ),
     components(schemas(
         health::HealthResponse,
@@ -116,12 +130,22 @@ use crate::routes::transactions;
         BudgetWithCategory,
         BudgetSummaryItem,
         BudgetSummaryResponse,
+        BudgetAlert,
+        BudgetAlertListResponse,
+        AcknowledgeAlertsResponse,
         MonthlyReportItem,
         MonthlyReportResponse,
         CategoryBreakdownItem,
         CategoryBreakdownResponse,
         TrendPoint,
         TrendsResponse,
+        InstallmentPlan,
+        InstallmentProgress,
+        InstallmentTransaction,
+        InstallmentPlanDetail,
+        CreateInstallmentPlanRequest,
+        GenerateInstallmentsResponse,
+        PayInstallmentResponse,
     )),
     info(
         title = "PudimFinance API",

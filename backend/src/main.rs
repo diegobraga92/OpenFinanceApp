@@ -14,6 +14,7 @@ mod middleware;
 mod models;
 mod openapi;
 mod receipt_scanner;
+mod reconciliation_parser;
 mod routes;
 mod state;
 mod telemetry;

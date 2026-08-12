@@ -28,6 +28,8 @@ pub mod models;
 pub mod openapi;
 /// NFC-e QR code parsing for receipt scanning.
 pub mod receipt_scanner;
+/// Bank statement parsing (CSV/OFX) for reconciliation.
+pub mod reconciliation_parser;
 /// HTTP route handlers for categories, transactions, summary, budgets, reports, and ledger.
 pub mod routes;
 /// Shared application state for axum handlers.

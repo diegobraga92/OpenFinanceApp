@@ -71,6 +71,9 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
                 </span>
               </div>
               <div style={styles.cardDescription}>{t.description}</div>
+              {t.installment_plan_id && (
+                <span style={styles.installmentBadge}>Parcela</span>
+              )}
               <div style={styles.cardBottom}>
                 {cat ? (
                   <span style={styles.badge}>
@@ -112,7 +115,14 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
             return (
               <tr key={t.id} style={styles.tr}>
                 <td style={styles.td}>{formatDate(t.date)}</td>
-                <td style={styles.td}>{t.description}</td>
+                <td style={styles.td}>
+                  <div style={styles.descCell}>
+                    {t.description}
+                    {t.installment_plan_id && (
+                      <span style={styles.installmentBadge}>Parcela</span>
+                    )}
+                  </div>
+                </td>
                 <td style={styles.td}>
                   {cat ? (
                     <span style={styles.badge}>
@@ -177,6 +187,24 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--color-text)',
     fontSize: '0.9375rem',
     fontWeight: 500,
+  },
+  installmentBadge: {
+    backgroundColor: 'var(--color-warning-bg, rgba(245, 158, 11, 0.15))',
+    border: '1px solid var(--color-warning-border, rgba(245, 158, 11, 0.4))',
+    color: 'var(--color-warning-text)',
+    fontSize: '0.625rem',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    padding: '0.125rem 0.375rem',
+    borderRadius: '0.25rem',
+    marginLeft: '0.375rem',
+    whiteSpace: 'nowrap',
+  },
+  descCell: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   cardBottom: {
     display: 'flex',

@@ -27,6 +27,9 @@ export type SummaryResponse = components['schemas']['SummaryResponse'];
 export type Budget = components['schemas']['Budget'];
 export type CreateBudgetRequest = components['schemas']['CreateBudgetRequest'];
 export type BudgetWithCategory = components['schemas']['BudgetWithCategory'];
+export type BudgetAlert = components['schemas']['BudgetAlert'];
+export type BudgetAlertListResponse = components['schemas']['BudgetAlertListResponse'];
+export type AcknowledgeAlertsResponse = components['schemas']['AcknowledgeAlertsResponse'];
 export type BudgetSummaryItem = components['schemas']['BudgetSummaryItem'];
 export type BudgetSummaryResponse = components['schemas']['BudgetSummaryResponse'];
 export type MonthlyReportItem = components['schemas']['MonthlyReportItem'];
@@ -55,11 +58,18 @@ export type ScanRequest = components['schemas']['ScanRequest'];
 export type SaveReceiptRequest = components['schemas']['SaveReceiptRequest'];
 export type ReceiptItemInput = components['schemas']['ReceiptItemInput'];
 export type MergeProductsRequest = components['schemas']['MergeProductsRequest'];
+export type InstallmentPlan = components['schemas']['InstallmentPlan'];
+export type InstallmentProgress = components['schemas']['InstallmentProgress'];
+export type InstallmentTransaction = components['schemas']['InstallmentTransaction'];
+export type InstallmentPlanDetail = components['schemas']['InstallmentPlanDetail'];
+export type CreateInstallmentPlanRequest = components['schemas']['CreateInstallmentPlanRequest'];
+export type GenerateInstallmentsResponse = components['schemas']['GenerateInstallmentsResponse'];
+export type PayInstallmentResponse = components['schemas']['PayInstallmentResponse'];
 
 interface RequestOptions {
   method?: string;
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | FormData;
 }
 
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -68,10 +78,12 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   // otherwise defeat the automatic refresh below).
   const doFetch = () => {
     const token = getAccessToken();
+    const isFormData = options?.body instanceof FormData;
     return fetch(`${API_BASE_URL}${path}`, {
       method: options?.method,
       headers: {
-        'Content-Type': 'application/json',
+        // For multipart FormData the browser sets the boundary header itself.
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...options?.headers,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -247,6 +259,39 @@ export async function fetchBudgetSummary(year?: number, month?: number): Promise
   return request<BudgetSummaryResponse>(`/api/budgets/summary${query}`);
 }
 
+export async function fetchBudgetAlerts(params?: {
+  year?: number;
+  month?: number;
+  acknowledged?: boolean;
+  page?: number;
+  page_size?: number;
+}): Promise<BudgetAlertListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.year !== undefined) qs.set('year', String(params.year));
+  if (params?.month !== undefined) qs.set('month', String(params.month));
+  if (params?.acknowledged !== undefined) qs.set('acknowledged', String(params.acknowledged));
+  if (params?.page !== undefined) qs.set('page', String(params.page));
+  if (params?.page_size !== undefined) qs.set('page_size', String(params.page_size));
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return request<BudgetAlertListResponse>(`/api/budgets/alerts${query}`);
+}
+
+export async function acknowledgeBudgetAlert(id: string): Promise<{ id: string; acknowledged: boolean }> {
+  return request<{ id: string; acknowledged: boolean }>(`/api/budgets/alerts/${id}/acknowledge`, {
+    method: 'POST',
+  });
+}
+
+export async function acknowledgeAllBudgetAlerts(year?: number, month?: number): Promise<AcknowledgeAlertsResponse> {
+  const qs = new URLSearchParams();
+  if (year !== undefined) qs.set('year', String(year));
+  if (month !== undefined) qs.set('month', String(month));
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return request<AcknowledgeAlertsResponse>(`/api/budgets/alerts/acknowledge-all${query}`, {
+    method: 'POST',
+  });
+}
+
 export async function fetchMonthlyReport(
   startYear?: number,
   startMonth?: number,
@@ -333,6 +378,39 @@ export async function uploadReconciliation(
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+// Uploads a raw CSV/OFX file to the reconciliation endpoint.
+export async function uploadReconciliationFile(file: File, options?: {
+  statementName?: string;
+  format?: 'csv' | 'ofx';
+  autoCreateUnmatched?: boolean;
+}): Promise<ReconciliationUploadResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  if (options?.statementName) form.append('statement_name', options.statementName);
+  if (options?.format) form.append('format', options.format);
+  if (options?.autoCreateUnmatched !== undefined) {
+    form.append('auto_create_unmatched', String(options.autoCreateUnmatched));
+  }
+  return request<ReconciliationUploadResponse>('/api/reconciliation/upload', {
+    method: 'POST',
+    body: form,
+  });
+}
+
+export interface ReconciliationHistoryItem {
+  id: string;
+  statement_name: string;
+  uploaded_at: string;
+  total_rows: number;
+  matched_rows: number;
+  unmatched_rows: number;
+  status: string;
+}
+
+export async function fetchReconciliationHistory(): Promise<{ items: ReconciliationHistoryItem[] }> {
+  return request<{ items: ReconciliationHistoryItem[] }>('/api/reconciliation/history');
 }
 
 // --- Auth ---
@@ -428,6 +506,35 @@ export async function mergeProducts(payload: MergeProductsRequest): Promise<{ ta
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+// --- Installments ---
+
+export async function fetchInstallmentPlans(): Promise<InstallmentPlan[]> {
+  return request<InstallmentPlan[]>('/api/installments');
+}
+
+export async function createInstallmentPlan(payload: CreateInstallmentPlanRequest): Promise<InstallmentPlan> {
+  return request<InstallmentPlan>('/api/installments', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchInstallmentPlan(id: string): Promise<InstallmentPlanDetail> {
+  return request<InstallmentPlanDetail>(`/api/installments/${id}`);
+}
+
+export async function deleteInstallmentPlan(id: string): Promise<void> {
+  return request<void>(`/api/installments/${id}`, { method: 'DELETE' });
+}
+
+export async function generateInstallments(id: string): Promise<GenerateInstallmentsResponse> {
+  return request<GenerateInstallmentsResponse>(`/api/installments/${id}/generate`, { method: 'POST' });
+}
+
+export async function payInstallment(id: string, number: number): Promise<PayInstallmentResponse> {
+  return request<PayInstallmentResponse>(`/api/installments/${id}/installment/${number}/pay`, { method: 'POST' });
 }
 
 export type { operations };

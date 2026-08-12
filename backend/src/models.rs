@@ -80,6 +80,8 @@ pub struct Transaction {
     pub date: NaiveDate,
     /// Optional free-form notes.
     pub notes: Option<String>,
+    /// Installment plan this transaction belongs to (NULL for regular transactions).
+    pub installment_plan_id: Option<Uuid>,
     /// Row creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Last row update timestamp.
@@ -104,6 +106,8 @@ pub struct CreateTransactionRequest {
     pub date: NaiveDate,
     /// Optional free-form notes.
     pub notes: Option<String>,
+    /// Installment plan this transaction belongs to (optional).
+    pub installment_plan_id: Option<Uuid>,
 }
 
 /// Payload for updating an existing transaction.
@@ -124,6 +128,8 @@ pub struct UpdateTransactionRequest {
     pub date: NaiveDate,
     /// Optional free-form notes.
     pub notes: Option<String>,
+    /// Installment plan this transaction belongs to (optional).
+    pub installment_plan_id: Option<Uuid>,
 }
 
 /// Query parameters for listing transactions.
@@ -305,6 +311,170 @@ pub struct BudgetSummaryResponse {
     pub month: i32,
     /// Year used for the query.
     pub year: i32,
+}
+
+/// A single budget alert (triggered when spending crosses a threshold).
+#[derive(Debug, Serialize, FromRow, ToSchema)]
+pub struct BudgetAlert {
+    /// Unique alert identifier.
+    pub id: Uuid,
+    /// Budget this alert belongs to.
+    pub budget_id: Uuid,
+    /// Denormalized category id (set at trigger time).
+    pub category_id: Option<Uuid>,
+    /// Category name (joined).
+    pub category_name: String,
+    /// Category icon identifier (joined).
+    pub category_icon: Option<String>,
+    /// Category hex color (joined).
+    pub category_color: Option<String>,
+    /// Budget amount limit (joined).
+    #[schema(value_type = String)]
+    pub amount_limit: Decimal,
+    /// Actual spending when the alert triggered.
+    #[schema(value_type = String)]
+    pub actual_spent: Decimal,
+    /// Threshold percentage that triggered this alert (e.g. 80.00).
+    #[schema(value_type = String)]
+    pub threshold: Decimal,
+    /// Alert trigger timestamp.
+    pub triggered_at: DateTime<Utc>,
+    /// Whether the user acknowledged this alert.
+    pub acknowledged: bool,
+    /// Year of the budget period.
+    pub year: i32,
+    /// Month of the budget period (1-12).
+    pub month: i32,
+}
+
+/// Response for the budget alerts listing endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BudgetAlertListResponse {
+    /// Alerts matching the filters, newest first.
+    pub items: Vec<BudgetAlert>,
+    /// Total count of unacknowledged alerts across all periods.
+    pub unacknowledged_count: i64,
+}
+
+/// Response for the bulk acknowledge endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AcknowledgeAlertsResponse {
+    /// Number of alerts acknowledged.
+    pub acknowledged: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Layer 4: Installments (Parcelas)
+// ---------------------------------------------------------------------------
+
+/// Progress summary computed for an installment plan.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InstallmentProgress {
+    /// Number of installments marked as paid.
+    pub paid_count: i64,
+    /// Number of installments still pending or generated.
+    pub pending_count: i64,
+    /// Total number of installments in the plan.
+    pub total_count: i64,
+    /// Sum of paid installment amounts.
+    #[schema(value_type = String)]
+    pub paid_amount: Decimal,
+    /// Remaining amount to be paid.
+    #[schema(value_type = String)]
+    pub remaining_amount: Decimal,
+}
+
+/// An installment plan: a purchase split into N monthly payments.
+#[derive(Debug, Serialize, FromRow, ToSchema)]
+pub struct InstallmentPlan {
+    /// Unique plan identifier.
+    pub id: Uuid,
+    /// Purchase description (e.g., "TV 55\" Samsung").
+    pub description: String,
+    /// Total purchase amount.
+    #[schema(value_type = String)]
+    pub total_amount: Decimal,
+    /// Number of monthly installments.
+    pub installments: i32,
+    /// Value of each installment (total / installments).
+    #[schema(value_type = String)]
+    pub installment_amount: Decimal,
+    /// Category this purchase belongs to (optional).
+    pub category_id: Option<Uuid>,
+    /// Category name (joined, optional).
+    pub category_name: Option<String>,
+    /// Category icon (joined, optional).
+    pub category_icon: Option<String>,
+    /// Category hex color (joined, optional).
+    pub category_color: Option<String>,
+    /// First installment due date.
+    pub start_date: NaiveDate,
+    /// Plan creation timestamp.
+    pub created_at: DateTime<Utc>,
+    /// Computed progress (paid/pending/total).
+    pub progress: InstallmentProgress,
+}
+
+/// Payload for creating a new installment plan.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateInstallmentPlanRequest {
+    /// Purchase description.
+    pub description: String,
+    /// Total purchase amount (must be > 0).
+    #[schema(value_type = String, example = "1200.00")]
+    pub total_amount: Decimal,
+    /// Number of installments (2-60).
+    #[schema(minimum = 2, maximum = 60)]
+    pub installments: i32,
+    /// Optional expense category.
+    pub category_id: Option<Uuid>,
+    /// First installment due date.
+    #[schema(value_type = String, format = Date)]
+    pub start_date: NaiveDate,
+}
+
+/// A single installment row within a plan.
+#[derive(Debug, Serialize, FromRow, ToSchema)]
+pub struct InstallmentTransaction {
+    /// Unique installment row identifier.
+    pub id: Uuid,
+    /// Parent plan identifier.
+    pub plan_id: Uuid,
+    /// 1-based installment number.
+    pub installment_number: i32,
+    /// Due date for this installment.
+    pub due_date: NaiveDate,
+    /// Linked simple transaction id (NULL until generated/paid).
+    pub transaction_id: Option<Uuid>,
+    /// `pending`, `generated`, or `paid`.
+    pub status: String,
+}
+
+/// Detail view of a plan including all its installment rows.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InstallmentPlanDetail {
+    /// The plan header with progress.
+    pub plan: InstallmentPlan,
+    /// All installment rows, ordered by number.
+    pub installments: Vec<InstallmentTransaction>,
+}
+
+/// Response for the installment generate endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct GenerateInstallmentsResponse {
+    /// Number of new transactions created.
+    pub generated: i64,
+    /// Number of installments already generated (skipped).
+    pub already_generated: i64,
+}
+
+/// Response for the pay endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PayInstallmentResponse {
+    /// The linked transaction (created if one didn't exist).
+    pub transaction: Transaction,
+    /// Whether a new transaction was created or an existing one reused.
+    pub created: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -580,6 +750,9 @@ pub struct ReconciliationUploadRequest {
     pub statement_name: String,
     /// Statement lines parsed from the uploaded CSV.
     pub lines: Vec<StatementLine>,
+    /// When true, unmatched rows are automatically converted into new expense
+    /// transactions (category "Uncategorized"). Defaults to false.
+    pub auto_create_unmatched: Option<bool>,
 }
 
 /// A reconciliation item result (matched or unmatched).

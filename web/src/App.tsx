@@ -25,11 +25,12 @@ import { BudgetManager } from './components/BudgetManager';
 import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
+import { InstallmentManager } from './components/InstallmentManager';
 import { EmptyState } from './components/EmptyState';
 import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit' | 'installments';
 
 const TABS: Tab[] = [
   'dashboard',
@@ -37,6 +38,7 @@ const TABS: Tab[] = [
   'accounts',
   'ledger',
   'budgets',
+  'installments',
   'reports',
   'reconciliation',
   'receipts',
@@ -55,6 +57,7 @@ const NAV_ITEMS: [Tab, string][] = [
   ['accounts', 'Accounts'],
   ['ledger', 'Ledger'],
   ['budgets', 'Budgets'],
+  ['installments', 'Installments'],
   ['reports', 'Reports'],
   ['reconciliation', 'Reconciliation'],
   ['receipts', 'Receipts'],
@@ -552,6 +555,8 @@ export default function App() {
           </div>
         ) : tab === 'budgets' ? (
           <BudgetManager categories={categories} formatMoney={formatMoney} />
+        ) : tab === 'installments' ? (
+          <InstallmentManager categories={categories} formatMoney={formatMoney} />
         ) : tab === 'reports' ? (
           <ReportsDashboard formatMoney={formatMoney} />
         ) : tab === 'reconciliation' ? (

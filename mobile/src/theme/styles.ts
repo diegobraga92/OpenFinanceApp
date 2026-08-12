@@ -263,10 +263,30 @@ export const styles = StyleSheet.create({
   transactionInfo: {
     flex: 1,
   },
+  transactionDescriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  installmentTag: {
+    backgroundColor: colors.warningBg,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  installmentTagText: {
+    color: colors.warningText,
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
   transactionDescription: {
     color: colors.text,
     fontSize: 14,
     fontWeight: '500',
+    flexShrink: 1,
   },
   transactionMeta: {
     color: colors.textDim,
@@ -649,6 +669,55 @@ export const styles = StyleSheet.create({
   overText: {
     color: colors.danger,
     fontSize: 13,
+  },
+  alertSection: {
+    backgroundColor: colors.warningBg,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  alertTitle: {
+    color: colors.warningText,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  alertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    borderRadius: 10,
+    padding: 10,
+  },
+  alertInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  alertCategory: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  alertText: {
+    fontSize: 12,
+  },
+  ackButton: {
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  ackButtonText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
   groupTitle: {
     color: colors.textMuted,
@@ -1398,5 +1467,134 @@ export const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     marginTop: 12,
+  },
+  // --- Installments screen ---
+  planCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    marginBottom: 12,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 12,
+  },
+  planCategory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  categoryIconEmoji: {
+    fontSize: 18,
+  },
+  planTitleBlock: {
+    flex: 1,
+  },
+  planTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  planSubtitle: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  planAmounts: {
+    alignItems: 'flex-end',
+  },
+  planTotal: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  planRemaining: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  planActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  planActionButton: {
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  planActionButtonText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  planDeleteButton: {
+    borderColor: colors.dangerBorder,
+  },
+  planDeleteText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  modalClose: {
+    color: colors.textMuted,
+    fontSize: 16,
+    padding: 4,
+  },
+  planDetailMeta: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  installmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  installmentNumber: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    minWidth: 36,
+  },
+  installmentDue: {
+    color: colors.textMuted,
+    fontSize: 12,
+    flex: 1,
+  },
+  installmentStatus: {
+    color: colors.text,
+    fontSize: 12,
+    flex: 1,
+  },
+  payButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  payButtonText: {
+    color: colors.primaryText,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

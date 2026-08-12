@@ -1,8 +1,11 @@
-import { useState, type CSSProperties, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import {
+  ReconciliationHistoryItem,
   ReconciliationUploadResponse,
   ReconciliationUploadRequest,
+  fetchReconciliationHistory,
   uploadReconciliation,
+  uploadReconciliationFile,
 } from '../api';
 import { useToast } from './Toast';
 
@@ -19,10 +22,26 @@ interface CsvRow {
 export function ReconciliationUpload({ formatMoney }: Props) {
   const [statementName, setStatementName] = useState('Bank Statement');
   const [rawCsv, setRawCsv] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [autoCreateUnmatched, setAutoCreateUnmatched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ReconciliationUploadResponse | null>(null);
+  const [history, setHistory] = useState<ReconciliationHistoryItem[]>([]);
   const { push: pushToast } = useToast();
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const data = await fetchReconciliationHistory();
+      setHistory(data.items);
+    } catch {
+      // Non-critical.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const parseCsv = (text: string): CsvRow[] => {
     const lines = text
@@ -73,6 +92,7 @@ export function ReconciliationUpload({ formatMoney }: Props) {
           description: r.description,
           amount: r.amount,
         })),
+        auto_create_unmatched: autoCreateUnmatched,
       };
       setLoading(true);
       const res = await uploadReconciliation(payload);
@@ -80,8 +100,32 @@ export function ReconciliationUpload({ formatMoney }: Props) {
       pushToast({
         message: `Reconciliation done: ${res.matched_rows} matched, ${res.unmatched_rows} unmatched`,
       });
+      loadHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload reconciliation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+    setError(null);
+    setResult(null);
+    setLoading(true);
+    try {
+      const res = await uploadReconciliationFile(selectedFile, {
+        statementName: statementName.trim() || selectedFile.name,
+        autoCreateUnmatched,
+      });
+      setResult(res);
+      pushToast({
+        message: `Reconciliation done: ${res.matched_rows} matched, ${res.unmatched_rows} unmatched`,
+      });
+      loadHistory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload statement file');
     } finally {
       setLoading(false);
     }
@@ -99,21 +143,14 @@ export function ReconciliationUpload({ formatMoney }: Props) {
         <div>
           <h2 style={styles.pageTitle}>Reconciliation</h2>
           <p style={styles.pageSubtitle}>
-            Upload a bank statement CSV (date,description,amount) to match against your transactions
+            Upload a bank statement (CSV or OFX) or paste CSV to match against your transactions
           </p>
         </div>
       </div>
 
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Upload Statement</h3>
-        {error && (
-          <div style={styles.errorBanner}>
-            <p>{error}</p>
-            <button onClick={() => setError(null)} style={styles.dismissButton}>✕</button>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={styles.form}>
+        <h3 style={styles.sectionTitle}>Upload Statement File (.csv / .ofx)</h3>
+        <form onSubmit={handleFileUpload} style={styles.form}>
           <label style={styles.label}>
             Statement Name
             <input
@@ -123,7 +160,43 @@ export function ReconciliationUpload({ formatMoney }: Props) {
               placeholder="e.g. Nubank August 2026"
             />
           </label>
+          <label style={styles.fileLabel}>
+            Choose file
+            <input
+              type="file"
+              accept=".csv,.ofx,.qfx,text/csv,application/x-ofx"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+              style={styles.fileInput}
+            />
+          </label>
+          {selectedFile && (
+            <p style={styles.fileHint}>Selected: {selectedFile.name} ({selectedFile.size} bytes)</p>
+          )}
+          <label style={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={autoCreateUnmatched}
+              onChange={(e) => setAutoCreateUnmatched(e.target.checked)}
+              style={styles.checkbox}
+            />
+            Auto-create transactions for unmatched rows (as expenses, uncategorized)
+          </label>
+          <button type="submit" style={styles.submitButton} disabled={loading || !selectedFile}>
+            {loading ? 'Reconciling…' : 'Upload & Reconcile'}
+          </button>
+        </form>
+      </div>
 
+      <div style={styles.section}>
+        <h3 style={styles.sectionTitle}>Or Paste CSV Manually</h3>
+        {error && (
+          <div style={styles.errorBanner}>
+            <p>{error}</p>
+            <button onClick={() => setError(null)} style={styles.dismissButton}>✕</button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>
             CSV Data
             <textarea
@@ -133,6 +206,16 @@ export function ReconciliationUpload({ formatMoney }: Props) {
               placeholder={`date,description,amount\n2026-08-01,Supermarket,150.00\n2026-08-02,Salary,2500.00\n...\n\nFormat: date (YYYY-MM-DD), description, amount. Negative amounts = expenses.`}
               spellCheck={false}
             />
+          </label>
+
+          <label style={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={autoCreateUnmatched}
+              onChange={(e) => setAutoCreateUnmatched(e.target.checked)}
+              style={styles.checkbox}
+            />
+            Auto-create transactions for unmatched rows
           </label>
 
           <button type="submit" style={styles.submitButton} disabled={loading}>
@@ -192,6 +275,38 @@ export function ReconciliationUpload({ formatMoney }: Props) {
                     <td style={{ ...styles.td, ...styles.numCell }}>
                       {item.confidence ? `${Math.round(parseAmount(item.confidence))}%` : '—'}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>History</h3>
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Name</th>
+                  <th style={styles.th}>Uploaded</th>
+                  <th style={styles.th} align="right">Total</th>
+                  <th style={styles.th} align="right">Matched</th>
+                  <th style={styles.th} align="right">Unmatched</th>
+                  <th style={styles.th}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} style={styles.tr}>
+                    <td style={styles.td}>{h.statement_name}</td>
+                    <td style={styles.td}>{new Date(h.uploaded_at).toLocaleString('pt-BR')}</td>
+                    <td style={{ ...styles.td, ...styles.numCell }}>{h.total_rows}</td>
+                    <td style={{ ...styles.td, ...styles.numCell }}>{h.matched_rows}</td>
+                    <td style={{ ...styles.td, ...styles.numCell }}>{h.unmatched_rows}</td>
+                    <td style={styles.td}>{h.status}</td>
                   </tr>
                 ))}
               </tbody>
@@ -283,6 +398,42 @@ const styles: Record<string, CSSProperties> = {
     resize: 'vertical',
     width: '100%',
     boxSizing: 'border-box',
+  },
+  fileLabel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.375rem',
+    fontSize: '0.875rem',
+    color: 'var(--color-text-muted)',
+  },
+  fileInput: {
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '0.5rem',
+    padding: '0.5rem 0.75rem',
+    color: 'var(--color-text)',
+    fontSize: '0.875rem',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  fileHint: {
+    color: 'var(--color-text-muted)',
+    fontSize: '0.8125rem',
+    margin: 0,
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    fontSize: '0.875rem',
+    color: 'var(--color-text-muted)',
+    cursor: 'pointer',
+  },
+  checkbox: {
+    accentColor: 'var(--color-primary)',
+    width: '1rem',
+    height: '1rem',
+    cursor: 'pointer',
   },
   submitButton: {
     alignSelf: 'flex-start',

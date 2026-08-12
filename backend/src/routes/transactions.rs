@@ -98,7 +98,8 @@ pub async fn list_transactions(
     })?;
 
     let items: Vec<Transaction> = sqlx::query_as(
-        "SELECT id, description, amount, type, category_id, date, notes, created_at, updated_at
+        "SELECT id, description, amount, type, category_id, date, notes,
+                installment_plan_id, created_at, updated_at
          FROM transactions
          WHERE ($1::uuid IS NULL OR category_id = $1)
            AND ($2::text IS NULL OR type = $2)
@@ -170,9 +171,10 @@ pub async fn create_transaction(
     }
 
     let transaction = sqlx::query_as::<_, Transaction>(
-        "INSERT INTO transactions (description, amount, type, category_id, date, notes)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, description, amount, type, category_id, date, notes, created_at, updated_at",
+        "INSERT INTO transactions (description, amount, type, category_id, date, notes, installment_plan_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, description, amount, type, category_id, date, notes,
+                   installment_plan_id, created_at, updated_at",
     )
     .bind(payload.description.trim())
     .bind(payload.amount)
@@ -180,6 +182,7 @@ pub async fn create_transaction(
     .bind(payload.category_id)
     .bind(payload.date)
     .bind(&payload.notes)
+    .bind(payload.installment_plan_id)
     .fetch_one(&state.pg_pool)
     .await
     .map_err(|e| {
@@ -211,7 +214,8 @@ pub async fn get_transaction(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Transaction>, (StatusCode, Json<serde_json::Value>)> {
     let transaction = sqlx::query_as::<_, Transaction>(
-        "SELECT id, description, amount, type, category_id, date, notes, created_at, updated_at
+        "SELECT id, description, amount, type, category_id, date, notes,
+                installment_plan_id, created_at, updated_at
          FROM transactions WHERE id = $1",
     )
     .bind(id)
@@ -280,9 +284,10 @@ pub async fn update_transaction(
     let result = sqlx::query_as::<_, Transaction>(
         "UPDATE transactions
          SET description = $1, amount = $2, type = $3, category_id = $4,
-             date = $5, notes = $6, updated_at = NOW()
-         WHERE id = $7
-         RETURNING id, description, amount, type, category_id, date, notes, created_at, updated_at",
+             date = $5, notes = $6, installment_plan_id = $7, updated_at = NOW()
+         WHERE id = $8
+         RETURNING id, description, amount, type, category_id, date, notes,
+                   installment_plan_id, created_at, updated_at",
     )
     .bind(payload.description.trim())
     .bind(payload.amount)
@@ -290,6 +295,7 @@ pub async fn update_transaction(
     .bind(payload.category_id)
     .bind(payload.date)
     .bind(&payload.notes)
+    .bind(payload.installment_plan_id)
     .bind(id)
     .fetch_optional(&state.pg_pool)
     .await

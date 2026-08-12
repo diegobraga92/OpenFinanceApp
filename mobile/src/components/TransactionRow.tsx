@@ -30,7 +30,14 @@ export function TransactionRow({
           </View>
         )}
         <View style={styles.transactionInfo}>
-          <Text style={styles.transactionDescription}>{t.description}</Text>
+          <View style={styles.transactionDescriptionRow}>
+            <Text style={styles.transactionDescription}>{t.description}</Text>
+            {t.installment_plan_id && (
+              <View style={styles.installmentTag}>
+                <Text style={styles.installmentTagText}>parcela</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.transactionMeta}>
             {cat?.name || 'Uncategorised'} • {t.date}
           </Text>

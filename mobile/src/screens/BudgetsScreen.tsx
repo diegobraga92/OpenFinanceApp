@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { BudgetSummaryItem, BudgetSummaryResponse, Category, createBudget, deleteBudget, fetchBudgetSummary } from '../api';
+import { BudgetAlertListResponse, BudgetSummaryItem, BudgetSummaryResponse, Category, acknowledgeBudgetAlert, createBudget, deleteBudget, fetchBudgetAlerts, fetchBudgetSummary } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { MONTHS } from '../theme/constants';
@@ -25,6 +25,7 @@ interface Props {
 export function BudgetsScreen({ categories, formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummaryResponse | null>(null);
+  const [alerts, setAlerts] = useState<BudgetAlertListResponse | null>(null);
   const [budgetMonth, setBudgetMonth] = useState(new Date().getMonth() + 1);
   const [budgetYear, setBudgetYear] = useState(new Date().getFullYear());
   const [showBudgetForm, setShowBudgetForm] = useState(false);
@@ -42,6 +43,12 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       setBudgetSummary(summ);
     } catch (err) {
       showSnackbar(err instanceof Error ? err.message : 'Failed to load budgets');
+    }
+    try {
+      const alertData = await fetchBudgetAlerts({ acknowledged: false });
+      setAlerts(alertData);
+    } catch {
+      // Alerts are non-critical — don't block the screen if they fail.
     }
   }, [budgetYear, budgetMonth, showSnackbar]);
 
@@ -135,6 +142,17 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
     ]);
   };
 
+  const handleAcknowledge = async (id: string) => {
+    try {
+      await acknowledgeBudgetAlert(id);
+      const alertData = await fetchBudgetAlerts({ acknowledged: false });
+      setAlerts(alertData);
+      showSnackbar('Alert acknowledged');
+    } catch (err) {
+      showSnackbar(err instanceof Error ? err.message : 'Failed to acknowledge alert');
+    }
+  };
+
   return (
     <ScrollView
       style={styles.content}
@@ -164,6 +182,36 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
           <Text style={styles.navButtonText}>→</Text>
         </TouchableOpacity>
       </View>
+
+      {alerts && alerts.items.length > 0 && (
+        <View style={styles.alertSection}>
+          <Text style={styles.alertTitle}>
+            ⚠️ Budget Alerts {alerts.unacknowledged_count > 0 && `(${alerts.unacknowledged_count})`}
+          </Text>
+          {alerts.items.map((alert) => {
+            const pct = Math.round(
+              parseFloat(alert.actual_spent) / Math.max(parseFloat(alert.amount_limit), 0.01) * 100,
+            );
+            const overLimit = pct >= 100;
+            return (
+              <View key={alert.id} style={styles.alertCard}>
+                <View style={styles.alertInfo}>
+                  <Text style={styles.alertCategory}>
+                    {alert.category_icon ? `${alert.category_icon} ` : ''}{alert.category_name}
+                  </Text>
+                  <Text style={[styles.alertText, { color: overLimit ? colors.danger : colors.warningText }]}>
+                    {formatMoney(alert.actual_spent)} of {formatMoney(alert.amount_limit)} ({pct}%)
+                    {overLimit ? ' — over budget' : ' — near limit'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.ackButton} onPress={() => handleAcknowledge(alert.id)}>
+                  <Text style={styles.ackButtonText}>Acknowledge</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {!budgetSummary ? (
         <View style={styles.loadingBox}>

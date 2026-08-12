@@ -40,9 +40,10 @@ import { LedgerScreen } from './src/screens/LedgerScreen';
 import { BudgetsScreen } from './src/screens/BudgetsScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
+import { InstallmentsScreen } from './src/screens/InstallmentsScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 
-type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'installments' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
 
 const DRAWER_ITEMS: {
   key: Screen;
@@ -54,6 +55,7 @@ const DRAWER_ITEMS: {
   { key: 'accounts', icon: 'wallet-outline', label: 'Accounts' },
   { key: 'ledger', icon: 'book-outline', label: 'Ledger' },
   { key: 'budgets', icon: 'pie-chart-outline', label: 'Budgets' },
+  { key: 'installments', icon: 'calendar-outline', label: 'Installments' },
   { key: 'reports', icon: 'trending-up-outline', label: 'Reports' },
   { key: 'reconciliation', icon: 'sync-outline', label: 'Reconciliation' },
   { key: 'categories', icon: 'pricetags-outline', label: 'Categories' },
@@ -267,6 +269,9 @@ function AppContent() {
           )}
           {screen === 'budgets' && (
             <BudgetsScreen categories={categories} formatMoney={formatMoney} />
+          )}
+          {screen === 'installments' && (
+            <InstallmentsScreen categories={categories} formatMoney={formatMoney} />
           )}
           {screen === 'reports' && <ReportsScreen formatMoney={formatMoney} />}
           {screen === 'accounts' && (

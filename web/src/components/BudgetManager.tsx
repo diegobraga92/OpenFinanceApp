@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import {
+  acknowledgeAllBudgetAlerts,
+  acknowledgeBudgetAlert,
+  BudgetAlertListResponse,
   BudgetSummaryItem,
   BudgetSummaryResponse,
   Category,
   createBudget,
   deleteBudget,
+  fetchBudgetAlerts,
   fetchBudgetSummary,
 } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -31,6 +35,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1); // 1-12
   const [summary, setSummary] = useState<BudgetSummaryResponse | null>(null);
+  const [alerts, setAlerts] = useState<BudgetAlertListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -55,9 +60,42 @@ export function BudgetManager({ categories, formatMoney }: Props) {
     }
   }, [year, month]);
 
+  const loadAlerts = useCallback(async () => {
+    try {
+      const data = await fetchBudgetAlerts({ acknowledged: false });
+      setAlerts(data);
+    } catch {
+      // Alerts are non-critical — don't block the page if they fail.
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    loadAlerts();
+  }, [loadAlerts]);
+
+  const handleAcknowledge = async (id: string) => {
+    try {
+      await acknowledgeBudgetAlert(id);
+      await loadAlerts();
+      pushToast({ message: 'Alert acknowledged' });
+    } catch (err) {
+      pushToast({ message: err instanceof Error ? err.message : 'Failed to acknowledge alert' });
+    }
+  };
+
+  const handleAcknowledgeAll = async () => {
+    try {
+      await acknowledgeAllBudgetAlerts();
+      await loadAlerts();
+      pushToast({ message: 'All alerts acknowledged' });
+    } catch (err) {
+      pushToast({ message: err instanceof Error ? err.message : 'Failed to acknowledge alerts' });
+    }
+  };
 
   const prevMonth = () => {
     if (month === 1) {
@@ -151,6 +189,44 @@ export function BudgetManager({ categories, formatMoney }: Props) {
         <div style={styles.errorBanner}>
           <p>{error}</p>
           <button onClick={loadData} style={styles.retryButton}>Retry</button>
+        </div>
+      )}
+
+      {alerts && alerts.items.length > 0 && (
+        <div style={styles.alertSection}>
+          <div style={styles.alertHeader}>
+            <h3 style={styles.alertTitle}>
+              ⚠️ Budget Alerts {alerts.unacknowledged_count > 0 && `(${alerts.unacknowledged_count})`}
+            </h3>
+            <button style={styles.ackAllButton} onClick={handleAcknowledgeAll}>
+              Acknowledge all
+            </button>
+          </div>
+          {alerts.items.map((alert) => {
+            const pct = Math.round(
+              parseFloat(alert.actual_spent) / Math.max(parseFloat(alert.amount_limit), 0.01) * 100,
+            );
+            const overLimit = pct >= 100;
+            return (
+              <div key={alert.id} style={styles.alertCard}>
+                <div style={styles.alertInfo}>
+                  <span style={styles.alertCategory}>
+                    {alert.category_icon ? `${alert.category_icon} ` : ''}{alert.category_name}
+                  </span>
+                  <span style={{ ...styles.alertText, color: overLimit ? 'var(--color-danger)' : 'var(--color-warning-text)' }}>
+                    {formatMoney(alert.actual_spent)} of {formatMoney(alert.amount_limit)} ({pct}%)
+                    {overLimit ? ' — over budget' : ' — near limit'}
+                  </span>
+                </div>
+                <button
+                  style={styles.ackButton}
+                  onClick={() => handleAcknowledge(alert.id)}
+                >
+                  Acknowledge
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -398,6 +474,69 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '0.375rem',
     cursor: 'pointer',
     fontWeight: 500,
+  },
+  alertSection: {
+    backgroundColor: 'var(--color-warning-bg, rgba(245, 158, 11, 0.08))',
+    border: '1px solid var(--color-warning-border, rgba(245, 158, 11, 0.35))',
+    borderRadius: '0.75rem',
+    padding: '1rem',
+    marginBottom: '1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.625rem',
+  },
+  alertHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.5rem',
+  },
+  alertTitle: {
+    margin: 0,
+    fontSize: '0.9375rem',
+    fontWeight: 600,
+  },
+  ackAllButton: {
+    background: 'transparent',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '0.375rem',
+    fontSize: '0.75rem',
+    cursor: 'pointer',
+  },
+  alertCard: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+    backgroundColor: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '0.5rem',
+    padding: '0.625rem 0.875rem',
+  },
+  alertInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.125rem',
+    minWidth: 0,
+  },
+  alertCategory: {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+  },
+  alertText: {
+    fontSize: '0.8125rem',
+  },
+  ackButton: {
+    background: 'transparent',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '0.375rem',
+    fontSize: '0.75rem',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   monthNav: {
     display: 'flex',
