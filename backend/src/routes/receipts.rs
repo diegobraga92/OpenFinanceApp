@@ -100,6 +100,14 @@ pub async fn scan(
         "cnpj": parsed.cnpj,
         "store_name": parsed.store_name,
         "version": parsed.version,
+        "items": parsed.items.iter().map(|i| {
+            json!({
+                "description": i.description,
+                "quantity": i.quantity.map(|q| q.to_string()),
+                "unit_price": i.unit_price.map(|p| p.to_string()),
+                "total_price": i.total_price.map(|p| p.to_string()),
+            })
+        }).collect::<Vec<_>>(),
     })))
 }
 

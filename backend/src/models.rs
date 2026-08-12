@@ -791,3 +791,67 @@ pub struct ReconciliationUploadResponse {
     /// Per-row match results.
     pub items: Vec<ReconciliationItem>,
 }
+
+// ---------------------------------------------------------------------------
+// Offline sync
+// ---------------------------------------------------------------------------
+
+/// Request: pull changes since a given timestamp.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SyncPullRequest {
+    /// Only return rows with `updated_at` after this timestamp.
+    pub last_synced_at: DateTime<Utc>,
+}
+
+/// Response: entities changed since the client's last sync.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SyncPullResponse {
+    /// All categories (or those changed since last sync).
+    pub categories: Vec<Category>,
+    /// Transactions changed since last sync.
+    pub transactions: Vec<Transaction>,
+    /// Server time — client stores this as its next `last_synced_at`.
+    pub server_time: DateTime<Utc>,
+}
+
+/// A single client-initiated mutation to apply on the server.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SyncOperation {
+    /// `create`, `update`, or `delete`.
+    pub operation_type: String,
+    /// `transaction` or `category`.
+    pub entity_type: String,
+    /// Client-generated UUID used as an idempotency key.
+    pub client_id: String,
+    /// Server UUID for `update`/`delete` operations.
+    pub server_id: Option<Uuid>,
+    /// Request body (e.g. a CreateTransactionRequest) for create/update.
+    pub payload: serde_json::Value,
+}
+
+/// Request: batch of client mutations.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SyncPushRequest {
+    /// Operations to apply, in order.
+    pub operations: Vec<SyncOperation>,
+}
+
+/// Result for a single pushed operation.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SyncOpResult {
+    /// Echo of the client_id.
+    pub client_id: String,
+    /// `ok`, `conflict`, or `error`.
+    pub status: String,
+    /// Server-assigned UUID for creates.
+    pub server_id: Option<Uuid>,
+    /// Error message when status != ok.
+    pub error: Option<String>,
+}
+
+/// Response: results for each pushed operation.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SyncPushResponse {
+    /// Per-operation results (same order as the request).
+    pub results: Vec<SyncOpResult>,
+}

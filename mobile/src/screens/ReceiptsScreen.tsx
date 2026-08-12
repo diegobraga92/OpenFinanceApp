@@ -26,10 +26,29 @@ interface GalleryReceipt {
   item_count?: number;
 }
 
+interface ParsedReceipt {
+  access_key?: string;
+  total?: string;
+  icms?: string;
+  date?: string;
+  cnpj?: string | null;
+  store_name?: string;
+  version?: string;
+  items?: { description?: string; quantity?: string | null; unit_price?: string | null; total_price?: string | null }[];
+}
+
+interface EditableItem {
+  description: string;
+  quantity: string;
+  unit_price: string;
+  total_price: string;
+}
+
 export function ReceiptsScreen({ formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
   const [qrData, setQrData] = useState('');
-  const [parsed, setParsed] = useState<Record<string, string | null> | null>(null);
+  const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
+  const [reviewItems, setReviewItems] = useState<EditableItem[]>([]);
   const [gallery, setGallery] = useState<GalleryReceipt[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,7 +72,24 @@ export function ReceiptsScreen({ formatMoney }: Props) {
     setParsed(null);
     try {
       const res = await scanReceipt(qrData);
-      setParsed(res as Record<string, string | null>);
+      const receipt = res as ParsedReceipt;
+      setParsed(receipt);
+      // Pre-fill the review list from parsed items, or fall back to a single
+      // "Receipt" line with the total (current behavior).
+      if (receipt.items && receipt.items.length > 0) {
+        setReviewItems(
+          receipt.items.map((i) => ({
+            description: i.description ?? 'Item',
+            quantity: i.quantity ?? '1',
+            unit_price: i.unit_price ?? '',
+            total_price: i.total_price ?? '',
+          })),
+        );
+      } else {
+        setReviewItems([
+          { description: 'Receipt', quantity: '1', unit_price: '', total_price: receipt.total ?? '' },
+        ]);
+      }
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to parse QR');
     } finally {
@@ -61,20 +97,33 @@ export function ReceiptsScreen({ formatMoney }: Props) {
     }
   };
 
+  const updateReviewItem = (idx: number, patch: Partial<EditableItem>) => {
+    setReviewItems((items) => items.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
+  };
+
   const save = async () => {
     if (!parsed || !parsed.total) return;
     setSaving(true);
     try {
+      const items = reviewItems
+        .filter((i) => i.description.trim().length > 0)
+        .map((i) => ({
+          description: i.description.trim(),
+          quantity: i.quantity || '1',
+          unit_price: i.unit_price || undefined,
+          total_price: i.total_price || undefined,
+        }));
       const res = await saveReceipt({
         store_name: parsed.store_name || 'Unknown Store',
         cnpj: parsed.cnpj ?? null,
         date: (parsed.date as string)?.split('T')[0] || new Date().toISOString().slice(0, 10),
         total: parsed.total,
-        items: [{ description: 'Receipt', quantity: '1', total_price: parsed.total }],
+        items: items.length > 0 ? items : [{ description: 'Receipt', quantity: '1', total_price: parsed.total }],
       });
-      showSnackbar(`✅ Receipt saved (${res.id.slice(0, 8)}…)`);
+      showSnackbar(`✅ Receipt saved with ${items.length} item(s) (${res.id.slice(0, 8)}…)`);
       await loadGallery();
       setParsed(null);
+      setReviewItems([]);
       setQrData('');
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save receipt');
@@ -140,6 +189,65 @@ export function ReceiptsScreen({ formatMoney }: Props) {
               <Text style={styles.receiptFieldValue}>{parsed.cnpj || '—'}</Text>
             </View>
           </View>
+
+          {reviewItems.length > 0 && (
+            <View style={styles.receiptItemReview}>
+              <Text style={styles.receiptItemTitle}>Items ({reviewItems.length}) — edit before saving</Text>
+              {reviewItems.map((item, idx) => (
+                <View key={idx} style={styles.receiptItemRow}>
+                  <TextInput
+                    style={[styles.receiptItemInput, styles.receiptItemDesc]}
+                    value={item.description}
+                    onChangeText={(v) => updateReviewItem(idx, { description: v })}
+                    placeholder="Description"
+                    placeholderTextColor={colors.textDim}
+                  />
+                  <TextInput
+                    style={[styles.receiptItemInput, styles.receiptItemSmall]}
+                    value={item.quantity}
+                    onChangeText={(v) => updateReviewItem(idx, { quantity: v })}
+                    placeholder="Qty"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="decimal-pad"
+                  />
+                  <TextInput
+                    style={[styles.receiptItemInput, styles.receiptItemSmall]}
+                    value={item.unit_price}
+                    onChangeText={(v) => updateReviewItem(idx, { unit_price: v })}
+                    placeholder="Unit"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="decimal-pad"
+                  />
+                  <TextInput
+                    style={[styles.receiptItemInput, styles.receiptItemSmall]}
+                    value={item.total_price}
+                    onChangeText={(v) => updateReviewItem(idx, { total_price: v })}
+                    placeholder="Total"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="decimal-pad"
+                  />
+                  <TouchableOpacity
+                    style={styles.receiptItemRemove}
+                    onPress={() => setReviewItems((items) => items.filter((_, i) => i !== idx))}
+                  >
+                    <Text style={styles.receiptItemRemoveText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={styles.receiptItemAdd}
+                onPress={() =>
+                  setReviewItems((items) => [
+                    ...items,
+                    { description: '', quantity: '1', unit_price: '', total_price: '' },
+                  ])
+                }
+              >
+                <Text style={styles.receiptItemAddText}>+ Add item</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <TouchableOpacity
             style={[styles.submitButton, saving && styles.submitButtonDisabled]}
             onPress={save}

@@ -587,6 +587,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pulls entities changed since `last_synced_at`. */
+        post: operations["pull"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Applies a batch of client mutations. */
+        post: operations["push"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/transactions": {
         parameters: {
             query?: never;
@@ -1584,6 +1618,66 @@ export interface components {
              * @description Year used for the query.
              */
             year: number;
+        };
+        /** @description Result for a single pushed operation. */
+        SyncOpResult: {
+            /** @description Echo of the client_id. */
+            client_id: string;
+            /** @description Error message when status != ok. */
+            error?: string | null;
+            /**
+             * Format: uuid
+             * @description Server-assigned UUID for creates.
+             */
+            server_id?: string | null;
+            /** @description `ok`, `conflict`, or `error`. */
+            status: string;
+        };
+        /** @description A single client-initiated mutation to apply on the server. */
+        SyncOperation: {
+            /** @description Client-generated UUID used as an idempotency key. */
+            client_id: string;
+            /** @description `transaction` or `category`. */
+            entity_type: string;
+            /** @description `create`, `update`, or `delete`. */
+            operation_type: string;
+            /** @description Request body (e.g. a CreateTransactionRequest) for create/update. */
+            payload: unknown;
+            /**
+             * Format: uuid
+             * @description Server UUID for `update`/`delete` operations.
+             */
+            server_id?: string | null;
+        };
+        /** @description Request: pull changes since a given timestamp. */
+        SyncPullRequest: {
+            /**
+             * Format: date-time
+             * @description Only return rows with `updated_at` after this timestamp.
+             */
+            last_synced_at: string;
+        };
+        /** @description Response: entities changed since the client's last sync. */
+        SyncPullResponse: {
+            /** @description All categories (or those changed since last sync). */
+            categories: components["schemas"]["Category"][];
+            /**
+             * Format: date-time
+             * @description Server time — client stores this as its next `last_synced_at`.
+             */
+            server_time: string;
+            /** @description Transactions changed since last sync. */
+            transactions: components["schemas"]["Transaction"][];
+        };
+        /** @description Request: batch of client mutations. */
+        SyncPushRequest: {
+            /** @description Operations to apply, in order. */
+            operations: components["schemas"]["SyncOperation"][];
+        };
+        /** @description Response: results for each pushed operation. */
+        SyncPushResponse: {
+            /** @description Per-operation results (same order as the request). */
+            results: components["schemas"]["SyncOpResult"][];
         };
         /** @description A single income or expense transaction. */
         Transaction: {
@@ -3044,6 +3138,54 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    pull: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncPullRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed entities since last sync */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncPullResponse"];
+                };
+            };
+        };
+    };
+    push: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncPushRequest"];
+            };
+        };
+        responses: {
+            /** @description Per-operation results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncPushResponse"];
+                };
             };
         };
     };

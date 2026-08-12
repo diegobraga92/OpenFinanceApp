@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   RefreshControl,
   Text,
   TouchableOpacity,
@@ -42,6 +43,8 @@ import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 import { InstallmentsScreen } from './src/screens/InstallmentsScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
+import { OfflineBanner } from './src/components/OfflineBanner';
+import { syncAll } from './src/offline/sync-engine';
 
 type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'installments' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
 
@@ -117,6 +120,8 @@ function AppContent() {
     setLoading(true);
     setError(null);
     try {
+      // Try to sync first so the local mirror + server agree before rendering.
+      await syncAll().catch(() => null);
       const [cats, summ, txns, accnts] = await Promise.all([
         fetchCategories(),
         fetchSummary(),
@@ -136,6 +141,16 @@ function AppContent() {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // Sync whenever the app returns to the foreground.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void loadData();
+      }
+    });
+    return () => sub.remove();
   }, [loadData]);
 
   // Fade screen content in on every navigation.
@@ -238,6 +253,7 @@ function AppContent() {
         </View>
       ) : (
         <Animated.View style={[styles.screenContainer, { opacity: screenOpacity }]}>
+          <OfflineBanner />
           {screen === 'dashboard' && (
             <DashboardScreen
               summary={summary}

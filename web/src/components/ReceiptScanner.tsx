@@ -29,9 +29,35 @@ interface PricePoint {
   description: string;
 }
 
+interface ParsedReceipt {
+  access_key?: string;
+  total?: string;
+  icms?: string;
+  date?: string;
+  cnpj?: string | null;
+  store_name?: string;
+  version?: string;
+  items?: ParsedItem[];
+}
+
+interface ParsedItem {
+  description?: string;
+  quantity?: string | null;
+  unit_price?: string | null;
+  total_price?: string | null;
+}
+
+interface EditableItem {
+  description: string;
+  quantity: string;
+  unit_price: string;
+  total_price: string;
+}
+
 export function ReceiptScanner({ formatMoney }: Props) {
   const [qrData, setQrData] = useState('');
-  const [parsed, setParsed] = useState<Record<string, string> | null>(null);
+  const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
+  const [reviewItems, setReviewItems] = useState<EditableItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -98,7 +124,29 @@ export function ReceiptScanner({ formatMoney }: Props) {
     setLoading(true);
     try {
       const res = await scanReceipt(qrData);
-      setParsed(res as Record<string, string>);
+      const receipt = res as ParsedReceipt;
+      setParsed(receipt);
+      // Pre-fill the review list from parsed items, or fall back to a single
+      // "Receipt" line with the total (current behavior).
+      if (receipt.items && receipt.items.length > 0) {
+        setReviewItems(
+          receipt.items.map((i) => ({
+            description: i.description ?? 'Item',
+            quantity: i.quantity ?? '1',
+            unit_price: i.unit_price ?? '',
+            total_price: i.total_price ?? '',
+          })),
+        );
+      } else {
+        setReviewItems([
+          {
+            description: 'Receipt',
+            quantity: '1',
+            unit_price: '',
+            total_price: receipt.total ?? '',
+          },
+        ]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse QR');
     } finally {
@@ -106,21 +154,33 @@ export function ReceiptScanner({ formatMoney }: Props) {
     }
   };
 
+  const updateReviewItem = (idx: number, patch: Partial<EditableItem>) => {
+    setReviewItems((items) => items.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
+  };
+
   const save = async () => {
     if (!parsed || !parsed.total) return;
     setError(null);
     setLoading(true);
     try {
+      const items = reviewItems
+        .filter((i) => i.description.trim().length > 0)
+        .map((i) => ({
+          description: i.description.trim(),
+          quantity: i.quantity || '1',
+          unit_price: i.unit_price || undefined,
+          total_price: i.total_price || undefined,
+        }));
       const res = await saveReceipt({
         store_name: parsed.store_name || 'Unknown Store',
         cnpj: parsed.cnpj || null,
         date: (parsed.date as string)?.split('T')[0] || new Date().toISOString().slice(0, 10),
         total: parsed.total,
-        items: [{ description: 'Receipt', quantity: '1', total_price: parsed.total }],
+        items: items.length > 0 ? items : [{ description: 'Receipt', quantity: '1', total_price: parsed.total }],
       });
       setSavedId(res.id);
       await loadGallery();
-      pushToast({ message: 'Receipt saved' });
+      pushToast({ message: `Receipt saved with ${items.length} item(s)` });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save receipt');
     } finally {
@@ -164,6 +224,63 @@ export function ReceiptScanner({ formatMoney }: Props) {
             <div><p style={styles.fieldLabel}>Date</p><p style={styles.fieldValue}>{parsed.date || '—'}</p></div>
             <div><p style={styles.fieldLabel}>CNPJ</p><p style={styles.fieldValue}>{parsed.cnpj || '—'}</p></div>
           </div>
+
+          {reviewItems.length > 0 && (
+            <div style={styles.itemReview}>
+              <p style={styles.itemReviewTitle}>
+                Items ({reviewItems.length}) — edit before saving
+              </p>
+              {reviewItems.map((item, idx) => (
+                <div key={idx} style={styles.itemRow}>
+                  <input
+                    style={styles.itemInputDesc}
+                    value={item.description}
+                    onChange={(e) => updateReviewItem(idx, { description: e.target.value })}
+                    placeholder="Description"
+                  />
+                  <input
+                    style={styles.itemInputSmall}
+                    value={item.quantity}
+                    onChange={(e) => updateReviewItem(idx, { quantity: e.target.value })}
+                    placeholder="Qty"
+                  />
+                  <input
+                    style={styles.itemInputSmall}
+                    value={item.unit_price}
+                    onChange={(e) => updateReviewItem(idx, { unit_price: e.target.value })}
+                    placeholder="Unit"
+                  />
+                  <input
+                    style={styles.itemInputSmall}
+                    value={item.total_price}
+                    onChange={(e) => updateReviewItem(idx, { total_price: e.target.value })}
+                    placeholder="Total"
+                  />
+                  <button
+                    type="button"
+                    style={styles.itemRemove}
+                    onClick={() => setReviewItems((items) => items.filter((_, i) => i !== idx))}
+                    title="Remove item"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                style={styles.itemAdd}
+                onClick={() =>
+                  setReviewItems((items) => [
+                    ...items,
+                    { description: '', quantity: '1', unit_price: '', total_price: '' },
+                  ])
+                }
+              >
+                + Add item
+              </button>
+            </div>
+          )}
+
           <button type="button" style={styles.button} onClick={save} disabled={loading}>
             {loading ? 'Saving…' : 'Save Receipt'}
           </button>
@@ -317,6 +434,62 @@ const styles: Record<string, CSSProperties> = {
   fieldGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1rem' },
   fieldLabel: { color: 'var(--color-text-muted)', fontSize: '0.75rem', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.05em' },
   fieldValue: { color: 'var(--color-text)', fontSize: '1rem', margin: 0 },
+  itemReview: {
+    marginTop: '1rem',
+    marginBottom: '1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+  },
+  itemReviewTitle: {
+    color: 'var(--color-text-muted)',
+    fontSize: '0.8125rem',
+    fontWeight: 600,
+    margin: 0,
+  },
+  itemRow: {
+    display: 'flex',
+    gap: '0.375rem',
+    alignItems: 'center',
+  },
+  itemInputDesc: {
+    flex: 2,
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '0.375rem',
+    padding: '0.375rem 0.5rem',
+    color: 'var(--color-text)',
+    fontSize: '0.8125rem',
+    minWidth: 0,
+  },
+  itemInputSmall: {
+    flex: 1,
+    backgroundColor: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '0.375rem',
+    padding: '0.375rem 0.5rem',
+    color: 'var(--color-text)',
+    fontSize: '0.8125rem',
+    minWidth: 0,
+  },
+  itemRemove: {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--color-danger)',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    padding: '0.25rem',
+  },
+  itemAdd: {
+    alignSelf: 'flex-start',
+    background: 'transparent',
+    border: '1px dashed var(--color-border)',
+    color: 'var(--color-text-muted)',
+    borderRadius: '0.375rem',
+    padding: '0.375rem 0.75rem',
+    fontSize: '0.8125rem',
+    cursor: 'pointer',
+  },
   success: { color: 'var(--color-primary)', marginTop: '0.75rem', fontSize: '0.875rem' },
   empty: { color: 'var(--color-text-dim)', textAlign: 'center', padding: '1rem 0' },
   tableWrapper: { overflowX: 'auto' },

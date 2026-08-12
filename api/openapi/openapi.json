@@ -1438,6 +1438,68 @@
         }
       }
     },
+    "/api/sync/pull": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "summary": "Pulls entities changed since `last_synced_at`.",
+        "operationId": "pull",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPullRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Changed entities since last sync",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPullResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/push": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "summary": "Applies a batch of client mutations.",
+        "operationId": "push",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Per-operation results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/transactions": {
       "get": {
         "tags": [
@@ -3454,6 +3516,150 @@
             "type": "integer",
             "format": "int32",
             "description": "Year used for the query."
+          }
+        }
+      },
+      "SyncOpResult": {
+        "type": "object",
+        "description": "Result for a single pushed operation.",
+        "required": [
+          "client_id",
+          "status"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Echo of the client_id."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Error message when status != ok."
+          },
+          "server_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Server-assigned UUID for creates."
+          },
+          "status": {
+            "type": "string",
+            "description": "`ok`, `conflict`, or `error`."
+          }
+        }
+      },
+      "SyncOperation": {
+        "type": "object",
+        "description": "A single client-initiated mutation to apply on the server.",
+        "required": [
+          "operation_type",
+          "entity_type",
+          "client_id",
+          "payload"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Client-generated UUID used as an idempotency key."
+          },
+          "entity_type": {
+            "type": "string",
+            "description": "`transaction` or `category`."
+          },
+          "operation_type": {
+            "type": "string",
+            "description": "`create`, `update`, or `delete`."
+          },
+          "payload": {
+            "description": "Request body (e.g. a CreateTransactionRequest) for create/update."
+          },
+          "server_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Server UUID for `update`/`delete` operations."
+          }
+        }
+      },
+      "SyncPullRequest": {
+        "type": "object",
+        "description": "Request: pull changes since a given timestamp.",
+        "required": [
+          "last_synced_at"
+        ],
+        "properties": {
+          "last_synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Only return rows with `updated_at` after this timestamp."
+          }
+        }
+      },
+      "SyncPullResponse": {
+        "type": "object",
+        "description": "Response: entities changed since the client's last sync.",
+        "required": [
+          "categories",
+          "transactions",
+          "server_time"
+        ],
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "description": "All categories (or those changed since last sync)."
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server time — client stores this as its next `last_synced_at`."
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "description": "Transactions changed since last sync."
+          }
+        }
+      },
+      "SyncPushRequest": {
+        "type": "object",
+        "description": "Request: batch of client mutations.",
+        "required": [
+          "operations"
+        ],
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncOperation"
+            },
+            "description": "Operations to apply, in order."
+          }
+        }
+      },
+      "SyncPushResponse": {
+        "type": "object",
+        "description": "Response: results for each pushed operation.",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncOpResult"
+            },
+            "description": "Per-operation results (same order as the request)."
           }
         }
       },

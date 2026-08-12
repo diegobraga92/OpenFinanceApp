@@ -1038,6 +1038,57 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  receiptItemReview: {
+    marginBottom: 14,
+    gap: 8,
+  },
+  receiptItemTitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  receiptItemRow: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+  },
+  receiptItemInput: {
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    color: colors.text,
+    fontSize: 13,
+  },
+  receiptItemDesc: {
+    flex: 2,
+  },
+  receiptItemSmall: {
+    flex: 1,
+    minWidth: 56,
+  },
+  receiptItemRemove: {
+    padding: 4,
+  },
+  receiptItemRemoveText: {
+    color: colors.danger,
+    fontSize: 14,
+  },
+  receiptItemAdd: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.surfaceHover,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  receiptItemAddText: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
   receiptList: {
     gap: 8,
   },

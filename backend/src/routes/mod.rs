@@ -12,6 +12,7 @@ pub mod ledger;
 pub mod receipts;
 pub mod reports;
 pub mod summary;
+pub mod sync;
 pub mod transactions;
 
 use axum::Router;
@@ -32,4 +33,5 @@ pub fn api_router() -> Router<AppState> {
         .merge(audit::router())
         .merge(receipts::router())
         .merge(installments::router())
+        .merge(sync::router())
 }

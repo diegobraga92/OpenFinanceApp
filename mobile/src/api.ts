@@ -1,6 +1,15 @@
 import type { components } from './api-types';
 import { clearAuthSession, getAccessToken, getRefreshToken, setAuthSession } from './auth';
 import { getApiBaseUrl } from './config/server';
+import { isOnline, uuid } from './offline/net';
+import {
+  addPendingOperation,
+  deleteLocalTransaction,
+  getLocalCategories,
+  getLocalTransactionById,
+  getLocalTransactions,
+  upsertLocalTransaction,
+} from './offline/database';
 
 // Single-flight refresh: concurrent 401s share one refresh request instead of
 // hammering the backend.
@@ -55,6 +64,11 @@ export type InstallmentPlanDetail = components['schemas']['InstallmentPlanDetail
 export type CreateInstallmentPlanRequest = components['schemas']['CreateInstallmentPlanRequest'];
 export type GenerateInstallmentsResponse = components['schemas']['GenerateInstallmentsResponse'];
 export type PayInstallmentResponse = components['schemas']['PayInstallmentResponse'];
+export type SyncPullRequest = components['schemas']['SyncPullRequest'];
+export type SyncPullResponse = components['schemas']['SyncPullResponse'];
+export type SyncOperation = components['schemas']['SyncOperation'];
+export type SyncPushRequest = components['schemas']['SyncPushRequest'];
+export type SyncPushResponse = components['schemas']['SyncPushResponse'];
 
 async function request<T>(path: string, options?: {
   method?: string;
@@ -146,11 +160,46 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 export async function fetchCategories(type?: 'income' | 'expense'): Promise<Category[]> {
+  if (!(await isOnline())) {
+    // Offline fallback: serve categories from the local mirror.
+    const local = getLocalCategories();
+    return local.map((c) => ({
+      id: c.server_id ?? c.id,
+      name: c.name,
+      type: c.type,
+      parent_id: c.parent_id ?? null,
+      icon: c.icon ?? null,
+      color: c.color ?? null,
+      created_at: c.updated_at,
+      updated_at: c.updated_at,
+    }));
+  }
   const query = type ? `?type=${encodeURIComponent(type)}` : '';
   return request<Category[]>(`/api/categories${query}`);
 }
 
 export async function createCategory(payload: CreateCategoryRequest): Promise<Category> {
+  const localId = uuid();
+  if (!(await isOnline())) {
+    addPendingOperation({
+      operation_type: 'create',
+      entity_type: 'category',
+      local_id: localId,
+      server_id: null,
+      payload: JSON.stringify(payload),
+    });
+    const now = new Date().toISOString();
+    return {
+      id: localId,
+      name: payload.name,
+      type: payload.type,
+      parent_id: payload.parent_id ?? null,
+      icon: payload.icon ?? null,
+      color: payload.color ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+  }
   return request<Category>('/api/categories', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -158,6 +207,26 @@ export async function createCategory(payload: CreateCategoryRequest): Promise<Ca
 }
 
 export async function updateCategory(id: string, payload: UpdateCategoryRequest): Promise<Category> {
+  if (!(await isOnline())) {
+    addPendingOperation({
+      operation_type: 'update',
+      entity_type: 'category',
+      local_id: null,
+      server_id: id,
+      payload: JSON.stringify(payload),
+    });
+    const now = new Date().toISOString();
+    return {
+      id,
+      name: payload.name,
+      type: payload.type,
+      parent_id: payload.parent_id ?? null,
+      icon: payload.icon ?? null,
+      color: payload.color ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+  }
   return request<Category>(`/api/categories/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
@@ -165,6 +234,16 @@ export async function updateCategory(id: string, payload: UpdateCategoryRequest)
 }
 
 export async function deleteCategory(id: string): Promise<void> {
+  if (!(await isOnline())) {
+    addPendingOperation({
+      operation_type: 'delete',
+      entity_type: 'category',
+      local_id: null,
+      server_id: id,
+      payload: '{}',
+    });
+    return;
+  }
   return request<void>(`/api/categories/${id}`, {
     method: 'DELETE',
   });
@@ -178,6 +257,28 @@ export async function fetchTransactions(params?: {
   start_date?: string;
   end_date?: string;
 }): Promise<TransactionListResponse> {
+  if (!(await isOnline())) {
+    // Offline fallback: serve transactions from the local mirror.
+    const local = getLocalTransactions();
+    const items: Transaction[] = local.map((t) => ({
+      id: t.server_id ?? t.id,
+      description: t.description,
+      amount: t.amount,
+      type: t.type,
+      category_id: t.category_id ?? null,
+      date: t.date,
+      notes: t.notes ?? null,
+      installment_plan_id: t.installment_plan_id ?? null,
+      created_at: t.updated_at,
+      updated_at: t.updated_at,
+    }));
+    return {
+      items,
+      page: params?.page ?? 0,
+      page_size: params?.page_size ?? items.length,
+      total: items.length,
+    };
+  }
   const qs = new URLSearchParams();
   if (params?.page !== undefined) qs.set('page', String(params.page));
   if (params?.page_size !== undefined) qs.set('page_size', String(params.page_size));
@@ -193,16 +294,104 @@ export async function fetchTransactions(params?: {
 export async function createTransaction(
   payload: CreateTransactionRequest,
 ): Promise<Transaction> {
-  return request<Transaction>('/api/transactions', {
+  const localId = uuid();
+  const now = new Date().toISOString();
+  if (!(await isOnline())) {
+    // Optimistic offline create: store locally and queue for sync.
+    upsertLocalTransaction({
+      id: localId,
+      server_id: null,
+      description: payload.description,
+      amount: payload.amount,
+      type: payload.type as 'income' | 'expense',
+      category_id: payload.category_id ?? null,
+      date: payload.date,
+      notes: payload.notes ?? null,
+      installment_plan_id: payload.installment_plan_id ?? null,
+      synced: 0,
+    });
+    addPendingOperation({
+      operation_type: 'create',
+      entity_type: 'transaction',
+      local_id: localId,
+      server_id: null,
+      payload: JSON.stringify(payload),
+    });
+    return {
+      id: localId,
+      description: payload.description,
+      amount: payload.amount,
+      type: payload.type,
+      category_id: payload.category_id ?? null,
+      date: payload.date,
+      notes: payload.notes ?? null,
+      installment_plan_id: payload.installment_plan_id ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+  const tx = await request<Transaction>('/api/transactions', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  // Mirror the created row locally so the offline view stays consistent.
+  upsertLocalTransaction({
+    id: tx.id,
+    server_id: tx.id,
+    description: tx.description,
+    amount: tx.amount,
+    type: tx.type as 'income' | 'expense',
+    category_id: tx.category_id ?? null,
+    date: tx.date,
+    notes: tx.notes ?? null,
+    installment_plan_id: tx.installment_plan_id ?? null,
+    synced: 1,
+  });
+  return tx;
 }
 
 export async function updateTransaction(
   id: string,
   payload: UpdateTransactionRequest,
 ): Promise<Transaction> {
+  const now = new Date().toISOString();
+  if (!(await isOnline())) {
+    // Update the local row if present, then queue for sync.
+    const local = getLocalTransactionById(id);
+    addPendingOperation({
+      operation_type: 'update',
+      entity_type: 'transaction',
+      local_id: local ? (local.synced === 0 ? local.id : null) : null,
+      server_id: local && local.synced === 1 ? local.server_id : null,
+      payload: JSON.stringify(payload),
+    });
+    if (local) {
+      upsertLocalTransaction({
+        id: local.id,
+        server_id: local.server_id,
+        description: payload.description,
+        amount: payload.amount,
+        type: payload.type as 'income' | 'expense',
+        category_id: payload.category_id ?? null,
+        date: payload.date,
+        notes: payload.notes ?? null,
+        installment_plan_id: local.installment_plan_id,
+        synced: local.synced,
+      });
+    }
+    return {
+      id,
+      description: payload.description,
+      amount: payload.amount,
+      type: payload.type,
+      category_id: payload.category_id ?? null,
+      date: payload.date,
+      notes: payload.notes ?? null,
+      installment_plan_id: local?.installment_plan_id ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+  }
   return request<Transaction>(`/api/transactions/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
@@ -210,9 +399,22 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  return request<void>(`/api/transactions/${id}`, {
+  if (!(await isOnline())) {
+    const local = getLocalTransactionById(id);
+    addPendingOperation({
+      operation_type: 'delete',
+      entity_type: 'transaction',
+      local_id: local && local.synced === 0 ? local.id : null,
+      server_id: local && local.synced === 1 ? local.server_id : null,
+      payload: '{}',
+    });
+    deleteLocalTransaction(id);
+    return;
+  }
+  await request<void>(`/api/transactions/${id}`, {
     method: 'DELETE',
   });
+  deleteLocalTransaction(id);
 }
 
 export async function fetchSummary(
@@ -530,4 +732,30 @@ export async function generateInstallments(id: string): Promise<GenerateInstallm
 
 export async function payInstallment(id: string, number: number): Promise<PayInstallmentResponse> {
   return request<PayInstallmentResponse>(`/api/installments/${id}/installment/${number}/pay`, { method: 'POST' });
+}
+
+// --- Sync ---
+
+export interface SyncPushOperation {
+  operation_type: 'create' | 'update' | 'delete';
+  entity_type: 'transaction' | 'category';
+  client_id: string;
+  server_id?: string;
+  payload: Record<string, unknown>;
+}
+
+/** Pulls entities changed since the given timestamp. */
+export async function syncPull(lastSyncedAt: string): Promise<SyncPullResponse> {
+  return request<SyncPullResponse>('/api/sync/pull', {
+    method: 'POST',
+    body: JSON.stringify({ last_synced_at: lastSyncedAt } satisfies SyncPullRequest),
+  });
+}
+
+/** Pushes a batch of client mutations. */
+export async function syncPush(operations: SyncPushOperation[]): Promise<SyncPushResponse> {
+  return request<SyncPushResponse>('/api/sync/push', {
+    method: 'POST',
+    body: JSON.stringify({ operations } satisfies SyncPushRequest),
+  });
 }

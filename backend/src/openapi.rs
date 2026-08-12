@@ -11,8 +11,9 @@ use crate::models::{
     InstallmentProgress, InstallmentTransaction, LedgerEntry, LedgerEntryRequest, LedgerTransaction,
     MigrationResponse, MonthlyReportItem, MonthlyReportResponse, PayInstallmentResponse,
     ReconciliationItem, ReconciliationUploadRequest, ReconciliationUploadResponse, StatementLine,
-    SummaryResponse, Transaction, TransactionListParams, TransactionListResponse, TrendPoint,
-    TrendsResponse, UpdateAccountRequest, UpdateCategoryRequest, UpdateTransactionRequest,
+    SummaryResponse, SyncOpResult, SyncOperation, SyncPullRequest, SyncPullResponse,
+    SyncPushRequest, SyncPushResponse, Transaction, TransactionListParams, TransactionListResponse,
+    TrendPoint, TrendsResponse, UpdateAccountRequest, UpdateCategoryRequest, UpdateTransactionRequest,
 };
 use crate::routes::accounts;
 use crate::routes::audit;
@@ -27,6 +28,7 @@ use crate::routes::receipts::{
 };
 use crate::routes::reports;
 use crate::routes::summary::{self, SummaryParams};
+use crate::routes::sync;
 use crate::routes::transactions;
 
 /// Root OpenAPI document for the PudimFinance API.
@@ -86,6 +88,8 @@ use crate::routes::transactions;
         installments::delete_installment_plan,
         installments::generate_installments,
         installments::pay_installment,
+        sync::pull,
+        sync::push,
     ),
     components(schemas(
         health::HealthResponse,
@@ -146,6 +150,12 @@ use crate::routes::transactions;
         CreateInstallmentPlanRequest,
         GenerateInstallmentsResponse,
         PayInstallmentResponse,
+        SyncPullRequest,
+        SyncPullResponse,
+        SyncOperation,
+        SyncPushRequest,
+        SyncOpResult,
+        SyncPushResponse,
     )),
     info(
         title = "PudimFinance API",
