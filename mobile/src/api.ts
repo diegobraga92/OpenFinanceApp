@@ -316,6 +316,7 @@ export async function createTransaction(
       date: payload.date,
       notes: payload.notes ?? null,
       installment_plan_id: payload.installment_plan_id ?? null,
+      account_id: payload.account_id ?? null,
       synced: 0,
     });
     addPendingOperation({
@@ -353,6 +354,7 @@ export async function createTransaction(
     date: tx.date,
     notes: tx.notes ?? null,
     installment_plan_id: tx.installment_plan_id ?? null,
+    account_id: tx.account_id ?? null,
     synced: 1,
   });
   return tx;
@@ -384,6 +386,7 @@ export async function updateTransaction(
         date: payload.date,
         notes: payload.notes ?? null,
         installment_plan_id: local.installment_plan_id,
+        account_id: local.account_id,
         synced: local.synced,
       });
     }

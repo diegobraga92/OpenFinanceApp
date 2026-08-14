@@ -616,6 +616,22 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
+  drawerDivider: {
+    height: 1,
+    backgroundColor: colors.surfaceHover,
+    marginHorizontal: 20,
+    marginVertical: 8,
+  },
+  drawerSectionLabel: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
   drawerFooter: {
     marginTop: 'auto',
     borderTopWidth: 1,

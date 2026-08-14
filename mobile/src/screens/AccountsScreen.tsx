@@ -9,44 +9,64 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { AccountWithBalance, createAccount, deleteAccount, updateAccount } from '../api';
+import { AccountWithBalance, Category, createAccount, deleteAccount, updateAccount } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { EmptyState } from '../components/EmptyState';
+import { CreditCardsScreen } from './CreditCardsScreen';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../../../shared/i18n';
 
 interface Props {
   accounts: AccountWithBalance[];
+  categories: Category[];
   onChanged: () => Promise<void>;
 }
 
-type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+type AccountKind = 'bank' | 'cash' | 'card' | 'loan' | 'investment' | 'income' | 'expense' | 'equity' | 'other';
 
 const ACCOUNT_GROUPS: {
-  key: AccountType;
+  kinds: AccountKind[];
   labelKey: TranslationKey;
   blurbKey: TranslationKey;
   icon: string;
 }[] = [
-  { key: 'asset', labelKey: 'accounts.type.asset', blurbKey: 'accounts.type.assetBlurb', icon: '💰' },
-  { key: 'liability', labelKey: 'accounts.type.liability', blurbKey: 'accounts.type.liabilityBlurb', icon: '💳' },
-  { key: 'equity', labelKey: 'accounts.type.equity', blurbKey: 'accounts.type.equityBlurb', icon: '🏛️' },
-  { key: 'income', labelKey: 'accounts.type.income', blurbKey: 'accounts.type.incomeBlurb', icon: '📥' },
-  { key: 'expense', labelKey: 'accounts.type.expense', blurbKey: 'accounts.type.expenseBlurb', icon: '📤' },
+  { kinds: ['bank', 'cash', 'investment'], labelKey: 'accounts.kindGroup.assets', blurbKey: 'accounts.kindGroup.assetsBlurb', icon: '💰' },
+  { kinds: ['card', 'loan'], labelKey: 'accounts.kindGroup.liabilities', blurbKey: 'accounts.kindGroup.liabilitiesBlurb', icon: '💳' },
+  { kinds: ['income', 'expense', 'equity', 'other'], labelKey: 'accounts.kindGroup.system', blurbKey: 'accounts.kindGroup.systemBlurb', icon: '📊' },
 ];
+
+const KIND_OPTIONS: { key: AccountKind; labelKey: TranslationKey; icon: string }[] = [
+  { key: 'bank', labelKey: 'accounts.kind.bank', icon: '🏦' },
+  { key: 'cash', labelKey: 'accounts.kind.cash', icon: '💵' },
+  { key: 'card', labelKey: 'accounts.kind.card', icon: '💳' },
+  { key: 'loan', labelKey: 'accounts.kind.loan', icon: '🏛️' },
+  { key: 'investment', labelKey: 'accounts.kind.investment', icon: '📈' },
+];
+
+const ACCOUNT_TYPE_FOR_KIND: Record<AccountKind, string> = {
+  bank: 'asset',
+  cash: 'asset',
+  investment: 'asset',
+  card: 'liability',
+  loan: 'liability',
+  income: 'income',
+  expense: 'expense',
+  equity: 'equity',
+  other: 'other',
+};
 
 interface FormState {
   name: string;
-  type: AccountType;
+  kind: AccountKind;
   closing_day: string;
   due_day: string;
   credit_limit: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', type: 'asset', closing_day: '', due_day: '', credit_limit: '' };
+const EMPTY_FORM: FormState = { name: '', kind: 'bank', closing_day: '', due_day: '', credit_limit: '' };
 
-export function AccountsScreen({ accounts, onChanged }: Props) {
+export function AccountsScreen({ accounts, categories, onChanged }: Props) {
   const { t, formatMoney } = useI18n();
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -54,9 +74,9 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const openCreate = (type: AccountType) => {
+  const openCreate = (kind: AccountKind) => {
     setEditingId(null);
-    setForm({ name: '', type, closing_day: '', due_day: '', credit_limit: '' });
+    setForm({ name: '', kind, closing_day: '', due_day: '', credit_limit: '' });
     setShowForm(true);
   };
 
@@ -64,7 +84,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
     setEditingId(a.id);
     setForm({
       name: a.name,
-      type: a.type as AccountType,
+      kind: (a.account_kind as AccountKind) ?? 'other',
       closing_day: a.closing_day != null ? String(a.closing_day) : '',
       due_day: a.due_day != null ? String(a.due_day) : '',
       credit_limit: a.credit_limit != null ? String(a.credit_limit) : '',
@@ -77,7 +97,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
       Alert.alert(t('common.validation'), t('accounts.validation.name'));
       return;
     }
-    const isCard = form.type === 'liability';
+    const isCard = form.kind === 'card';
     const closingDay = form.closing_day.trim() ? Number(form.closing_day.trim()) : null;
     const dueDay = form.due_day.trim() ? Number(form.due_day.trim()) : null;
     const creditLimit = form.credit_limit.trim() ? form.credit_limit.trim() : null;
@@ -97,7 +117,8 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
     try {
       const payload = {
         name: form.name.trim(),
-        type: form.type,
+        type: ACCOUNT_TYPE_FOR_KIND[form.kind],
+        account_kind: form.kind,
         closing_day: isCard ? closingDay : undefined,
         due_day: isCard ? dueDay : undefined,
         credit_limit: isCard && creditLimit ? creditLimit : undefined,
@@ -188,7 +209,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>{t('accounts.title')}</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => openCreate('asset')}>
+        <TouchableOpacity style={styles.addButton} onPress={() => openCreate('bank')}>
           <Text style={styles.addButtonText}>{t('accounts.new')}</Text>
         </TouchableOpacity>
       </View>
@@ -210,13 +231,17 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
           title={t('accounts.noTitle')}
           description={t('accounts.noDesc')}
           actionLabel={t('accounts.new')}
-          onAction={() => openCreate('asset')}
+          onAction={() => openCreate('bank')}
         />
       ) : (
         ACCOUNT_GROUPS.map((group) => {
-          const items = visible.filter((a) => a.type === group.key);
+          // Credit cards (kind 'card') are managed in the embedded Credit Cards
+          // section; only non-card liabilities (loans) appear in this list.
+          const items = visible.filter(
+            (a) => group.kinds.includes(a.account_kind as AccountKind) && a.account_kind !== 'card',
+          );
           return (
-            <View key={group.key} style={styles.accountGroup}>
+            <View key={group.kinds.join('-')} style={styles.accountGroup}>
               <View style={styles.accountGroupHeader}>
                 <Text style={styles.accountGroupIcon}>{group.icon}</Text>
                 <View style={styles.accountGroupHeaderText}>
@@ -236,6 +261,8 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
           );
         })
       )}
+
+      <CreditCardsScreen categories={categories} formatMoney={formatMoney} />
 
 
       <Modal
@@ -260,28 +287,28 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
 
             <Text style={styles.label}>{t('accounts.form.type')}</Text>
             <View style={styles.accountTypeGrid}>
-              {ACCOUNT_GROUPS.map((groupType) => (
+              {KIND_OPTIONS.map((kind) => (
                 <TouchableOpacity
-                  key={groupType.key}
+                  key={kind.key}
                   style={[
                     styles.accountTypeButton,
-                    form.type === groupType.key && styles.accountTypeButtonActive,
+                    form.kind === kind.key && styles.accountTypeButtonActive,
                   ]}
-                  onPress={() => setForm((f) => ({ ...f, type: groupType.key }))}
+                  onPress={() => setForm((f) => ({ ...f, kind: kind.key }))}
                 >
                   <Text
                     style={[
                       styles.accountTypeButtonText,
-                      form.type === groupType.key && styles.accountTypeButtonTextActive,
+                      form.kind === kind.key && styles.accountTypeButtonTextActive,
                     ]}
                   >
-                    {groupType.icon} {t(groupType.labelKey)}
+                    {kind.icon} {t(kind.labelKey)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {form.type === 'liability' && (
+            {form.kind === 'card' && (
               <View style={styles.accountCardFields}>
                 <Text style={styles.accountCardFieldsHint}>
                   {t('accounts.form.cardHint')}

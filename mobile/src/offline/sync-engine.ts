@@ -143,6 +143,7 @@ export async function pullChanges(): Promise<{
       date: t.date,
       notes: t.notes ?? null,
       installment_plan_id: t.installment_plan_id ?? null,
+      account_id: t.account_id ?? null,
       synced: 1,
       updated_at: t.updated_at,
     });

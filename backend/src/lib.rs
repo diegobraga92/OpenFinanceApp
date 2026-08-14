@@ -38,5 +38,7 @@ pub mod routes;
 pub mod state;
 /// Logging and OpenTelemetry tracing initialization.
 pub mod telemetry;
+/// Transaction → ledger posting service (single source of truth for balances).
+pub mod transaction_ledger;
 
 pub use openapi::ApiDoc;

@@ -45,26 +45,29 @@ import { BudgetsScreen } from './src/screens/BudgetsScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 import { InstallmentsScreen } from './src/screens/InstallmentsScreen';
-import { CreditCardsScreen } from './src/screens/CreditCardsScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 import { OfflineBanner } from './src/components/OfflineBanner';
 import { syncAll } from './src/offline/sync-engine';
 
-type Screen = 'dashboard' | 'transactions' | 'accounts' | 'credit-cards' | 'ledger' | 'budgets' | 'installments' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'installments' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
 
-const DRAWER_ITEMS: {
+type DrawerItem = {
   key: Screen;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   labelKey: TranslationKey;
-}[] = [
+};
+
+const PRIMARY_ITEMS: DrawerItem[] = [
   { key: 'dashboard', icon: 'stats-chart-outline', labelKey: 'nav.dashboard' },
   { key: 'transactions', icon: 'swap-horizontal-outline', labelKey: 'nav.transactions' },
   { key: 'accounts', icon: 'wallet-outline', labelKey: 'nav.accounts' },
-  { key: 'credit-cards', icon: 'card-outline', labelKey: 'nav.creditCards' },
-  { key: 'ledger', icon: 'book-outline', labelKey: 'nav.ledger' },
   { key: 'budgets', icon: 'pie-chart-outline', labelKey: 'nav.budgets' },
-  { key: 'installments', icon: 'calendar-outline', labelKey: 'nav.installments' },
   { key: 'reports', icon: 'trending-up-outline', labelKey: 'nav.reports' },
+];
+
+const TOOLS_ITEMS: DrawerItem[] = [
+  { key: 'ledger', icon: 'book-outline', labelKey: 'nav.ledger' },
+  { key: 'installments', icon: 'calendar-outline', labelKey: 'nav.installments' },
   { key: 'reconciliation', icon: 'sync-outline', labelKey: 'nav.reconciliation' },
   { key: 'categories', icon: 'pricetags-outline', labelKey: 'nav.categories' },
   { key: 'receipts', icon: 'receipt-outline', labelKey: 'nav.receipts' },
@@ -144,7 +147,7 @@ function AppContent() {
       const [cats, summ, txns, accnts] = await Promise.all([
         fetchCategories(),
         fetchSummary(),
-        fetchTransactions({ page_size: 50 }),
+        fetchTransactions({ page_size: 200 }),
         fetchAccountsWithBalance().catch(() => [] as AccountWithBalance[]),
       ]);
       setCategories(cats);
@@ -304,12 +307,13 @@ function AppContent() {
           {screen === 'installments' && (
             <InstallmentsScreen categories={categories} formatMoney={formatMoney} />
           )}
-          {screen === 'credit-cards' && (
-            <CreditCardsScreen categories={categories} formatMoney={formatMoney} />
-          )}
           {screen === 'reports' && <ReportsScreen formatMoney={formatMoney} />}
           {screen === 'accounts' && (
-            <AccountsScreen accounts={accounts} onChanged={loadData} />
+            <AccountsScreen
+              accounts={accounts}
+              categories={categories}
+              onChanged={loadData}
+            />
           )}
           {screen === 'categories' && (
             <CategoriesScreen
@@ -330,6 +334,7 @@ function AppContent() {
             <AddTransactionForm
               key={editing?.id ?? 'new'}
               categories={categories}
+              accounts={accounts}
               editing={editing}
               onSaved={async () => {
                 setEditing(null);
@@ -379,7 +384,29 @@ function AppContent() {
               </TouchableOpacity>
             </View>
 
-            {DRAWER_ITEMS.map((item) => {
+            {PRIMARY_ITEMS.map((item) => {
+              const active = screen === item.key;
+              return (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[styles.drawerItem, active && styles.drawerItemActive]}
+                  onPress={() => navigate(item.key)}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={18}
+                    color={active ? colors.primary : colors.textMuted}
+                  />
+                  <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
+                    {t(item.labelKey)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            <View style={styles.drawerDivider} />
+            <Text style={styles.drawerSectionLabel}>{t('nav.tools')}</Text>
+            {TOOLS_ITEMS.map((item) => {
               const active = screen === item.key;
               return (
                 <TouchableOpacity

@@ -346,10 +346,10 @@ Internal container-to-container communication (`postgres:5432`, `backend:3000`,
 | `POST` | `/api/ledger/transactions` | Create balanced double-entry transaction |
 | `POST` | `/api/migrate/single-to-double` | Migrate simple transactions to double-entry |
 | `GET` | `/api/transactions` | Paginated list with filters (category, type, date range) |
-| `POST` | `/api/transactions` | Create transaction |
+| `POST` | `/api/transactions` | Create transaction (optionally split into 2-60 installments) — posts balanced ledger entries |
 | `GET` | `/api/transactions/{id}` | Get single transaction |
-| `PUT` | `/api/transactions/{id}` | Update transaction |
-| `DELETE` | `/api/transactions/{id}` | Delete transaction |
+| `PUT` | `/api/transactions/{id}` | Update transaction (re-posts its ledger entries) |
+| `DELETE` | `/api/transactions/{id}` | Delete transaction (removes its ledger entries) |
 | `GET` | `/api/summary` | Current month totals (income, expense, balance), grouped by category |
 | `GET` | `/api/receipts` | List saved receipts (includes items + normalized product ids) |
 | `POST` | `/api/receipts` | Save a parsed receipt |

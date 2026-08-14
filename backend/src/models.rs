@@ -113,6 +113,11 @@ pub struct CreateTransactionRequest {
     pub installment_plan_id: Option<Uuid>,
     /// Source account (payment method) for this transaction (optional).
     pub account_id: Option<Uuid>,
+    /// Split this transaction into N monthly installments (2-60).
+    /// When set, a plan is created and every installment is materialized as a
+    /// dated expense, starting on `date`.
+    #[schema(minimum = 2, maximum = 60)]
+    pub installments: Option<u8>,
 }
 
 /// Payload for updating an existing transaction.
@@ -727,6 +732,9 @@ pub struct Account {
     pub name: String,
     /// `asset`, `liability`, `equity`, `income`, or `expense`.
     pub r#type: String,
+    /// User-facing kind: `bank`, `cash`, `card`, `loan`, `investment`, or a
+    /// system kind (`income`/`expense`/`equity`/`other`).
+    pub account_kind: String,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
     /// Closing day of the monthly billing cycle (credit cards only, 1-31).
@@ -745,9 +753,14 @@ pub struct Account {
 pub struct CreateAccountRequest {
     /// Account display name (e.g., "Nubank Credit Card").
     pub name: String,
-    /// `asset`, `liability`, `equity`, `income`, or `expense`.
+    /// `asset`, `liability`, `equity`, `income`, or `expense`. Ignored when
+    /// `account_kind` is provided (the type is derived from the kind).
     #[schema(example = "liability")]
     pub r#type: String,
+    /// User-facing kind. When set, the accounting `type` is derived from it
+    /// (`bank`/`cash`/`investment` → asset, `card`/`loan` → liability).
+    #[schema(example = "card")]
+    pub account_kind: Option<String>,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
     /// Closing day of the monthly billing cycle (credit cards only, 1-31).
@@ -764,9 +777,13 @@ pub struct CreateAccountRequest {
 pub struct UpdateAccountRequest {
     /// Account display name.
     pub name: String,
-    /// `asset`, `liability`, `equity`, `income`, or `expense`.
+    /// `asset`, `liability`, `equity`, `income`, or `expense`. Ignored when
+    /// `account_kind` is provided (the type is derived from the kind).
     #[schema(example = "liability")]
     pub r#type: String,
+    /// User-facing kind. When set, the accounting `type` is derived from it.
+    #[schema(example = "card")]
+    pub account_kind: Option<String>,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
     /// Closing day of the monthly billing cycle (credit cards only, 1-31).
@@ -787,6 +804,9 @@ pub struct AccountWithBalance {
     pub name: String,
     /// `asset`, `liability`, `equity`, `income`, or `expense`.
     pub r#type: String,
+    /// User-facing kind: `bank`, `cash`, `card`, `loan`, `investment`, or a
+    /// system kind (`income`/`expense`/`equity`/`other`).
+    pub account_kind: String,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
     /// Closing day of the monthly billing cycle (credit cards only, 1-31).
@@ -809,9 +829,40 @@ pub struct AccountWithBalance {
 
 const ACCOUNT_TYPES: [&str; 5] = ["asset", "liability", "equity", "income", "expense"];
 
+/// All valid user-facing account kinds (system kinds included).
+const ACCOUNT_KINDS: [&str; 9] = [
+    "bank",
+    "cash",
+    "card",
+    "loan",
+    "investment",
+    "income",
+    "expense",
+    "equity",
+    "other",
+];
+
 /// Returns true if `t` is a valid chart-of-accounts type.
 pub fn is_valid_account_type(t: &str) -> bool {
     ACCOUNT_TYPES.contains(&t)
+}
+
+/// Returns true if `k` is a valid user-facing account kind.
+pub fn is_valid_account_kind(k: &str) -> bool {
+    ACCOUNT_KINDS.contains(&k)
+}
+
+/// Maps a user-facing account kind to its accounting type. Returns `None` for
+/// `other` (caller keeps the explicitly provided type).
+pub fn account_type_for_kind(kind: &str) -> Option<&'static str> {
+    match kind {
+        "bank" | "cash" | "investment" => Some("asset"),
+        "card" | "loan" => Some("liability"),
+        "income" => Some("income"),
+        "expense" => Some("expense"),
+        "equity" => Some("equity"),
+        _ => None,
+    }
 }
 
 /// Payload for creating a ledger transaction (double-entry).

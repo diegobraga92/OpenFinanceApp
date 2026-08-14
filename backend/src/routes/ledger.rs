@@ -638,15 +638,67 @@ async fn run_reconciliation(
         // transaction from the statement line. The category stays NULL
         // ("Uncategorized") — the user can categorize it later.
         let matched_tx_id = if matched_tx_id.is_none() && auto_create {
+            // Default posting: Cash is the source account, the generic expense
+            // account receives the debit.
+            let source_account =
+                crate::transaction_ledger::resolve_source_account(&state.pg_pool, None)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to resolve source account: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to auto-create transaction" })),
+                        )
+                    })?;
+            let source_name =
+                crate::transaction_ledger::account_name(&state.pg_pool, source_account)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to load source account name: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to auto-create transaction" })),
+                        )
+                    })?;
+            let posting_account =
+                crate::transaction_ledger::resolve_posting_account(&state.pg_pool, None, "expense")
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to resolve posting account: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to auto-create transaction" })),
+                        )
+                    })?;
+            let posting_name =
+                crate::transaction_ledger::account_name(&state.pg_pool, posting_account)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to load posting account name: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to auto-create transaction" })),
+                        )
+                    })?;
+
+            let mut db = state.pg_pool.begin().await.map_err(|e| {
+                error!("Failed to begin DB transaction: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to auto-create transaction" })),
+                )
+            })?;
+
             let new_tx: Option<(Uuid,)> = sqlx::query_as(
-                "INSERT INTO transactions (description, amount, type, date)
-                 VALUES ($1, $2, 'expense', $3)
+                "INSERT INTO transactions (description, amount, type, date, account_id)
+                 VALUES ($1, $2, 'expense', $3, $4)
                  RETURNING id",
             )
             .bind(line.description.trim())
             .bind(abs_amount)
             .bind(line.date)
-            .fetch_optional(&state.pg_pool)
+            .bind(source_account)
+            .fetch_optional(&mut *db)
             .await
             .map_err(|e| {
                 error!("Failed to auto-create transaction from statement: {}", e);
@@ -655,6 +707,49 @@ async fn run_reconciliation(
                     Json(json!({ "error": "Failed to auto-create transaction" })),
                 )
             })?;
+
+            if let Some((id,)) = new_tx {
+                crate::transaction_ledger::post_entries(
+                    &mut *db,
+                    id,
+                    "expense",
+                    posting_account,
+                    &posting_name,
+                    source_account,
+                    &source_name,
+                    abs_amount,
+                    line.description.trim(),
+                )
+                .await
+                .map_err(|e| {
+                    error!("Failed to post ledger entries: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": "Failed to auto-create transaction" })),
+                    )
+                })?;
+
+                sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+                    .bind(id)
+                    .execute(&mut *db)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to link ledger entries: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to auto-create transaction" })),
+                        )
+                    })?;
+            }
+
+            db.commit().await.map_err(|e| {
+                error!("Failed to commit DB transaction: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to auto-create transaction" })),
+                )
+            })?;
+
             new_tx.map(|(id,)| id)
         } else {
             matched_tx_id

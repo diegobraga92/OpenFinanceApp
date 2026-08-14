@@ -844,6 +844,11 @@ export interface components {
         /** @description A chart-of-accounts account. */
         Account: {
             /**
+             * @description User-facing kind: `bank`, `cash`, `card`, `loan`, `investment`, or a
+             *     system kind (`income`/`expense`/`equity`/`other`).
+             */
+            account_kind: string;
+            /**
              * Format: int32
              * @description Closing day of the monthly billing cycle (credit cards only, 1-31).
              */
@@ -877,6 +882,11 @@ export interface components {
         };
         /** @description Account joined with its current computed balance from ledger entries. */
         AccountWithBalance: {
+            /**
+             * @description User-facing kind: `bank`, `cash`, `card`, `loan`, `investment`, or a
+             *     system kind (`income`/`expense`/`equity`/`other`).
+             */
+            account_kind: string;
             /**
              * @description Balance = SUM(debit_amount) − SUM(credit_amount) across ledger entries.
              *     Positive for asset/expense accounts, negative for liability/income/equity
@@ -1286,6 +1296,12 @@ export interface components {
         /** @description Payload for creating a new account. */
         CreateAccountRequest: {
             /**
+             * @description User-facing kind. When set, the accounting `type` is derived from it
+             *     (`bank`/`cash`/`investment` → asset, `card`/`loan` → liability).
+             * @example card
+             */
+            account_kind?: string | null;
+            /**
              * Format: int32
              * @description Closing day of the monthly billing cycle (credit cards only, 1-31).
              */
@@ -1305,7 +1321,8 @@ export interface components {
              */
             parent_id?: string | null;
             /**
-             * @description `asset`, `liability`, `equity`, `income`, or `expense`.
+             * @description `asset`, `liability`, `equity`, `income`, or `expense`. Ignored when
+             *     `account_kind` is provided (the type is derived from the kind).
              * @example liability
              */
             type: string;
@@ -1464,6 +1481,13 @@ export interface components {
              * @description Installment plan this transaction belongs to (optional).
              */
             installment_plan_id?: string | null;
+            /**
+             * Format: int32
+             * @description Split this transaction into N monthly installments (2-60).
+             *     When set, a plan is created and every installment is materialized as a
+             *     dated expense, starting on `date`.
+             */
+            installments?: number | null;
             /** @description Optional free-form notes. */
             notes?: string | null;
             /**
@@ -2168,6 +2192,11 @@ export interface components {
         /** @description Payload for updating an existing account. */
         UpdateAccountRequest: {
             /**
+             * @description User-facing kind. When set, the accounting `type` is derived from it.
+             * @example card
+             */
+            account_kind?: string | null;
+            /**
              * Format: int32
              * @description Closing day of the monthly billing cycle (credit cards only, 1-31).
              */
@@ -2187,7 +2216,8 @@ export interface components {
              */
             parent_id?: string | null;
             /**
-             * @description `asset`, `liability`, `equity`, `income`, or `expense`.
+             * @description `asset`, `liability`, `equity`, `income`, or `expense`. Ignored when
+             *     `account_kind` is provided (the type is derived from the kind).
              * @example liability
              */
             type: string;

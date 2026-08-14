@@ -19,6 +19,7 @@ mod reconciliation_parser;
 mod routes;
 mod state;
 mod telemetry;
+mod transaction_ledger;
 
 use axum::Router;
 use std::net::SocketAddr;

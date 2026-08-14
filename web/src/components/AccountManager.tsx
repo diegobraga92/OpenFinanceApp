@@ -1,43 +1,63 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
-import type { AccountWithBalance } from '../api';
+import type { AccountWithBalance, Category } from '../api';
 import { createAccount, deleteAccount, updateAccount } from '../api';
 import { useToast } from './Toast';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
+import { CreditCardManager } from './CreditCardManager';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../../../shared/i18n';
 
 interface Props {
   accounts: AccountWithBalance[];
+  categories: Category[];
   onAccountsChanged: () => Promise<AccountWithBalance[]>;
 }
 
-type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+type AccountKind = 'bank' | 'cash' | 'card' | 'loan' | 'investment' | 'income' | 'expense' | 'equity' | 'other';
 
-const ACCOUNT_TYPES: {
-  key: AccountType;
+const KIND_GROUPS: {
+  kinds: AccountKind[];
   labelKey: TranslationKey;
   blurbKey: TranslationKey;
   icon: string;
 }[] = [
-  { key: 'asset', labelKey: 'accounts.type.asset', blurbKey: 'accounts.type.assetBlurb', icon: '💰' },
-  { key: 'liability', labelKey: 'accounts.type.liability', blurbKey: 'accounts.type.liabilityBlurb', icon: '💳' },
-  { key: 'equity', labelKey: 'accounts.type.equity', blurbKey: 'accounts.type.equityBlurb', icon: '🏛️' },
-  { key: 'income', labelKey: 'accounts.type.income', blurbKey: 'accounts.type.incomeBlurb', icon: '📥' },
-  { key: 'expense', labelKey: 'accounts.type.expense', blurbKey: 'accounts.type.expenseBlurb', icon: '📤' },
+  { kinds: ['bank', 'cash', 'investment'], labelKey: 'accounts.kindGroup.assets', blurbKey: 'accounts.kindGroup.assetsBlurb', icon: '💰' },
+  { kinds: ['card', 'loan'], labelKey: 'accounts.kindGroup.liabilities', blurbKey: 'accounts.kindGroup.liabilitiesBlurb', icon: '💳' },
+  { kinds: ['income', 'expense', 'equity', 'other'], labelKey: 'accounts.kindGroup.system', blurbKey: 'accounts.kindGroup.systemBlurb', icon: '📊' },
 ];
+
+const KIND_OPTIONS: { key: AccountKind; labelKey: TranslationKey; icon: string }[] = [
+  { key: 'bank', labelKey: 'accounts.kind.bank', icon: '🏦' },
+  { key: 'cash', labelKey: 'accounts.kind.cash', icon: '💵' },
+  { key: 'card', labelKey: 'accounts.kind.card', icon: '💳' },
+  { key: 'loan', labelKey: 'accounts.kind.loan', icon: '🏛️' },
+  { key: 'investment', labelKey: 'accounts.kind.investment', icon: '📈' },
+];
+
+const ACCOUNT_TYPE_FOR_KIND: Record<AccountKind, string> = {
+  bank: 'asset',
+  cash: 'asset',
+  investment: 'asset',
+  card: 'liability',
+  loan: 'liability',
+  income: 'income',
+  expense: 'expense',
+  equity: 'equity',
+  other: 'other',
+};
 
 interface FormState {
   name: string;
-  type: AccountType;
+  kind: AccountKind;
   closing_day: string;
   due_day: string;
   credit_limit: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', type: 'asset', closing_day: '', due_day: '', credit_limit: '' };
+const EMPTY_FORM: FormState = { name: '', kind: 'bank', closing_day: '', due_day: '', credit_limit: '' };
 
-export function AccountManager({ accounts, onAccountsChanged }: Props) {
+export function AccountManager({ accounts, categories, onAccountsChanged }: Props) {
   const { t, formatMoney } = useI18n();
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -58,9 +78,9 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [showForm]);
 
-  const openCreate = (type: AccountType) => {
+  const openCreate = (kind: AccountKind) => {
     setEditingId(null);
-    setForm({ name: '', type, closing_day: '', due_day: '', credit_limit: '' });
+    setForm({ name: '', kind, closing_day: '', due_day: '', credit_limit: '' });
     setError(null);
     setShowForm(true);
   };
@@ -69,7 +89,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     setEditingId(a.id);
     setForm({
       name: a.name,
-      type: a.type as AccountType,
+      kind: (a.account_kind as AccountKind) ?? 'other',
       closing_day: a.closing_day != null ? String(a.closing_day) : '',
       due_day: a.due_day != null ? String(a.due_day) : '',
       credit_limit: a.credit_limit != null ? String(a.credit_limit) : '',
@@ -87,7 +107,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     }
     setSaving(true);
     setError(null);
-    const isCard = form.type === 'liability';
+    const isCard = form.kind === 'card';
     const closingDay = form.closing_day.trim() ? Number(form.closing_day.trim()) : null;
     const dueDay = form.due_day.trim() ? Number(form.due_day.trim()) : null;
     const creditLimit = form.credit_limit.trim() ? form.credit_limit.trim() : null;
@@ -108,7 +128,8 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     }
     const payload = {
       name,
-      type: form.type,
+      type: ACCOUNT_TYPE_FOR_KIND[form.kind],
+      account_kind: form.kind,
       closing_day: isCard ? closingDay : undefined,
       due_day: isCard ? dueDay : undefined,
       credit_limit: isCard && creditLimit ? creditLimit : undefined,
@@ -216,10 +237,15 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     );
   };
 
-  const renderGroup = (group: (typeof ACCOUNT_TYPES)[number]) => {
-    const items = visible.filter((a) => a.type === group.key);
+  const renderGroup = (group: (typeof KIND_GROUPS)[number]) => {
+    // Credit cards (kind 'card') are managed in the embedded Credit Card
+    // section below; only non-card liabilities (loans) appear in this list.
+    const items = visible.filter(
+      (a) => group.kinds.includes(a.account_kind as AccountKind) && a.account_kind !== 'card',
+    );
+    const canAdd = KIND_OPTIONS.some((k) => k.key === group.kinds[0]);
     return (
-      <div key={group.key} style={styles.group}>
+      <div key={group.kinds.join('-')} style={styles.group}>
         <div style={styles.groupHeader}>
           <span style={styles.groupIcon} aria-hidden="true">
             {group.icon}
@@ -229,15 +255,17 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
             <p style={styles.groupBlurb}>{t(group.blurbKey)}</p>
           </div>
           <span style={styles.groupBadge}>{items.length}</span>
-          <button
-            type="button"
-            style={styles.groupAdd}
-            onClick={() => openCreate(group.key)}
-            aria-label={t('accounts.form.addAccount')}
-            title={t('accounts.form.addAccount')}
-          >
-            +
-          </button>
+          {canAdd && (
+            <button
+              type="button"
+              style={styles.groupAdd}
+              onClick={() => openCreate(group.kinds[0])}
+              aria-label={t('accounts.form.addAccount')}
+              title={t('accounts.form.addAccount')}
+            >
+              +
+            </button>
+          )}
         </div>
         {items.length > 0 ? (
           <div style={styles.list}>{items.map(renderAccountCard)}</div>
@@ -252,7 +280,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     <div>
       <div style={styles.pageHeader}>
         <h2 style={styles.pageTitle}>{t('accounts.title')}</h2>
-        <button type="button" style={styles.primaryButton} onClick={() => openCreate('asset')}>
+        <button type="button" style={styles.primaryButton} onClick={() => openCreate('bank')}>
           {t('accounts.new')}
         </button>
       </div>
@@ -285,7 +313,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
           title={t('accounts.noTitle')}
           description={t('accounts.noDesc')}
           actionLabel={t('accounts.new')}
-          onAction={() => openCreate('asset')}
+          onAction={() => openCreate('bank')}
         />
       ) : (
         <div style={styles.summaryBar}>
@@ -313,9 +341,10 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
       )}
 
       {accounts.length > 0 && (
-        <div style={styles.groups}>{ACCOUNT_TYPES.map(renderGroup)}</div>
+        <div style={styles.groups}>{KIND_GROUPS.map(renderGroup)}</div>
       )}
 
+      <CreditCardManager categories={categories} formatMoney={formatMoney} />
 
       {showForm && (
         <div
@@ -366,22 +395,22 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
               <label style={styles.label}>
                 {t('accounts.form.type')}
                 <div style={styles.typeGrid}>
-                  {ACCOUNT_TYPES.map((accountType) => (
+                  {KIND_OPTIONS.map((kind) => (
                     <button
-                      key={accountType.key}
+                      key={kind.key}
                       type="button"
                       style={
-                        form.type === accountType.key ? styles.typeButtonActive : styles.typeButton
+                        form.kind === kind.key ? styles.typeButtonActive : styles.typeButton
                       }
-                      onClick={() => setForm((f) => ({ ...f, type: accountType.key }))}
+                      onClick={() => setForm((f) => ({ ...f, kind: kind.key }))}
                     >
-                      {accountType.icon} {t(accountType.labelKey)}
+                      {kind.icon} {t(kind.labelKey)}
                     </button>
                   ))}
                 </div>
               </label>
 
-              {form.type === 'liability' && (
+              {form.kind === 'card' && (
                 <div style={styles.cardFields}>
                   <p style={styles.cardFieldsHint}>
                     {t('accounts.form.cardHint')}

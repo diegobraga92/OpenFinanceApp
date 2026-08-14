@@ -2072,9 +2072,14 @@
           "id",
           "name",
           "type",
+          "account_kind",
           "created_at"
         ],
         "properties": {
+          "account_kind": {
+            "type": "string",
+            "description": "User-facing kind: `bank`, `cash`, `card`, `loan`, `investment`, or a\nsystem kind (`income`/`expense`/`equity`/`other`)."
+          },
           "closing_day": {
             "type": [
               "integer",
@@ -2133,11 +2138,16 @@
           "id",
           "name",
           "type",
+          "account_kind",
           "created_at",
           "balance",
           "transaction_count"
         ],
         "properties": {
+          "account_kind": {
+            "type": "string",
+            "description": "User-facing kind: `bank`, `cash`, `card`, `loan`, `investment`, or a\nsystem kind (`income`/`expense`/`equity`/`other`)."
+          },
           "balance": {
             "type": "string",
             "description": "Balance = SUM(debit_amount) − SUM(credit_amount) across ledger entries.\nPositive for asset/expense accounts, negative for liability/income/equity\nunder standard double-entry semantics."
@@ -2910,6 +2920,14 @@
           "type"
         ],
         "properties": {
+          "account_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "User-facing kind. When set, the accounting `type` is derived from it\n(`bank`/`cash`/`investment` → asset, `card`/`loan` → liability).",
+            "example": "card"
+          },
           "closing_day": {
             "type": [
               "integer",
@@ -2947,7 +2965,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`asset`, `liability`, `equity`, `income`, or `expense`.",
+            "description": "`asset`, `liability`, `equity`, `income`, or `expense`. Ignored when\n`account_kind` is provided (the type is derived from the kind).",
             "example": "liability"
           }
         }
@@ -3229,6 +3247,16 @@
             ],
             "format": "uuid",
             "description": "Installment plan this transaction belongs to (optional)."
+          },
+          "installments": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Split this transaction into N monthly installments (2-60).\nWhen set, a plan is created and every installment is materialized as a\ndated expense, starting on `date`.",
+            "maximum": 60,
+            "minimum": 2
           },
           "notes": {
             "type": [
@@ -4601,6 +4629,14 @@
           "type"
         ],
         "properties": {
+          "account_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "User-facing kind. When set, the accounting `type` is derived from it.",
+            "example": "card"
+          },
           "closing_day": {
             "type": [
               "integer",
@@ -4638,7 +4674,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`asset`, `liability`, `equity`, `income`, or `expense`.",
+            "description": "`asset`, `liability`, `equity`, `income`, or `expense`. Ignored when\n`account_kind` is provided (the type is derived from the kind).",
             "example": "liability"
           }
         }

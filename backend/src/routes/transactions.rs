@@ -15,6 +15,8 @@ use crate::models::{
     UpdateTransactionRequest,
 };
 use crate::state::AppState;
+use crate::transaction_ledger;
+use sqlx::PgPool;
 
 /// Returns a sub-router with all transaction routes mounted under `/api/transactions`.
 pub fn router() -> Router<AppState> {
@@ -136,6 +138,55 @@ pub async fn list_transactions(
     }))
 }
 
+/// Resolves the payment + posting accounts and their display names for a
+/// transaction payload. Runs before the write transaction is opened (it may
+/// create and link a posting account for a new category).
+#[allow(clippy::type_complexity)]
+async fn resolve_ledger_accounts(
+    pool: &PgPool,
+    account_id: Option<Uuid>,
+    category_id: Option<Uuid>,
+    ttype: &str,
+) -> Result<(Uuid, String, Uuid, String), (StatusCode, Json<serde_json::Value>)> {
+    let source = transaction_ledger::resolve_source_account(pool, account_id)
+        .await
+        .map_err(|e| {
+            error!("Failed to resolve source account: {e}");
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+    let source_name = transaction_ledger::account_name(pool, source)
+        .await
+        .map_err(|e| {
+            error!("Failed to load source account name: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to load source account" })),
+            )
+        })?;
+    let posting = transaction_ledger::resolve_posting_account(pool, category_id, ttype)
+        .await
+        .map_err(|e| {
+            error!("Failed to resolve posting account: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+    let posting_name = transaction_ledger::account_name(pool, posting)
+        .await
+        .map_err(|e| {
+            error!("Failed to load posting account name: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to load posting account" })),
+            )
+        })?;
+    Ok((source, source_name, posting, posting_name))
+}
+
 /// Creates a new transaction.
 #[utoipa::path(
     post,
@@ -152,6 +203,28 @@ pub async fn create_transaction(
     Json(payload): Json<CreateTransactionRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     validate_transaction_payload(&payload.description, payload.amount, &payload.r#type)?;
+
+    // Optional installment splitting: 2-60 monthly payments starting on `date`.
+    let installment_spec = match payload.installments {
+        Some(n) if !(2..=60).contains(&n) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "installments must be between 2 and 60" })),
+            ));
+        }
+        Some(n) => {
+            let count = n as i32;
+            let per = (payload.amount / Decimal::from(count)).round_dp(2);
+            let last = payload.amount - per * Decimal::from(count - 1);
+            Some((count, per, last))
+        }
+        None => None,
+    };
+    // The returned (first) transaction carries the first installment amount.
+    let first_amount = installment_spec
+        .as_ref()
+        .map(|(_, per, _)| *per)
+        .unwrap_or(payload.amount);
 
     if let Some(cid) = payload.category_id {
         let exists: Option<Uuid> = sqlx::query_scalar("SELECT id FROM categories WHERE id = $1")
@@ -174,26 +247,22 @@ pub async fn create_transaction(
         }
     }
 
-    if let Some(aid) = payload.account_id {
-        let exists: Option<Uuid> = sqlx::query_scalar("SELECT id FROM accounts WHERE id = $1")
-            .bind(aid)
-            .fetch_optional(&state.pg_pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to validate account: {e}");
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": "Failed to validate account" })),
-                )
-            })?;
+    // Resolve accounts before opening the DB transaction (read-only pool work).
+    let (source_account, source_name, posting_account, posting_name) = resolve_ledger_accounts(
+        &state.pg_pool,
+        payload.account_id,
+        payload.category_id,
+        &payload.r#type,
+    )
+    .await?;
 
-        if exists.is_none() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "account_id does not reference an existing account" })),
-            ));
-        }
-    }
+    let mut db = state.pg_pool.begin().await.map_err(|e| {
+        error!("Failed to begin DB transaction: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to begin transaction" })),
+        )
+    })?;
 
     let transaction = sqlx::query_as::<_, Transaction>(
         "INSERT INTO transactions (description, amount, type, category_id, date, notes, installment_plan_id, account_id)
@@ -202,20 +271,221 @@ pub async fn create_transaction(
                    installment_plan_id, account_id, created_at, updated_at",
     )
     .bind(payload.description.trim())
-    .bind(payload.amount)
+    .bind(first_amount)
     .bind(&payload.r#type)
     .bind(payload.category_id)
     .bind(payload.date)
     .bind(&payload.notes)
     .bind(payload.installment_plan_id)
-    .bind(payload.account_id)
-    .fetch_one(&state.pg_pool)
+    .bind(source_account)
+    .fetch_one(&mut *db)
     .await
     .map_err(|e| {
         error!("Failed to create transaction: {e}");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": "Failed to create transaction" })),
+        )
+    })?;
+
+    // Post a balanced ledger pair (single source of truth for balances).
+    transaction_ledger::post_entries(
+        &mut *db,
+        transaction.id,
+        &transaction.r#type,
+        posting_account,
+        &posting_name,
+        source_account,
+        &source_name,
+        transaction.amount,
+        &transaction.description,
+    )
+    .await
+    .map_err(|e| {
+        error!("Failed to post ledger entries for {}: {e}", transaction.id);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to post ledger entries" })),
+        )
+    })?;
+
+    // Link the transaction to its ledger group (same id).
+    sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+        .bind(transaction.id)
+        .execute(&mut *db)
+        .await
+        .map_err(|e| {
+            error!("Failed to link ledger entries for {}: {e}", transaction.id);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to link ledger entries" })),
+            )
+        })?;
+
+    // When splitting into installments, create the plan and materialize every
+    // installment as a dated expense (cash basis: each counts in its due month).
+    if let Some((count, per, last)) = installment_spec {
+        // The plan row (account_id is the resolved payment account).
+        let plan_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO installment_plans
+                (description, total_amount, installments, installment_amount, category_id, start_date, account_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id",
+        )
+        .bind(payload.description.trim())
+        .bind(payload.amount)
+        .bind(count)
+        .bind(per)
+        .bind(payload.category_id)
+        .bind(payload.date)
+        .bind(source_account)
+        .fetch_one(&mut *db)
+        .await
+        .map_err(|e| {
+            error!("Failed to create installment plan: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to create installment plan" })),
+            )
+        })?;
+
+        // First installment → the transaction we just created.
+        sqlx::query("UPDATE transactions SET installment_plan_id = $1 WHERE id = $2")
+            .bind(plan_id)
+            .bind(transaction.id)
+            .execute(&mut *db)
+            .await
+            .map_err(|e| {
+                error!("Failed to link installment plan: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to create installment plan" })),
+                )
+            })?;
+        sqlx::query(
+            "INSERT INTO installment_transactions (plan_id, installment_number, due_date, transaction_id, status)
+             VALUES ($1, 1, $2, $3, 'generated')",
+        )
+        .bind(plan_id)
+        .bind(payload.date)
+        .bind(transaction.id)
+        .execute(&mut *db)
+        .await
+        .map_err(|e| {
+            error!("Failed to schedule installment: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to create installment plan" })),
+            )
+        })?;
+
+        // Remaining installments: dated monthly, each a real expense.
+        for i in 2..=count {
+            let due = transaction_ledger::add_months(payload.date, i - 1);
+            let amount_i = if i == count { last } else { per };
+            let desc_i = format!("Parcela {}/{} — {}", i, count, payload.description.trim());
+            let t: Transaction = sqlx::query_as(
+                "INSERT INTO transactions (description, amount, type, category_id, date, notes, installment_plan_id, account_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 RETURNING id, description, amount, type, category_id, date, notes,
+                           installment_plan_id, account_id, created_at, updated_at",
+            )
+            .bind(&desc_i)
+            .bind(amount_i)
+            .bind(&payload.r#type)
+            .bind(payload.category_id)
+            .bind(due)
+            .bind(None::<String>)
+            .bind(plan_id)
+            .bind(source_account)
+            .fetch_one(&mut *db)
+            .await
+            .map_err(|e| {
+                error!("Failed to create installment transaction: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to create installment transaction" })),
+                )
+            })?;
+
+            transaction_ledger::post_entries(
+                &mut *db,
+                t.id,
+                &t.r#type,
+                posting_account,
+                &posting_name,
+                source_account,
+                &source_name,
+                t.amount,
+                &t.description,
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to post ledger entries for {}: {e}", t.id);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to post ledger entries" })),
+                )
+            })?;
+
+            sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+                .bind(t.id)
+                .execute(&mut *db)
+                .await
+                .map_err(|e| {
+                    error!("Failed to link ledger entries for {}: {e}", t.id);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": "Failed to post ledger entries" })),
+                    )
+                })?;
+
+            sqlx::query(
+                "INSERT INTO installment_transactions (plan_id, installment_number, due_date, transaction_id, status)
+                 VALUES ($1, $2, $3, $4, 'generated')",
+            )
+            .bind(plan_id)
+            .bind(i)
+            .bind(due)
+            .bind(t.id)
+            .execute(&mut *db)
+            .await
+            .map_err(|e| {
+                error!("Failed to schedule installment: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to create installment plan" })),
+                )
+            })?;
+        }
+    }
+
+    // Reload the first transaction so the response reflects the linked plan.
+    let transaction = if installment_spec.is_some() {
+        sqlx::query_as::<_, Transaction>(
+            "SELECT id, description, amount, type, category_id, date, notes,
+                    installment_plan_id, account_id, created_at, updated_at
+             FROM transactions WHERE id = $1",
+        )
+        .bind(transaction.id)
+        .fetch_one(&mut *db)
+        .await
+        .map_err(|e| {
+            error!("Failed to reload transaction {}: {e}", transaction.id);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to reload transaction" })),
+            )
+        })?
+    } else {
+        transaction
+    };
+
+    db.commit().await.map_err(|e| {
+        error!("Failed to commit DB transaction: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to commit transaction" })),
         )
     })?;
 
@@ -307,28 +577,48 @@ pub async fn update_transaction(
         }
     }
 
-    if let Some(aid) = payload.account_id {
-        let exists: Option<Uuid> = sqlx::query_scalar("SELECT id FROM accounts WHERE id = $1")
-            .bind(aid)
+    // Resolve accounts before opening the DB transaction (read-only pool work).
+    let (source_account, source_name, posting_account, posting_name) = resolve_ledger_accounts(
+        &state.pg_pool,
+        payload.account_id,
+        payload.category_id,
+        &payload.r#type,
+    )
+    .await?;
+
+    // Capture the existing ledger group id so stale entries can be removed.
+    let old_ledger_id: Option<Option<Uuid>> =
+        sqlx::query_scalar("SELECT ledger_transaction_id FROM transactions WHERE id = $1")
+            .bind(id)
             .fetch_optional(&state.pg_pool)
             .await
             .map_err(|e| {
-                error!("Failed to validate account: {e}");
+                error!("Failed to fetch transaction {}: {}", id, e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": "Failed to validate account" })),
+                    Json(json!({ "error": "Failed to update transaction" })),
                 )
             })?;
 
-        if exists.is_none() {
+    let old_ledger_id = match old_ledger_id {
+        Some(v) => v,
+        None => {
             return Err((
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "account_id does not reference an existing account" })),
-            ));
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Transaction not found" })),
+            ))
         }
-    }
+    };
 
-    let result = sqlx::query_as::<_, Transaction>(
+    let mut db = state.pg_pool.begin().await.map_err(|e| {
+        error!("Failed to begin DB transaction: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to begin transaction" })),
+        )
+    })?;
+
+    let transaction = sqlx::query_as::<_, Transaction>(
         "UPDATE transactions
          SET description = $1, amount = $2, type = $3, category_id = $4,
              date = $5, notes = $6, installment_plan_id = $7, account_id = $8, updated_at = NOW()
@@ -343,9 +633,9 @@ pub async fn update_transaction(
     .bind(payload.date)
     .bind(&payload.notes)
     .bind(payload.installment_plan_id)
-    .bind(payload.account_id)
+    .bind(source_account)
     .bind(id)
-    .fetch_optional(&state.pg_pool)
+    .fetch_optional(&mut *db)
     .await
     .map_err(|e| {
         error!("Failed to update transaction {}: {}", id, e);
@@ -355,13 +645,59 @@ pub async fn update_transaction(
         )
     })?;
 
-    match result {
-        Some(t) => Ok(Json(t)),
-        None => Err((
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Transaction not found" })),
-        )),
-    }
+    let transaction = match transaction {
+        Some(t) => t,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Transaction not found" })),
+            ))
+        }
+    };
+
+    // Replace the ledger entries with the new posting.
+    transaction_ledger::delete_entries(&mut *db, id, old_ledger_id).await;
+    transaction_ledger::post_entries(
+        &mut *db,
+        transaction.id,
+        &transaction.r#type,
+        posting_account,
+        &posting_name,
+        source_account,
+        &source_name,
+        transaction.amount,
+        &transaction.description,
+    )
+    .await
+    .map_err(|e| {
+        error!("Failed to post ledger entries for {}: {e}", transaction.id);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to post ledger entries" })),
+        )
+    })?;
+
+    sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+        .bind(transaction.id)
+        .execute(&mut *db)
+        .await
+        .map_err(|e| {
+            error!("Failed to link ledger entries for {}: {e}", transaction.id);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to link ledger entries" })),
+            )
+        })?;
+
+    db.commit().await.map_err(|e| {
+        error!("Failed to commit DB transaction: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to commit transaction" })),
+        )
+    })?;
+
+    Ok(Json(transaction))
 }
 
 /// Deletes a transaction by ID.
@@ -381,9 +717,44 @@ pub async fn delete_transaction(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    // Capture the existing ledger group id so its entries can be removed.
+    let old_ledger_id: Option<Option<Uuid>> =
+        sqlx::query_scalar("SELECT ledger_transaction_id FROM transactions WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                error!("Failed to fetch transaction {}: {}", id, e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to delete transaction" })),
+                )
+            })?;
+
+    let old_ledger_id = match old_ledger_id {
+        Some(v) => v,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Transaction not found" })),
+            ))
+        }
+    };
+
+    let mut db = state.pg_pool.begin().await.map_err(|e| {
+        error!("Failed to begin DB transaction: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to begin transaction" })),
+        )
+    })?;
+
+    // Remove the transaction's ledger entries first (they are the audit trail).
+    transaction_ledger::delete_entries(&mut *db, id, old_ledger_id).await;
+
     let result = sqlx::query("DELETE FROM transactions WHERE id = $1")
         .bind(id)
-        .execute(&state.pg_pool)
+        .execute(&mut *db)
         .await
         .map_err(|e| {
             error!("Failed to delete transaction {}: {}", id, e);
@@ -399,6 +770,14 @@ pub async fn delete_transaction(
             Json(json!({ "error": "Transaction not found" })),
         ));
     }
+
+    db.commit().await.map_err(|e| {
+        error!("Failed to commit DB transaction: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to commit transaction" })),
+        )
+    })?;
 
     Ok(StatusCode::NO_CONTENT)
 }

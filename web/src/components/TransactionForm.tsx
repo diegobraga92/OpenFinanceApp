@@ -1,16 +1,17 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
-import type { Category, Transaction } from '../api';
+import type { AccountWithBalance, Category, Transaction } from '../api';
 import { createTransaction, updateTransaction } from '../api';
 import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
+  accounts: AccountWithBalance[];
   editing: Transaction | null;
   onCancel: () => void;
   onSaved: () => void;
 }
 
-export function TransactionForm({ categories, editing, onCancel, onSaved }: Props) {
+export function TransactionForm({ categories, accounts, editing, onCancel, onSaved }: Props) {
   const { t } = useI18n();
   const [description, setDescription] = useState(editing?.description ?? '');
   const [amount, setAmount] = useState(editing?.amount ?? '');
@@ -20,6 +21,8 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
   const [categoryId, setCategoryId] = useState(editing?.category_id ?? '');
   const [date, setDate] = useState(editing?.date ?? new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState(editing?.notes ?? '');
+  const [accountId, setAccountId] = useState(editing?.account_id ?? '');
+  const [installments, setInstallments] = useState('1');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +36,9 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
   }, [onCancel]);
 
   const filteredCategories = categories.filter((c) => c.type === type);
+  const paymentAccounts = accounts.filter(
+    (a) => a.account_kind === 'bank' || a.account_kind === 'cash' || a.account_kind === 'card',
+  );
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -46,6 +52,8 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
         category_id: categoryId || null,
         date,
         notes: notes || null,
+        account_id: accountId || null,
+        installments: parseInt(installments, 10) > 1 ? parseInt(installments, 10) : undefined,
       };
       if (editing) {
         await updateTransaction(editing.id, payload);
@@ -163,6 +171,47 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
         </label>
 
         <label style={styles.label}>
+          {t('transactions.form.account')}
+          <select
+            style={styles.input}
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+          >
+            <option value="">— {t('transactions.form.defaultAccount')} —</option>
+            {paymentAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.type === 'liability' ? ' 💳' : ''}
+              </option>
+            ))}
+          </select>
+          <small style={styles.hint}>{t('transactions.form.accountPlaceholder')}</small>
+        </label>
+
+        <div style={styles.row}>
+          <label style={styles.label}>
+            {t('transactions.form.installments')}
+            <input
+              style={styles.input}
+              type="number"
+              min={1}
+              max={60}
+              value={installments}
+              onChange={(e) => setInstallments(e.target.value)}
+            />
+            <small style={styles.hint}>{t('transactions.form.installmentsHint')}</small>
+            {parseInt(installments, 10) > 1 && amount && (
+              <small style={styles.hint}>
+                {t('transactions.form.perInstallment', {
+                  installments,
+                  amount: `R$ ${(parseFloat(amount) / parseInt(installments, 10)).toFixed(2)}`,
+                })}
+              </small>
+            )}
+          </label>
+        </div>
+
+        <label style={styles.label}>
           {t('common.notes')}
           <textarea
             style={{ ...styles.input, minHeight: '4rem', resize: 'vertical' }}
@@ -252,6 +301,10 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '0.875rem',
     width: '100%',
     boxSizing: 'border-box',
+  },
+  hint: {
+    fontSize: '0.75rem',
+    color: 'var(--color-text-dim)',
   },
   typeToggle: {
     display: 'flex',

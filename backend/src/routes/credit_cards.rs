@@ -396,7 +396,7 @@ pub async fn list_credit_cards(
                 COALESCE(SUM(e.debit_amount) - SUM(e.credit_amount), 0) AS balance
          FROM accounts a
          LEFT JOIN ledger_entries e ON e.account_id = a.id
-         WHERE a.type = 'liability' AND a.due_day IS NOT NULL
+         WHERE a.type = 'liability' AND a.account_kind = 'card'
          GROUP BY a.id
          ORDER BY a.name",
     )
@@ -692,6 +692,20 @@ pub async fn create_card_purchase(
             Json(json!({ "error": "Failed to post ledger entries" })),
         )
     })?;
+
+    // Link the transaction to its ledger group (same id) so later updates and
+    // deletes can find its entries.
+    sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+        .bind(transaction.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            error!("Failed to link ledger entries: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to link ledger entries" })),
+            )
+        })?;
 
     // 3. Attach to the matching billing cycle.
     let bill_id = upsert_bill(&mut tx, id, closing_day, due_day, purchase_date)
@@ -1183,6 +1197,95 @@ pub async fn anticipate_installments(
                     Json(json!({ "error": "Failed to re-date installment transaction" })),
                 )
             })?;
+
+            // The amount may have been discounted — re-post the ledger entries.
+            let (desc, amt): (String, Decimal) =
+                sqlx::query_as("SELECT description, amount FROM transactions WHERE id = $1")
+                    .bind(existing_id)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to fetch re-priced transaction: {e}");
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to re-date installment transaction" })),
+                        )
+                    })?;
+            let old_ledger: Option<Uuid> =
+                sqlx::query_scalar("SELECT ledger_transaction_id FROM transactions WHERE id = $1")
+                    .bind(existing_id)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to fetch ledger link: {e}");
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to re-date installment transaction" })),
+                        )
+                    })?;
+            crate::transaction_ledger::delete_entries(&mut *tx, existing_id, old_ledger).await;
+            let posting_account = crate::transaction_ledger::resolve_posting_account(
+                &state.pg_pool,
+                r.category_id,
+                "expense",
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to resolve posting account: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to re-date installment transaction" })),
+                )
+            })?;
+            let posting_name =
+                crate::transaction_ledger::account_name(&state.pg_pool, posting_account)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to load posting account name: {e}");
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to re-date installment transaction" })),
+                        )
+                    })?;
+            let source_name = crate::transaction_ledger::account_name(&state.pg_pool, id)
+                .await
+                .map_err(|e| {
+                    error!("Failed to load card name: {e}");
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": "Failed to re-date installment transaction" })),
+                    )
+                })?;
+            crate::transaction_ledger::post_entries(
+                &mut *tx,
+                existing_id,
+                "expense",
+                posting_account,
+                &posting_name,
+                id,
+                &source_name,
+                amt,
+                &desc,
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to re-post ledger entries: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to re-date installment transaction" })),
+                )
+            })?;
+            sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+                .bind(existing_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!("Failed to link ledger entries: {e}");
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": "Failed to re-date installment transaction" })),
+                    )
+                })?;
             existing_id
         } else {
             let description = format!(
@@ -1212,6 +1315,82 @@ pub async fn anticipate_installments(
                     ),
                 )
             })?;
+
+            // Post ledger entries for the anticipated expense and link them.
+            let posting_account = crate::transaction_ledger::resolve_posting_account(
+                &state.pg_pool,
+                r.category_id,
+                "expense",
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to resolve posting account: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        json!({ "error": "Failed to create anticipated installment transaction" }),
+                    ),
+                )
+            })?;
+            let posting_name = crate::transaction_ledger::account_name(
+                &state.pg_pool,
+                posting_account,
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to load posting account name: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        json!({ "error": "Failed to create anticipated installment transaction" }),
+                    ),
+                )
+            })?;
+            let source_name = crate::transaction_ledger::account_name(&state.pg_pool, id)
+                .await
+                .map_err(|e| {
+                    error!("Failed to load card name: {e}");
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(
+                            json!({ "error": "Failed to create anticipated installment transaction" }),
+                        ),
+                    )
+                })?;
+            crate::transaction_ledger::post_entries(
+                &mut *tx,
+                new_id,
+                "expense",
+                posting_account,
+                &posting_name,
+                id,
+                &source_name,
+                discounted_amount,
+                &description,
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to post ledger entries: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        json!({ "error": "Failed to create anticipated installment transaction" }),
+                    ),
+                )
+            })?;
+            sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+                .bind(new_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!("Failed to link ledger entries: {e}");
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(
+                            json!({ "error": "Failed to create anticipated installment transaction" }),
+                        ),
+                    )
+                })?;
             new_id
         };
 

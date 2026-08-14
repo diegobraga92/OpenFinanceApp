@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Category, Transaction, createTransaction, updateTransaction } from '../api';
+import { Category, Transaction, AccountWithBalance, createTransaction, updateTransaction } from '../api';
 import { findPreviousTransaction } from '../offline/autocomplete';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
@@ -19,6 +19,7 @@ import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
+  accounts: AccountWithBalance[];
   editing: Transaction | null;
   onSaved: () => Promise<void>;
   onCancel: () => void;
@@ -39,7 +40,7 @@ function toIsoDate(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-export function AddTransactionForm({ categories, editing, onSaved, onCancel }: Props) {
+export function AddTransactionForm({ categories, accounts, editing, onSaved, onCancel }: Props) {
   const { t } = useI18n();
   const [description, setDescription] = useState(editing?.description ?? '');
   const [amount, setAmount] = useState(editing?.amount ?? '');
@@ -47,6 +48,8 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
     editing?.type === 'income' ? 'income' : 'expense',
   );
   const [categoryId, setCategoryId] = useState(editing?.category_id ?? '');
+  const [accountId, setAccountId] = useState(editing?.account_id ?? '');
+  const [installments, setInstallments] = useState('1');
   const [date, setDate] = useState(editing?.date ?? new Date().toISOString().slice(0, 10));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -56,6 +59,9 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
   const autoFillDisabled = useRef(false);
 
   const categoriesForType = categories.filter((c) => c.type === type);
+  const paymentAccounts = accounts.filter(
+    (a) => a.account_kind === 'bank' || a.account_kind === 'cash' || a.account_kind === 'card',
+  );
 
   /**
    * Auto-complete from a previously-added transaction: when the typed
@@ -104,6 +110,8 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
         category_id: categoryId || null,
         date,
         notes: null,
+        account_id: accountId || null,
+        installments: parseInt(installments, 10) > 1 ? parseInt(installments, 10) : undefined,
       };
       if (editing) {
         await updateTransaction(editing.id, payload);
@@ -266,6 +274,60 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             ))}
           </View>
         )}
+
+        <Text style={styles.label}>{t('transactions.form.account')}</Text>
+        {paymentAccounts.length === 0 ? (
+          <Text style={styles.emptyText}>{t('transactions.form.accountPlaceholder')}</Text>
+        ) : (
+          <View style={styles.categoryGrid}>
+            <TouchableOpacity
+              style={[styles.categoryChip, !accountId && styles.categoryChipActive]}
+              onPress={() => {
+                setAccountId('');
+                autoFillDisabled.current = true;
+              }}
+            >
+              <Text style={[styles.categoryChipText, !accountId && styles.categoryChipTextActive]}>
+                {t('transactions.form.defaultAccount')}
+              </Text>
+            </TouchableOpacity>
+            {paymentAccounts.map((a) => (
+              <TouchableOpacity
+                key={a.id}
+                style={[styles.categoryChip, accountId === a.id && styles.categoryChipActive]}
+                onPress={() => {
+                  setAccountId(a.id);
+                  autoFillDisabled.current = true;
+                }}
+              >
+                <Text style={[styles.categoryChipText, accountId === a.id && styles.categoryChipTextActive]}>
+                  {a.type === 'liability' ? '💳 ' : '🏦 '}{a.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.label}>{t('transactions.form.installments')}</Text>
+        <TextInput
+          style={styles.input}
+          value={installments}
+          onChangeText={(v) => {
+            setInstallments(v.replace(/[^0-9]/g, ''));
+            autoFillDisabled.current = true;
+          }}
+          keyboardType="number-pad"
+          placeholder="1"
+          placeholderTextColor={colors.textDim}
+        />
+        {parseInt(installments, 10) > 1 && amount ? (
+          <Text style={styles.autoFillHint}>
+            {t('transactions.form.perInstallment', {
+              installments,
+              amount: `R$ ${(parseFloat(amount) / parseInt(installments, 10)).toFixed(2)}`,
+            })}
+          </Text>
+        ) : null}
 
         <TouchableOpacity
           style={[styles.submitButton, saving && styles.submitButtonDisabled]}

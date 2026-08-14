@@ -14,7 +14,8 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::models::{
-    is_valid_account_type, Account, AccountWithBalance, CreateAccountRequest, UpdateAccountRequest,
+    account_type_for_kind, is_valid_account_kind, is_valid_account_type, Account,
+    AccountWithBalance, CreateAccountRequest, UpdateAccountRequest,
 };
 use crate::state::AppState;
 use rust_decimal::Decimal;
@@ -42,7 +43,7 @@ pub async fn list_accounts(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AccountWithBalance>>, (StatusCode, Json<serde_json::Value>)> {
     let accounts = sqlx::query_as::<_, AccountWithBalance>(
-        "SELECT a.id, a.name, a.type, a.parent_id, a.closing_day, a.due_day,
+        "SELECT a.id, a.name, a.type, a.account_kind, a.parent_id, a.closing_day, a.due_day,
                 a.credit_limit, a.created_at,
                 COALESCE(SUM(e.debit_amount) - SUM(e.credit_amount), 0) AS balance,
                 COUNT(e.id) AS transaction_count
@@ -90,7 +91,7 @@ pub async fn get_account(
     Path(id): Path<Uuid>,
 ) -> Result<Json<AccountWithBalance>, (StatusCode, Json<serde_json::Value>)> {
     let account = sqlx::query_as::<_, AccountWithBalance>(
-        "SELECT a.id, a.name, a.type, a.parent_id, a.closing_day, a.due_day,
+        "SELECT a.id, a.name, a.type, a.account_kind, a.parent_id, a.closing_day, a.due_day,
                 a.credit_limit, a.created_at,
                 COALESCE(SUM(e.debit_amount) - SUM(e.credit_amount), 0) AS balance,
                 COUNT(e.id) AS transaction_count
@@ -194,6 +195,36 @@ fn validate_card_fields(
     Ok(())
 }
 
+/// Resolves the user-facing kind and accounting type for an account payload.
+/// The kind is validated first; when present, the accounting type is derived
+/// from it (the explicitly provided type is kept only for `other`).
+fn resolve_kind_and_type(
+    kind: Option<&str>,
+    ttype: &str,
+) -> Result<(String, String), (StatusCode, Json<serde_json::Value>)> {
+    let kind = kind.unwrap_or("other").to_string();
+    if !is_valid_account_kind(&kind) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "account_kind must be one of: bank, cash, card, loan, investment, income, expense, equity, other"
+            })),
+        ));
+    }
+    let ttype = account_type_for_kind(&kind)
+        .map(String::from)
+        .unwrap_or_else(|| ttype.to_string());
+    if !is_valid_account_type(&ttype) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "type must be one of: asset, liability, equity, income, expense"
+            })),
+        ));
+    }
+    Ok((kind, ttype))
+}
+
 /// Creates a new account.
 ///
 /// Returns `400` if the payload is invalid (missing name, invalid type,
@@ -220,17 +251,19 @@ pub async fn create_account(
         ));
     }
 
-    if !is_valid_account_type(&payload.r#type) {
+    let (kind, ttype) = resolve_kind_and_type(payload.account_kind.as_deref(), &payload.r#type)?;
+
+    if kind == "card" && (payload.closing_day.is_none() || payload.due_day.is_none()) {
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(json!({
-                "error": "type must be one of: asset, liability, equity, income, expense"
-            })),
+            Json(
+                json!({ "error": "closing_day and due_day are required for credit card accounts" }),
+            ),
         ));
     }
 
     validate_card_fields(
-        &payload.r#type,
+        &ttype,
         payload.closing_day,
         payload.due_day,
         payload.credit_limit,
@@ -239,12 +272,13 @@ pub async fn create_account(
     validate_parent(&state, payload.parent_id, None).await?;
 
     let account = sqlx::query_as::<_, Account>(
-        "INSERT INTO accounts (name, type, parent_id, closing_day, due_day, credit_limit)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, name, type, parent_id, closing_day, due_day, credit_limit, created_at",
+        "INSERT INTO accounts (name, type, account_kind, parent_id, closing_day, due_day, credit_limit)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, name, type, account_kind, parent_id, closing_day, due_day, credit_limit, created_at",
     )
     .bind(name)
-    .bind(&payload.r#type)
+    .bind(&ttype)
+    .bind(&kind)
     .bind(payload.parent_id)
     .bind(payload.closing_day)
     .bind(payload.due_day)
@@ -292,17 +326,19 @@ pub async fn update_account(
         ));
     }
 
-    if !is_valid_account_type(&payload.r#type) {
+    let (kind, ttype) = resolve_kind_and_type(payload.account_kind.as_deref(), &payload.r#type)?;
+
+    if kind == "card" && (payload.closing_day.is_none() || payload.due_day.is_none()) {
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(json!({
-                "error": "type must be one of: asset, liability, equity, income, expense"
-            })),
+            Json(
+                json!({ "error": "closing_day and due_day are required for credit card accounts" }),
+            ),
         ));
     }
 
     validate_card_fields(
-        &payload.r#type,
+        &ttype,
         payload.closing_day,
         payload.due_day,
         payload.credit_limit,
@@ -312,13 +348,14 @@ pub async fn update_account(
 
     let result = sqlx::query_as::<_, Account>(
         "UPDATE accounts
-         SET name = $1, type = $2, parent_id = $3, closing_day = $4, due_day = $5,
-             credit_limit = $6
-         WHERE id = $7
-         RETURNING id, name, type, parent_id, closing_day, due_day, credit_limit, created_at",
+         SET name = $1, type = $2, account_kind = $3, parent_id = $4, closing_day = $5,
+             due_day = $6, credit_limit = $7
+         WHERE id = $8
+         RETURNING id, name, type, account_kind, parent_id, closing_day, due_day, credit_limit, created_at",
     )
     .bind(name)
-    .bind(&payload.r#type)
+    .bind(&ttype)
+    .bind(&kind)
     .bind(payload.parent_id)
     .bind(payload.closing_day)
     .bind(payload.due_day)

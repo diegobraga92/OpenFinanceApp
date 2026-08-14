@@ -23,6 +23,7 @@ export interface LocalTransaction {
   date: string;
   notes: string | null;
   installment_plan_id: string | null;
+  account_id: string | null;
   /** 0 = local-only (pending push), 1 = synced to server. */
   synced: number;
   updated_at: string;
@@ -77,13 +78,13 @@ function initSchema(): void {
       date TEXT NOT NULL,
       notes TEXT,
       installment_plan_id TEXT,
+      account_id TEXT,
       synced INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_local_tx_synced ON local_transactions (synced);
     CREATE INDEX IF NOT EXISTS idx_local_tx_server ON local_transactions (server_id);
-
     CREATE TABLE IF NOT EXISTS local_categories (
       id TEXT PRIMARY KEY,
       server_id TEXT,
@@ -111,6 +112,14 @@ function initSchema(): void {
       value TEXT NOT NULL
     );
   `);
+
+  // Lightweight migration for databases created before `account_id` existed.
+  const cols = db!.getAllSync('PRAGMA table_info(local_transactions)') as unknown as {
+    name: string;
+  }[];
+  if (!cols.some((c) => c.name === 'account_id')) {
+    db!.execSync('ALTER TABLE local_transactions ADD COLUMN account_id TEXT');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -122,8 +131,8 @@ export function upsertLocalTransaction(tx: Omit<LocalTransaction, 'updated_at'>)
   getDb().runSync(
     `INSERT INTO local_transactions
        (id, server_id, description, amount, type, category_id, date, notes,
-        installment_plan_id, synced, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        installment_plan_id, account_id, synced, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        server_id = excluded.server_id,
        description = excluded.description,
@@ -133,6 +142,7 @@ export function upsertLocalTransaction(tx: Omit<LocalTransaction, 'updated_at'>)
        date = excluded.date,
        notes = excluded.notes,
        installment_plan_id = excluded.installment_plan_id,
+       account_id = excluded.account_id,
        synced = excluded.synced,
        updated_at = excluded.updated_at`,
     tx.id,
@@ -144,6 +154,7 @@ export function upsertLocalTransaction(tx: Omit<LocalTransaction, 'updated_at'>)
     tx.date,
     tx.notes,
     tx.installment_plan_id,
+    tx.account_id,
     tx.synced,
     now,
   );

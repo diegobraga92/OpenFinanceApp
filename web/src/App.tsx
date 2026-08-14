@@ -26,7 +26,6 @@ import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
 import { InstallmentManager } from './components/InstallmentManager';
-import { CreditCardManager } from './components/CreditCardManager';
 import { EmptyState } from './components/EmptyState';
 import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
@@ -34,16 +33,14 @@ import { useI18n } from './i18n';
 import { LanguageToggle } from './components/LanguageToggle';
 import type { TranslationKey } from '../../shared/i18n';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit' | 'installments' | 'credit-cards';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
 
 const TABS: Tab[] = [
   'dashboard',
   'transactions',
   'accounts',
-  'credit-cards',
   'ledger',
   'budgets',
-  'installments',
   'reports',
   'reconciliation',
   'receipts',
@@ -51,15 +48,16 @@ const TABS: Tab[] = [
   'categories',
 ];
 
-const NAV_ITEMS: [Tab, TranslationKey][] = [
+const PRIMARY_NAV: [Tab, TranslationKey][] = [
   ['dashboard', 'nav.dashboard'],
   ['transactions', 'nav.transactions'],
   ['accounts', 'nav.accounts'],
-  ['credit-cards', 'nav.creditCards'],
-  ['ledger', 'nav.ledger'],
   ['budgets', 'nav.budgets'],
-  ['installments', 'nav.installments'],
   ['reports', 'nav.reports'],
+];
+
+const TOOLS_NAV: [Tab, TranslationKey][] = [
+  ['ledger', 'nav.ledger'],
   ['reconciliation', 'nav.reconciliation'],
   ['receipts', 'nav.receipts'],
   ['audit', 'nav.audit'],
@@ -80,6 +78,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [budgetAlert, setBudgetAlert] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const { toggle: toggleTheme, mode: themeMode } = useTheme();
   const { push: pushToast } = useToast();
   const { t, formatMoney, monthNames } = useI18n();
@@ -116,14 +116,30 @@ export default function App() {
 
   const loadTransactions = useCallback(async () => {
     try {
-      const data = await fetchTransactions({ page_size: 50 });
+      const data = await fetchTransactions({ page_size: 200 });
       setTransactions(data.items);
+      setHasMoreTransactions(data.total > data.items.length);
       return data.items;
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadTransactions'));
       return [];
     }
   }, [t]);
+
+  const loadMoreTransactions = async () => {
+    const page = Math.floor(transactions.length / 200);
+    setLoadingMore(true);
+    try {
+      const data = await fetchTransactions({ page_size: 200, page });
+      const next = [...transactions, ...data.items];
+      setTransactions(next);
+      setHasMoreTransactions(next.length < data.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.loadTransactions'));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -370,9 +386,21 @@ export default function App() {
             className={navOpen ? 'app-nav app-nav-open' : 'app-nav'}
             aria-label={t('nav.main')}
           >
-            {NAV_ITEMS.map(([key, label], i) => (
+            {PRIMARY_NAV.map(([key, label]) => (
               <span key={key} style={styles.navItem}>
-                {i === 4 && <span className="nav-divider" style={styles.navDivider} aria-hidden="true" />}
+                <button
+                  style={{ ...styles.navButton, ...(tab === key ? styles.navButtonActive : {}) }}
+                  aria-current={tab === key ? 'page' : undefined}
+                  onClick={() => { setTab(key); setNavOpen(false); }}
+                >
+                  {t(label)}
+                </button>
+              </span>
+            ))}
+            <span className="nav-divider" style={styles.navDivider} aria-hidden="true" />
+            <span style={styles.navToolsLabel}>{t('nav.tools')}</span>
+            {TOOLS_NAV.map(([key, label]) => (
+              <span key={key} style={styles.navItem}>
                 <button
                   style={{ ...styles.navButton, ...(tab === key ? styles.navButtonActive : {}) }}
                   aria-current={tab === key ? 'page' : undefined}
@@ -566,10 +594,6 @@ export default function App() {
           </div>
         ) : tab === 'budgets' ? (
           <BudgetManager categories={categories} formatMoney={formatMoney} />
-        ) : tab === 'installments' ? (
-          <InstallmentManager categories={categories} formatMoney={formatMoney} />
-        ) : tab === 'credit-cards' ? (
-          <CreditCardManager categories={categories} formatMoney={formatMoney} />
         ) : tab === 'reports' ? (
           <ReportsDashboard formatMoney={formatMoney} />
         ) : tab === 'reconciliation' ? (
@@ -581,6 +605,7 @@ export default function App() {
         ) : tab === 'accounts' ? (
           <AccountManager
             accounts={accounts}
+            categories={categories}
             onAccountsChanged={loadAccounts}
           />
         ) : tab === 'ledger' ? (
@@ -633,6 +658,7 @@ export default function App() {
             {showForm && (
               <TransactionForm
                 categories={categories}
+                accounts={accounts}
                 editing={editingTransaction}
                 onCancel={handleCloseForm}
                 onSaved={handleTransactionCreated}
@@ -663,17 +689,35 @@ export default function App() {
                 />
               </div>
             ) : (
-              <TransactionTable
-                transactions={filteredTransactions}
-                categories={categories}
-                formatMoney={formatMoney}
-                onEdit={(t) => {
-                  setEditingTransaction(t);
-                  setShowForm(true);
-                }}
-                onDelete={(t) => handleTransactionDeleted(t)}
-              />
+              <>
+                <TransactionTable
+                  transactions={filteredTransactions}
+                  categories={categories}
+                  formatMoney={formatMoney}
+                  onEdit={(t) => {
+                    setEditingTransaction(t);
+                    setShowForm(true);
+                  }}
+                  onDelete={(t) => handleTransactionDeleted(t)}
+                />
+                {hasMoreTransactions && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                    <button
+                      type="button"
+                      style={styles.secondaryButton}
+                      onClick={loadMoreTransactions}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? t('common.loading') : t('transactions.loadMore')}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
+
+            <section className="section" style={styles.section}>
+              <InstallmentManager categories={categories} formatMoney={formatMoney} />
+            </section>
           </div>
         ) : (
           <CategoryManager
@@ -736,6 +780,16 @@ const styles: Record<string, CSSProperties> = {
     alignSelf: 'stretch',
     backgroundColor: 'var(--color-border)',
     margin: '0.375rem 0.375rem',
+  },
+  navToolsLabel: {
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--color-text-dim)',
+    padding: '0.5rem 0.75rem',
+    alignSelf: 'center',
+    whiteSpace: 'nowrap',
   },
   navButton: {
     padding: '0.5rem 1rem',

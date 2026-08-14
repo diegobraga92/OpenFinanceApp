@@ -517,6 +517,57 @@ pub async fn generate_installments(
             row.installment_number, row.installments_total, row.plan_description
         );
 
+        // Resolve the payment + posting accounts (defaults to Cash).
+        let source_account =
+            crate::transaction_ledger::resolve_source_account(&state.pg_pool, row.account_id)
+                .await
+                .map_err(|e| {
+                    error!("Failed to resolve source account: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": "Failed to create installment transaction" })),
+                    )
+                })?;
+        let source_name = crate::transaction_ledger::account_name(&state.pg_pool, source_account)
+            .await
+            .map_err(|e| {
+                error!("Failed to load source account name: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to create installment transaction" })),
+                )
+            })?;
+        let posting_account = crate::transaction_ledger::resolve_posting_account(
+            &state.pg_pool,
+            row.category_id,
+            "expense",
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to resolve posting account: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to create installment transaction" })),
+            )
+        })?;
+        let posting_name = crate::transaction_ledger::account_name(&state.pg_pool, posting_account)
+            .await
+            .map_err(|e| {
+                error!("Failed to load posting account name: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to create installment transaction" })),
+                )
+            })?;
+
+        let mut db = state.pg_pool.begin().await.map_err(|e| {
+            error!("Failed to begin DB transaction: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to create installment transaction" })),
+            )
+        })?;
+
         // Create the simple transaction.
         let tx: Transaction = sqlx::query_as(
             "INSERT INTO transactions
@@ -530,8 +581,8 @@ pub async fn generate_installments(
         .bind(row.category_id)
         .bind(row.due_date)
         .bind(id)
-        .bind(row.account_id)
-        .fetch_one(&state.pg_pool)
+        .bind(source_account)
+        .fetch_one(&mut *db)
         .await
         .map_err(|e| {
             error!("Failed to create installment transaction: {}", e);
@@ -541,6 +592,39 @@ pub async fn generate_installments(
             )
         })?;
 
+        // Post the balanced ledger pair and link it to this transaction.
+        crate::transaction_ledger::post_entries(
+            &mut *db,
+            tx.id,
+            "expense",
+            posting_account,
+            &posting_name,
+            source_account,
+            &source_name,
+            tx.amount,
+            &tx.description,
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to post ledger entries: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to create installment transaction" })),
+            )
+        })?;
+
+        sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+            .bind(tx.id)
+            .execute(&mut *db)
+            .await
+            .map_err(|e| {
+                error!("Failed to link ledger entries: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to create installment transaction" })),
+                )
+            })?;
+
         // Link the transaction and mark the installment as generated.
         sqlx::query(
             "UPDATE installment_transactions
@@ -549,13 +633,21 @@ pub async fn generate_installments(
         )
         .bind(tx.id)
         .bind(row.id)
-        .execute(&state.pg_pool)
+        .execute(&mut *db)
         .await
         .map_err(|e| {
             error!("Failed to link installment transaction: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "Failed to link installment transaction" })),
+            )
+        })?;
+
+        db.commit().await.map_err(|e| {
+            error!("Failed to commit DB transaction: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to create installment transaction" })),
             )
         })?;
 
@@ -636,6 +728,57 @@ pub async fn pay_installment(
         ));
     }
 
+    // Resolve the payment + posting accounts (defaults to Cash).
+    let source_account =
+        crate::transaction_ledger::resolve_source_account(&state.pg_pool, row.account_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to resolve source account: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to pay installment" })),
+                )
+            })?;
+    let source_name = crate::transaction_ledger::account_name(&state.pg_pool, source_account)
+        .await
+        .map_err(|e| {
+            error!("Failed to load source account name: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to pay installment" })),
+            )
+        })?;
+    let posting_account = crate::transaction_ledger::resolve_posting_account(
+        &state.pg_pool,
+        row.category_id,
+        "expense",
+    )
+    .await
+    .map_err(|e| {
+        error!("Failed to resolve posting account: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to pay installment" })),
+        )
+    })?;
+    let posting_name = crate::transaction_ledger::account_name(&state.pg_pool, posting_account)
+        .await
+        .map_err(|e| {
+            error!("Failed to load posting account name: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to pay installment" })),
+            )
+        })?;
+
+    let mut db = state.pg_pool.begin().await.map_err(|e| {
+        error!("Failed to begin DB transaction: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to pay installment" })),
+        )
+    })?;
+
     let (tx, created) = if let Some(tx_id) = row.transaction_id {
         // Reuse the existing linked transaction.
         let tx: Option<Transaction> = sqlx::query_as(
@@ -644,7 +787,7 @@ pub async fn pay_installment(
              FROM transactions WHERE id = $1",
         )
         .bind(tx_id)
-        .fetch_optional(&state.pg_pool)
+        .fetch_optional(&mut *db)
         .await
         .map_err(|e| {
             error!("Failed to fetch linked transaction: {}", e);
@@ -655,7 +798,51 @@ pub async fn pay_installment(
         })?;
 
         match tx {
-            Some(t) => (t, false),
+            Some(t) => {
+                // Ensure the reused transaction has its ledger entries (it may
+                // predate the unified posting).
+                let linked: Option<Uuid> = sqlx::query_scalar(
+                    "SELECT ledger_transaction_id FROM transactions WHERE id = $1",
+                )
+                .bind(t.id)
+                .fetch_one(&mut *db)
+                .await
+                .ok()
+                .flatten();
+                if linked.is_none() {
+                    crate::transaction_ledger::post_entries(
+                        &mut *db,
+                        t.id,
+                        "expense",
+                        posting_account,
+                        &posting_name,
+                        source_account,
+                        &source_name,
+                        t.amount,
+                        &t.description,
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to post ledger entries: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to pay installment" })),
+                        )
+                    })?;
+                    sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+                        .bind(t.id)
+                        .execute(&mut *db)
+                        .await
+                        .map_err(|e| {
+                            error!("Failed to link ledger entries: {}", e);
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(json!({ "error": "Failed to pay installment" })),
+                            )
+                        })?;
+                }
+                (t, false)
+            }
             None => {
                 // Linked transaction was deleted — create a new one.
                 let description = format!(
@@ -674,8 +861,8 @@ pub async fn pay_installment(
                 .bind(row.category_id)
                 .bind(row.due_date)
                 .bind(id)
-                .bind(row.account_id)
-                .fetch_one(&state.pg_pool)
+                .bind(source_account)
+                .fetch_one(&mut *db)
                 .await
                 .map_err(|e| {
                     error!("Failed to create installment transaction: {}", e);
@@ -684,6 +871,38 @@ pub async fn pay_installment(
                         Json(json!({ "error": "Failed to create installment transaction" })),
                     )
                 })?;
+
+                // Post the balanced ledger pair and link it to this transaction.
+                crate::transaction_ledger::post_entries(
+                    &mut *db,
+                    t.id,
+                    "expense",
+                    posting_account,
+                    &posting_name,
+                    source_account,
+                    &source_name,
+                    t.amount,
+                    &t.description,
+                )
+                .await
+                .map_err(|e| {
+                    error!("Failed to post ledger entries: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": "Failed to create installment transaction" })),
+                    )
+                })?;
+                sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+                    .bind(t.id)
+                    .execute(&mut *db)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to link ledger entries: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "Failed to create installment transaction" })),
+                        )
+                    })?;
                 (t, true)
             }
         }
@@ -705,8 +924,8 @@ pub async fn pay_installment(
         .bind(row.category_id)
         .bind(row.due_date)
         .bind(id)
-        .bind(row.account_id)
-        .fetch_one(&state.pg_pool)
+        .bind(source_account)
+        .fetch_one(&mut *db)
         .await
         .map_err(|e| {
             error!("Failed to create installment transaction: {}", e);
@@ -715,6 +934,38 @@ pub async fn pay_installment(
                 Json(json!({ "error": "Failed to create installment transaction" })),
             )
         })?;
+
+        // Post the balanced ledger pair and link it to this transaction.
+        crate::transaction_ledger::post_entries(
+            &mut *db,
+            t.id,
+            "expense",
+            posting_account,
+            &posting_name,
+            source_account,
+            &source_name,
+            t.amount,
+            &t.description,
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to post ledger entries: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to create installment transaction" })),
+            )
+        })?;
+        sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+            .bind(t.id)
+            .execute(&mut *db)
+            .await
+            .map_err(|e| {
+                error!("Failed to link ledger entries: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to create installment transaction" })),
+                )
+            })?;
         (t, true)
     };
 
@@ -726,13 +977,21 @@ pub async fn pay_installment(
     )
     .bind(tx.id)
     .bind(row.row_id)
-    .execute(&state.pg_pool)
+    .execute(&mut *db)
     .await
     .map_err(|e| {
         error!("Failed to mark installment as paid: {}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": "Failed to mark installment as paid" })),
+        )
+    })?;
+
+    db.commit().await.map_err(|e| {
+        error!("Failed to commit DB transaction: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to pay installment" })),
         )
     })?;
 

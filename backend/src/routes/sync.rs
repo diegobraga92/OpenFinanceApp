@@ -211,6 +211,44 @@ async fn apply_transaction_create(
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok());
 
+    // Resolve the payment + posting accounts (read-only pool work).
+    let source_account =
+        crate::transaction_ledger::resolve_source_account(&state.pg_pool, account_id)
+            .await
+            .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid account: {e}")))?;
+    let source_name = crate::transaction_ledger::account_name(&state.pg_pool, source_account)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to load source account: {e}"),
+            )
+        })?;
+    let posting_account =
+        crate::transaction_ledger::resolve_posting_account(&state.pg_pool, category_id, &ttype)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to resolve posting account: {e}"),
+                )
+            })?;
+    let posting_name = crate::transaction_ledger::account_name(&state.pg_pool, posting_account)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to load posting account: {e}"),
+            )
+        })?;
+
+    let mut db = state.pg_pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Begin transaction failed: {e}"),
+        )
+    })?;
+
     let tx: Transaction = sqlx::query_as(
         "INSERT INTO transactions
             (id, description, amount, type, category_id, date, notes, account_id, installment_plan_id, idempotency_key)
@@ -225,15 +263,53 @@ async fn apply_transaction_create(
     .bind(category_id)
     .bind(date)
     .bind(notes)
-    .bind(account_id)
+    .bind(source_account)
     .bind(installment_plan_id)
     .bind(&op.client_id)
-    .fetch_one(&state.pg_pool)
+    .fetch_one(&mut *db)
     .await
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Create transaction failed: {e}"),
+        )
+    })?;
+
+    // Post the balanced ledger pair and link it to this transaction.
+    crate::transaction_ledger::post_entries(
+        &mut *db,
+        tx.id,
+        &tx.r#type,
+        posting_account,
+        &posting_name,
+        source_account,
+        &source_name,
+        tx.amount,
+        &tx.description,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Post ledger entries failed: {e}"),
+        )
+    })?;
+
+    sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+        .bind(tx.id)
+        .execute(&mut *db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Link ledger entries failed: {e}"),
+            )
+        })?;
+
+    db.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Commit transaction failed: {e}"),
         )
     })?;
 
@@ -296,6 +372,60 @@ async fn apply_transaction_update(
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok());
 
+    // Resolve the payment + posting accounts (read-only pool work).
+    let source_account =
+        crate::transaction_ledger::resolve_source_account(&state.pg_pool, account_id)
+            .await
+            .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid account: {e}")))?;
+    let source_name = crate::transaction_ledger::account_name(&state.pg_pool, source_account)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to load source account: {e}"),
+            )
+        })?;
+    let posting_account =
+        crate::transaction_ledger::resolve_posting_account(&state.pg_pool, category_id, &ttype)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to resolve posting account: {e}"),
+                )
+            })?;
+    let posting_name = crate::transaction_ledger::account_name(&state.pg_pool, posting_account)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to load posting account: {e}"),
+            )
+        })?;
+
+    let old_ledger_id: Option<Option<Uuid>> =
+        sqlx::query_scalar("SELECT ledger_transaction_id FROM transactions WHERE id = $1")
+            .bind(server_id)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to fetch transaction: {e}"),
+                )
+            })?;
+    let old_ledger_id = match old_ledger_id {
+        Some(v) => v,
+        None => return Err((StatusCode::NOT_FOUND, "Transaction not found".to_string())),
+    };
+
+    let mut db = state.pg_pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Begin transaction failed: {e}"),
+        )
+    })?;
+
     let result = sqlx::query(
         "UPDATE transactions
          SET description = $1, amount = $2, type = $3, category_id = $4,
@@ -308,10 +438,10 @@ async fn apply_transaction_update(
     .bind(category_id)
     .bind(date)
     .bind(notes)
-    .bind(account_id)
+    .bind(source_account)
     .bind(installment_plan_id)
     .bind(server_id)
-    .execute(&state.pg_pool)
+    .execute(&mut *db)
     .await
     .map_err(|e| {
         (
@@ -323,6 +453,46 @@ async fn apply_transaction_update(
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "Transaction not found".to_string()));
     }
+
+    // Replace the ledger entries with the new posting.
+    crate::transaction_ledger::delete_entries(&mut *db, server_id, old_ledger_id).await;
+    crate::transaction_ledger::post_entries(
+        &mut *db,
+        server_id,
+        &ttype,
+        posting_account,
+        &posting_name,
+        source_account,
+        &source_name,
+        amount,
+        &description,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Post ledger entries failed: {e}"),
+        )
+    })?;
+
+    sqlx::query("UPDATE transactions SET ledger_transaction_id = $1 WHERE id = $1")
+        .bind(server_id)
+        .execute(&mut *db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Link ledger entries failed: {e}"),
+            )
+        })?;
+
+    db.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Commit transaction failed: {e}"),
+        )
+    })?;
+
     Ok(Some(server_id))
 }
 
@@ -337,9 +507,35 @@ async fn apply_transaction_delete(
         )
     })?;
 
+    let old_ledger_id: Option<Option<Uuid>> =
+        sqlx::query_scalar("SELECT ledger_transaction_id FROM transactions WHERE id = $1")
+            .bind(server_id)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to fetch transaction: {e}"),
+                )
+            })?;
+    let old_ledger_id = match old_ledger_id {
+        Some(v) => v,
+        None => return Ok(Some(server_id)), // already deleted — idempotent
+    };
+
+    let mut db = state.pg_pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Begin transaction failed: {e}"),
+        )
+    })?;
+
+    // Remove the transaction's ledger entries first.
+    crate::transaction_ledger::delete_entries(&mut *db, server_id, old_ledger_id).await;
+
     let result = sqlx::query("DELETE FROM transactions WHERE id = $1")
         .bind(server_id)
-        .execute(&state.pg_pool)
+        .execute(&mut *db)
         .await
         .map_err(|e| {
             (
@@ -347,6 +543,13 @@ async fn apply_transaction_delete(
                 format!("Delete transaction failed: {e}"),
             )
         })?;
+
+    db.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Commit transaction failed: {e}"),
+        )
+    })?;
 
     if result.rows_affected() == 0 {
         // Deleting an already-deleted row is idempotent for sync purposes.
