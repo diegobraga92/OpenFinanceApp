@@ -4,6 +4,7 @@ import { deleteTransaction } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useI18n } from '../i18n';
+import { categoryIcon } from '../../../shared/category-icons';
 
 interface Props {
   transactions: Transaction[];
@@ -77,7 +78,7 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
               <div style={styles.cardBottom}>
                 {cat ? (
                   <span style={styles.badge}>
-                    {cat.icon && <span style={styles.icon}>{cat.icon}</span>}
+                    {cat.icon && <span style={styles.icon}>{categoryIcon(cat.icon)}</span>}
                     {cat.name}
                   </span>
                 ) : (
@@ -126,7 +127,7 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
                 <td style={styles.td}>
                   {cat ? (
                     <span style={styles.badge}>
-                      {cat.icon && <span style={styles.icon}>{cat.icon}</span>}
+                      {cat.icon && <span style={styles.icon}>{categoryIcon(cat.icon)}</span>}
                       {cat.name}
                     </span>
                   ) : (

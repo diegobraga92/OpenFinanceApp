@@ -5,6 +5,7 @@ import { useToast } from './Toast';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 import { CreditCardManager } from './CreditCardManager';
+import { AccountDetail, type AccountLike } from './AccountDetail';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../../../shared/i18n';
 
@@ -24,7 +25,6 @@ const KIND_GROUPS: {
 }[] = [
   { kinds: ['bank', 'cash', 'investment'], labelKey: 'accounts.kindGroup.assets', blurbKey: 'accounts.kindGroup.assetsBlurb', icon: '💰' },
   { kinds: ['card', 'loan'], labelKey: 'accounts.kindGroup.liabilities', blurbKey: 'accounts.kindGroup.liabilitiesBlurb', icon: '💳' },
-  { kinds: ['income', 'expense', 'equity', 'other'], labelKey: 'accounts.kindGroup.system', blurbKey: 'accounts.kindGroup.systemBlurb', icon: '📊' },
 ];
 
 const KIND_OPTIONS: { key: AccountKind; labelKey: TranslationKey; icon: string }[] = [
@@ -66,6 +66,7 @@ export function AccountManager({ accounts, categories, onAccountsChanged }: Prop
   const [deleting, setDeleting] = useState<AccountWithBalance | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AccountLike | null>(null);
   const { push: pushToast } = useToast();
 
   // Close the modal on Escape for keyboard users.
@@ -174,6 +175,30 @@ export function AccountManager({ accounts, categories, onAccountsChanged }: Prop
     );
   }, [query, accounts]);
 
+  // Lifetime roll-ups for the summary bar. Income accounts carry a negative
+  // ledger balance (credited on income), so use |balance|; expenses are debited.
+  const summary = useMemo(() => {
+    const totalAssets = accounts
+      .filter((a) => a.type === 'asset')
+      .reduce((sum, a) => sum + parseFloat(a.balance), 0);
+    const totalDebt = accounts
+      .filter((a) => a.type === 'liability')
+      .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0);
+    const totalIncome = accounts
+      .filter((a) => a.type === 'income')
+      .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0);
+    const totalExpenses = accounts
+      .filter((a) => a.type === 'expense')
+      .reduce((sum, a) => sum + parseFloat(a.balance), 0);
+    return {
+      totalAssets,
+      totalDebt,
+      totalIncome,
+      totalExpenses,
+      netIncome: totalIncome - totalExpenses,
+    };
+  }, [accounts]);
+
   const formatBalance = (a: AccountWithBalance) => {
     const n = Math.abs(parseFloat(a.balance));
     return formatMoney(n);
@@ -183,7 +208,12 @@ export function AccountManager({ accounts, categories, onAccountsChanged }: Prop
     const isDebt = a.type === 'liability';
     const isIncomeOrExpense = a.type === 'income' || a.type === 'expense';
     return (
-      <div key={a.id} style={styles.card}>
+      <div
+        key={a.id}
+        style={{ ...styles.card, cursor: 'pointer' }}
+        onClick={() => setDetail({ id: a.id, name: a.name, type: a.type, account_kind: a.account_kind })}
+        title={t('accounts.detail.title', { name: a.name })}
+      >
         <div
           style={{
             ...styles.accountIcon,
@@ -217,7 +247,10 @@ export function AccountManager({ accounts, categories, onAccountsChanged }: Prop
           <button
             type="button"
             style={styles.iconAction}
-            onClick={() => openEdit(a)}
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(a);
+            }}
             aria-label={t('common.edit') + ' ' + a.name}
             title={t('common.edit')}
           >
@@ -226,7 +259,10 @@ export function AccountManager({ accounts, categories, onAccountsChanged }: Prop
           <button
             type="button"
             style={styles.iconActionDanger}
-            onClick={() => setDeleting(a)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleting(a);
+            }}
             aria-label={t('common.delete') + ' ' + a.name}
             title={t('common.delete')}
           >
@@ -319,22 +355,35 @@ export function AccountManager({ accounts, categories, onAccountsChanged }: Prop
         <div style={styles.summaryBar}>
           <div style={styles.summaryItem}>
             <span style={styles.summaryLabel}>{t('accounts.totalAssets')}</span>
-            <span style={styles.summaryValue}>
-              {formatMoney(
-                accounts
-                  .filter((a) => a.type === 'asset')
-                  .reduce((sum, a) => sum + parseFloat(a.balance), 0),
-              )}
-            </span>
+            <span style={styles.summaryValue}>{formatMoney(summary.totalAssets)}</span>
           </div>
           <div style={styles.summaryItem}>
             <span style={styles.summaryLabel}>{t('accounts.totalDebt')}</span>
             <span style={{ ...styles.summaryValue, ...styles.summaryDebt }}>
-              {formatMoney(
-                accounts
-                  .filter((a) => a.type === 'liability')
-                  .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0),
-              )}
+              {formatMoney(summary.totalDebt)}
+            </span>
+          </div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>{t('accounts.totalIncome')}</span>
+            <span style={{ ...styles.summaryValue, ...styles.summaryIncome }}>
+              {formatMoney(summary.totalIncome)}
+            </span>
+          </div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>{t('accounts.totalExpenses')}</span>
+            <span style={{ ...styles.summaryValue, ...styles.summaryExpense }}>
+              {formatMoney(summary.totalExpenses)}
+            </span>
+          </div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>{t('accounts.netIncome')}</span>
+            <span
+              style={{
+                ...styles.summaryValue,
+                ...(summary.netIncome >= 0 ? styles.summaryIncome : styles.summaryExpense),
+              }}
+            >
+              {formatMoney(summary.netIncome)}
             </span>
           </div>
         </div>
@@ -345,6 +394,14 @@ export function AccountManager({ accounts, categories, onAccountsChanged }: Prop
       )}
 
       <CreditCardManager categories={categories} formatMoney={formatMoney} />
+
+      {detail && (
+        <AccountDetail
+          account={detail}
+          categories={categories}
+          onClose={() => setDetail(null)}
+        />
+      )}
 
       {showForm && (
         <div
@@ -526,6 +583,12 @@ const styles: Record<string, CSSProperties> = {
   },
   summaryDebt: {
     color: 'var(--color-danger-text)',
+  },
+  summaryIncome: {
+    color: 'var(--color-income)',
+  },
+  summaryExpense: {
+    color: 'var(--color-expense)',
   },
   searchWrap: {
     position: 'relative',

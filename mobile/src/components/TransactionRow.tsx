@@ -4,6 +4,7 @@ import { Category, Transaction } from '../api';
 import { colors } from '../theme/tokens';
 import { useI18n } from '../i18n';
 import { styles } from '../theme/styles';
+import { categoryIcon } from '../../../shared/category-icons';
 
 interface Props {
   transaction: Transaction;
@@ -28,7 +29,7 @@ export function TransactionRow({
       <View style={styles.transactionLeft}>
         {cat && (
           <View style={[styles.categoryIconCircle, { backgroundColor: cat.color || colors.surfaceHover }]}>
-            <Text style={styles.categoryIconText}>{cat.icon || '•'}</Text>
+            <Text style={styles.categoryIconText}>{categoryIcon(cat.icon)}</Text>
           </View>
         )}
         <View style={styles.transactionInfo}>

@@ -25,13 +25,13 @@ import { BudgetManager } from './components/BudgetManager';
 import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
-import { InstallmentManager } from './components/InstallmentManager';
 import { EmptyState } from './components/EmptyState';
 import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
 import { useI18n } from './i18n';
 import { LanguageToggle } from './components/LanguageToggle';
 import type { TranslationKey } from '../../shared/i18n';
+import { categoryIcon } from '../../shared/category-icons';
 
 type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit';
 
@@ -533,7 +533,7 @@ export default function App() {
                     <div key={cat.category_id || 'none'} style={styles.categoryBar}>
                       <div style={styles.categoryBarHeader}>
                         <span style={styles.categoryBarName}>
-                          {cat.icon && <span style={styles.categoryIcon}>{cat.icon}</span>}
+                          {cat.icon && <span style={styles.categoryIcon}>{categoryIcon(cat.icon)}</span>}
                           {cat.category_name || t('common.uncategorised')}
                         </span>
                         <span style={styles.categoryBarTotal}>
@@ -714,10 +714,6 @@ export default function App() {
                 )}
               </>
             )}
-
-            <section className="section" style={styles.section}>
-              <InstallmentManager categories={categories} formatMoney={formatMoney} />
-            </section>
           </div>
         ) : (
           <CategoryManager

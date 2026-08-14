@@ -20,6 +20,7 @@ import { Category, createTransaction, fetchCategories } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useSnackbar } from '../components/Snackbar';
+import { categoryIcon } from '../../../shared/category-icons';
 import { useI18n } from '../i18n';
 import {
   NotificationSettings,
@@ -183,7 +184,7 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
                         pendingCategoryId === c.id && styles.categoryChipTextActive,
                       ]}
                     >
-                      {c.icon ? `${c.icon} ` : ''}{c.name}
+                      {c.icon ? `${categoryIcon(c.icon)} ` : ''}{c.name}
                     </Text>
                   </TouchableOpacity>
                 ))}

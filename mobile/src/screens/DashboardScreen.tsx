@@ -6,6 +6,7 @@ import { styles } from '../theme/styles';
 import { useI18n } from '../i18n';
 import { TransactionRow } from '../components/TransactionRow';
 import { QuickAddWidget } from '../components/QuickAddWidget';
+import { categoryIcon } from '../../../shared/category-icons';
 
 interface Props {
   summary: SummaryResponse | null;
@@ -76,7 +77,7 @@ export function DashboardScreen({
             <View key={cat.category_id || 'none'} style={styles.categoryRow}>
               <View style={styles.categoryLabelRow}>
                 <Text style={styles.categoryName}>
-                  {cat.icon ? `${cat.icon} ` : ''}{cat.category_name || t('common.uncategorised')}
+                  {cat.icon ? `${categoryIcon(cat.icon)} ` : ''}{cat.category_name || t('common.uncategorised')}
                 </Text>
                 <Text style={styles.categoryTotal}>{formatMoney(cat.total)}</Text>
               </View>

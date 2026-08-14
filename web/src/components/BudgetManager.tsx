@@ -12,6 +12,7 @@ import {
   fetchBudgetSummary,
 } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
+import { categoryIcon } from '../../../shared/category-icons';
 import { EmptyState } from './EmptyState';
 import { useToast } from './Toast';
 import { useI18n } from '../i18n';
@@ -208,7 +209,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
               <div key={alert.id} style={styles.alertCard}>
                 <div style={styles.alertInfo}>
                   <span style={styles.alertCategory}>
-                    {alert.category_icon ? `${alert.category_icon} ` : ''}{alert.category_name}
+                    {alert.category_icon ? `${categoryIcon(alert.category_icon)} ` : ''}{alert.category_name}
                   </span>
                   <span style={{ ...styles.alertText, color: overLimit ? 'var(--color-danger)' : 'var(--color-warning-text)' }}>
                     {t('budgets.spentOf', { spent: formatMoney(alert.actual_spent), limit: formatMoney(alert.amount_limit), pct })}
@@ -284,7 +285,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                   <div style={styles.budgetHeader}>
                     <div style={styles.budgetCategory}>
                       <span style={{ ...styles.categoryIcon, backgroundColor: item.budget.color || 'var(--color-border)' }}>
-                        {item.budget.icon || '•'}
+                        {categoryIcon(item.budget.icon)}
                       </span>
                       <span style={styles.categoryName}>{item.budget.category_name}</span>
                       {pct >= 80 && (
@@ -359,7 +360,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                 <option value="">{t('budgets.form.selectCategory')}</option>
                 {expenseCategories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.icon ? `${c.icon} ` : ''}{c.name}
+                    {c.icon ? `${categoryIcon(c.icon)} ` : ''}{c.name}
                   </option>
                 ))}
               </select>

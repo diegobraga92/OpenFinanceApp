@@ -22,6 +22,7 @@ import {
 import { useToast } from './Toast';
 import { useI18n } from '../i18n';
 import { EmptyState } from './EmptyState';
+import { AccountDetail, type AccountLike } from './AccountDetail';
 
 interface Props {
   categories: Category[];
@@ -71,6 +72,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
   const [anticipatable, setAnticipatable] = useState<AnticipatableItem[]>([]);
   const [checkedInstallments, setCheckedInstallments] = useState<string[]>([]);
   const [discountPercent, setDiscountPercent] = useState('');
+  const [detail, setDetail] = useState<AccountLike | null>(null);
 
   const expenseCategories = categories.filter((c) => c.type === 'expense');
   const selected = cards.find((c) => c.id === selectedId) ?? null;
@@ -296,6 +298,20 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                   </button>
                   <button type="button" style={styles.secondaryButton} onClick={() => setShowPay(true)}>
                     {t('creditCards.payBill')}
+                  </button>
+                  <button
+                    type="button"
+                    style={styles.secondaryButton}
+                    onClick={() =>
+                      setDetail({
+                        id: selected.id,
+                        name: selected.name,
+                        type: 'liability',
+                        account_kind: 'card',
+                      })
+                    }
+                  >
+                    {t('accounts.detail.viewExpenses')}
                   </button>
                   <button type="button" style={styles.primaryButton} onClick={() => setShowPurchase(true)}>
                     {t('creditCards.purchase')}
@@ -551,6 +567,14 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
             </form>
           )}
         </Modal>
+      )}
+
+      {detail && (
+        <AccountDetail
+          account={detail}
+          categories={categories}
+          onClose={() => setDetail(null)}
+        />
       )}
     </div>
   );

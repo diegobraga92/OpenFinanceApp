@@ -12,6 +12,7 @@ import {
   YAxis,
   Legend,
 } from 'recharts';
+import { categoryIcon } from '../../../shared/category-icons';
 import {
   CategoryBreakdownResponse,
   fetchCategoryBreakdown,
@@ -348,7 +349,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                           {(breakdown?.categories ?? []).map((c) => (
                             <tr key={c.category_id || 'none'} style={styles.tr}>
                               <td style={styles.td}>
-                                {c.icon && <span style={styles.icon}>{c.icon} </span>}
+                                {c.icon && <span style={styles.icon}>{categoryIcon(c.icon)} </span>}
                                 {c.category_name || t('common.uncategorised')}
                               </td>
                               <td style={{ ...styles.td, ...styles.numCell }}>{c.transaction_count}</td>

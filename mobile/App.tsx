@@ -44,12 +44,11 @@ import { LedgerScreen } from './src/screens/LedgerScreen';
 import { BudgetsScreen } from './src/screens/BudgetsScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
-import { InstallmentsScreen } from './src/screens/InstallmentsScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 import { OfflineBanner } from './src/components/OfflineBanner';
 import { syncAll } from './src/offline/sync-engine';
 
-type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'installments' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
 
 type DrawerItem = {
   key: Screen;
@@ -67,7 +66,6 @@ const PRIMARY_ITEMS: DrawerItem[] = [
 
 const TOOLS_ITEMS: DrawerItem[] = [
   { key: 'ledger', icon: 'book-outline', labelKey: 'nav.ledger' },
-  { key: 'installments', icon: 'calendar-outline', labelKey: 'nav.installments' },
   { key: 'reconciliation', icon: 'sync-outline', labelKey: 'nav.reconciliation' },
   { key: 'categories', icon: 'pricetags-outline', labelKey: 'nav.categories' },
   { key: 'receipts', icon: 'receipt-outline', labelKey: 'nav.receipts' },
@@ -303,9 +301,6 @@ function AppContent() {
           )}
           {screen === 'budgets' && (
             <BudgetsScreen categories={categories} formatMoney={formatMoney} />
-          )}
-          {screen === 'installments' && (
-            <InstallmentsScreen categories={categories} formatMoney={formatMoney} />
           )}
           {screen === 'reports' && <ReportsScreen formatMoney={formatMoney} />}
           {screen === 'accounts' && (

@@ -16,6 +16,7 @@ import { findPreviousTransaction } from '../offline/autocomplete';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useI18n } from '../i18n';
+import { categoryIcon } from '../../../shared/category-icons';
 
 interface Props {
   categories: Category[];
@@ -81,7 +82,7 @@ export function AddTransactionForm({ categories, accounts, editing, onSaved, onC
       setAutoFilledHint(
         t('transactions.form.filledPrevious', {
           amount: `R$ ${prev.amount}`,
-          category: cat ? `${cat.icon ? `${cat.icon} ` : ''}${cat.name}` : t('transactions.form.noCategory'),
+          category: cat ? `${cat.icon ? `${categoryIcon(cat.icon)} ` : ''}${cat.name}` : t('transactions.form.noCategory'),
         }),
       );
     } else if (!prev) {
@@ -268,7 +269,7 @@ export function AddTransactionForm({ categories, accounts, editing, onSaved, onC
                 }}
               >
                 <Text style={[styles.categoryChipText, categoryId === c.id && styles.categoryChipTextActive]}>
-                  {c.icon ? `${c.icon} ` : ''}{c.name}
+                  {c.icon ? `${categoryIcon(c.icon)} ` : ''}{c.name}
                 </Text>
               </TouchableOpacity>
             ))}

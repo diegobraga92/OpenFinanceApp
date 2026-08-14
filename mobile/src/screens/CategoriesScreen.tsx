@@ -12,7 +12,8 @@ import {
 import { Category, createCategory, deleteCategory, updateCategory } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
-import { CATEGORY_COLORS, CATEGORY_ICONS } from '../theme/constants';
+import { CATEGORY_COLORS } from '../theme/constants';
+import { categoryIcon, CATEGORY_ICON_NAMES } from '../../../shared/category-icons';
 import { EmptyState } from '../components/EmptyState';
 import { useI18n } from '../i18n';
 
@@ -157,7 +158,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
         accessibilityLabel={`${c.name}. ${t('accounts.form.longPress')}`}
       >
         <View style={[styles.categoryIconCircle, { backgroundColor: c.color || colors.surfaceHover }]}>
-          <Text style={styles.categoryIconText}>{c.icon || '•'}</Text>
+          <Text style={styles.categoryIconText}>{categoryIcon(c.icon)}</Text>
         </View>
         <View style={styles.categoryRowInfo}>
           <Text style={styles.categoryListTitle}>{c.name}</Text>
@@ -283,13 +284,13 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
 
             <Text style={styles.label}>{t('categories.form.icon')}</Text>
             <View style={styles.iconGrid}>
-              {CATEGORY_ICONS.map((ic) => (
+              {CATEGORY_ICON_NAMES.map((ic) => (
                 <TouchableOpacity
                   key={ic}
                   style={[styles.iconButton, form.icon === ic && styles.iconButtonActive]}
                   onPress={() => setForm((f) => ({ ...f, icon: ic }))}
                 >
-                  <Text style={styles.iconButtonText}>{ic}</Text>
+                  <Text style={styles.iconButtonText}>{categoryIcon(ic)}</Text>
                 </TouchableOpacity>
               ))}
             </View>

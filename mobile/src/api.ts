@@ -69,9 +69,6 @@ export type InstallmentPlan = components['schemas']['InstallmentPlan'];
 export type InstallmentProgress = components['schemas']['InstallmentProgress'];
 export type InstallmentTransaction = components['schemas']['InstallmentTransaction'];
 export type InstallmentPlanDetail = components['schemas']['InstallmentPlanDetail'];
-export type CreateInstallmentPlanRequest = components['schemas']['CreateInstallmentPlanRequest'];
-export type GenerateInstallmentsResponse = components['schemas']['GenerateInstallmentsResponse'];
-export type PayInstallmentResponse = components['schemas']['PayInstallmentResponse'];
 export type SyncPullRequest = components['schemas']['SyncPullRequest'];
 export type SyncPullResponse = components['schemas']['SyncPullResponse'];
 export type SyncOperation = components['schemas']['SyncOperation'];
@@ -264,6 +261,7 @@ export async function fetchTransactions(params?: {
   type?: 'income' | 'expense';
   start_date?: string;
   end_date?: string;
+  account_id?: string;
 }): Promise<TransactionListResponse> {
   if (!(await isOnline())) {
     // Offline fallback: serve transactions from the local mirror.
@@ -294,6 +292,7 @@ export async function fetchTransactions(params?: {
   if (params?.type) qs.set('type', params.type);
   if (params?.start_date) qs.set('start_date', params.start_date);
   if (params?.end_date) qs.set('end_date', params.end_date);
+  if (params?.account_id) qs.set('account_id', params.account_id);
 
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<TransactionListResponse>(`/api/transactions${query}`);
@@ -498,12 +497,14 @@ export async function fetchMonthlyReport(
   startMonth?: number,
   endYear?: number,
   endMonth?: number,
+  accountId?: string,
 ): Promise<MonthlyReportResponse> {
   const qs = new URLSearchParams();
   if (startYear !== undefined) qs.set('start_year', String(startYear));
   if (startMonth !== undefined) qs.set('start_month', String(startMonth));
   if (endYear !== undefined) qs.set('end_year', String(endYear));
   if (endMonth !== undefined) qs.set('end_month', String(endMonth));
+  if (accountId) qs.set('account_id', accountId);
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return request<MonthlyReportResponse>(`/api/reports/monthly${query}`);
 }
@@ -771,27 +772,8 @@ export async function fetchInstallmentPlans(): Promise<InstallmentPlan[]> {
   return request<InstallmentPlan[]>('/api/installments');
 }
 
-export async function createInstallmentPlan(payload: CreateInstallmentPlanRequest): Promise<InstallmentPlan> {
-  return request<InstallmentPlan>('/api/installments', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
 export async function fetchInstallmentPlan(id: string): Promise<InstallmentPlanDetail> {
   return request<InstallmentPlanDetail>(`/api/installments/${id}`);
-}
-
-export async function deleteInstallmentPlan(id: string): Promise<void> {
-  return request<void>(`/api/installments/${id}`, { method: 'DELETE' });
-}
-
-export async function generateInstallments(id: string): Promise<GenerateInstallmentsResponse> {
-  return request<GenerateInstallmentsResponse>(`/api/installments/${id}/generate`, { method: 'POST' });
-}
-
-export async function payInstallment(id: string, number: number): Promise<PayInstallmentResponse> {
-  return request<PayInstallmentResponse>(`/api/installments/${id}/installment/${number}/pay`, { method: 'POST' });
 }
 
 // --- Sync ---

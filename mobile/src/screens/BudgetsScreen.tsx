@@ -14,6 +14,7 @@ import { BudgetAlertListResponse, BudgetSummaryItem, BudgetSummaryResponse, Cate
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useI18n } from '../i18n';
+import { categoryIcon } from '../../../shared/category-icons';
 import { EmptyState } from '../components/EmptyState';
 import { useSnackbar } from '../components/Snackbar';
 
@@ -198,7 +199,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
               <View key={alert.id} style={styles.alertCard}>
                 <View style={styles.alertInfo}>
                   <Text style={styles.alertCategory}>
-                    {alert.category_icon ? `${alert.category_icon} ` : ''}{alert.category_name}
+                    {alert.category_icon ? `${categoryIcon(alert.category_icon)} ` : ''}{alert.category_name}
                   </Text>
                   <Text style={[styles.alertText, { color: overLimit ? colors.danger : colors.warningText }]}>
                     {t('budgets.spentOf', { spent: formatMoney(alert.actual_spent), limit: formatMoney(alert.amount_limit), pct })}
@@ -265,7 +266,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
                 <View style={styles.budgetHeader}>
                   <View style={styles.budgetCategoryRow}>
                     <View style={[styles.categoryIconCircle, { backgroundColor: item.budget.color || colors.surfaceHover }]}>
-                      <Text style={styles.categoryIconText}>{item.budget.icon || '•'}</Text>
+                      <Text style={styles.categoryIconText}>{categoryIcon(item.budget.icon)}</Text>
                     </View>
                     <Text style={styles.budgetCategoryName}>{item.budget.category_name}</Text>
                     {pct >= 80 && (
@@ -342,7 +343,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
                       onPress={() => setBudgetCategoryId(c.id)}
                     >
                       <Text style={[styles.categoryChipText, budgetCategoryId === c.id && styles.categoryChipTextActive]}>
-                        {c.icon ? `${c.icon} ` : ''}{c.name}
+                        {c.icon ? `${categoryIcon(c.icon)} ` : ''}{c.name}
                       </Text>
                     </TouchableOpacity>
                   ))}

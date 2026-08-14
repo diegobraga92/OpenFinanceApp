@@ -3702,6 +3702,8 @@ export interface operations {
                 end_year?: number;
                 /** @description End month 1-12 */
                 end_month?: number;
+                /** @description Restrict to a single source account (payment method) UUID */
+                account_id?: string;
             };
             header?: never;
             path?: never;

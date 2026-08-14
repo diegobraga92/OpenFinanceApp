@@ -9,6 +9,7 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::json;
 use tracing::error;
+use uuid::Uuid;
 
 use crate::models::{
     CategoryBreakdownItem, CategoryBreakdownResponse, MonthlyReportItem, MonthlyReportResponse,
@@ -27,6 +28,8 @@ pub struct MonthlyParams {
     pub end_year: Option<i32>,
     /// End month (default: current month).
     pub end_month: Option<i32>,
+    /// Restrict to a single source account (payment method) UUID.
+    pub account_id: Option<Uuid>,
 }
 
 /// Query parameters for the category breakdown report.
@@ -101,6 +104,7 @@ fn add_months(d: NaiveDate, months: i32) -> NaiveDate {
         ("start_month" = Option<i32>, Query, description = "Start month 1-12"),
         ("end_year" = Option<i32>, Query, description = "End year (default: current)"),
         ("end_month" = Option<i32>, Query, description = "End month 1-12"),
+        ("account_id" = Option<Uuid>, Query, description = "Restrict to a single source account (payment method) UUID"),
     ),
     responses(
         (status = 200, description = "Monthly income/expense summary", body = MonthlyReportResponse),
@@ -162,11 +166,13 @@ pub async fn monthly_report(
                 COALESCE(SUM(amount) FILTER (WHERE type = 'expense'), 0)::numeric AS expense_total
          FROM transactions
          WHERE date >= $1 AND date < $2
+           AND ($3::uuid IS NULL OR account_id = $3)
          GROUP BY EXTRACT(YEAR FROM date)::int, EXTRACT(MONTH FROM date)::int
          ORDER BY year, month",
     )
     .bind(start)
     .bind(add_months(end, 1))
+    .bind(params.account_id)
     .fetch_all(&state.pg_pool)
     .await
     .map_err(|e| {

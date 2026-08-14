@@ -5,17 +5,12 @@ import { useToast } from './Toast';
 import { useI18n } from '../i18n';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
+import { categoryIcon, CATEGORY_ICON_NAMES } from '../../../shared/category-icons';
 
 interface Props {
   categories: Category[];
   onCategoriesChanged: () => Promise<Category[]>;
 }
-
-const ICONS = [
-  'briefcase', 'laptop', 'trending-up', 'gift', 'plus-circle',
-  'shopping-cart', 'home', 'car', 'zap', 'film', 'heart', 'book',
-  'shopping-bag', 'plane', 'repeat', 'shield', 'more-horizontal',
-];
 
 const COLORS = [
   '#22c55e', '#16a34a', '#15803d', '#a3e635', '#86efac',
@@ -168,7 +163,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
           }}
           aria-hidden="true"
         >
-          <span style={styles.swatchIcon}>{c.icon || '•'}</span>
+          <span style={styles.swatchIcon}>{categoryIcon(c.icon)}</span>
         </div>
         <div style={styles.cardInfo}>
           <p style={styles.cardName}>{c.name}</p>
@@ -356,7 +351,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
               <label style={styles.label}>
                 {t('categories.form.icon')}
                 <div style={styles.iconGrid}>
-                  {ICONS.map((ic) => (
+                  {CATEGORY_ICON_NAMES.map((ic) => (
                     <button
                       key={ic}
                       type="button"
@@ -364,7 +359,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
                       onClick={() => setForm((f) => ({ ...f, icon: ic }))}
                       aria-label={t('categories.form.iconAria', { icon: ic })}
                     >
-                      {ic}
+                      {categoryIcon(ic)}
                     </button>
                   ))}
                 </div>

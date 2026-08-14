@@ -27,6 +27,7 @@ import { styles } from '../theme/styles';
 import { EmptyState } from '../components/EmptyState';
 import { useSnackbar } from '../components/Snackbar';
 import { useI18n } from '../i18n';
+import { AccountDetailScreen, type AccountLike } from './AccountDetailScreen';
 
 interface Props {
   categories: Category[];
@@ -66,6 +67,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
   const [anticipatable, setAnticipatable] = useState<AnticipatableItem[]>([]);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [discountPercent, setDiscountPercent] = useState('');
+  const [detailAccount, setDetailAccount] = useState<AccountLike | null>(null);
 
   const expenseCategories = categories.filter((c) => c.type === 'expense');
   const selected = cards.find((c) => c.id === selectedId) ?? null;
@@ -289,6 +291,19 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
                 <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowPay(true)}>
                   <Text style={styles.secondaryButtonText}>{t('creditCards.payBill')}</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() =>
+                    setDetailAccount({
+                      id: selected.id,
+                      name: selected.name,
+                      type: 'liability',
+                      account_kind: 'card',
+                    })
+                  }
+                >
+                  <Text style={styles.secondaryButtonText}>{t('accounts.detail.viewExpenses')}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.primaryButton} onPress={() => setShowPurchase(true)}>
                   <Text style={styles.primaryButtonText}>{t('creditCards.purchase')}</Text>
                 </TouchableOpacity>
@@ -501,6 +516,14 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
           </View>
         </View>
       </Modal>
+
+      {detailAccount && (
+        <AccountDetailScreen
+          account={detailAccount}
+          categories={categories}
+          onClose={() => setDetailAccount(null)}
+        />
+      )}
     </ScrollView>
   );
 }

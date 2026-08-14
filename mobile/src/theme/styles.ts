@@ -1019,6 +1019,41 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  accountSummaryBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  accountSummaryItem: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+  },
+  accountSummaryLabel: {
+    color: colors.textDim,
+    fontSize: 11,
+  },
+  accountSummaryValue: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  accountSummaryDebt: {
+    color: colors.dangerText,
+  },
+  accountSummaryIncome: {
+    color: colors.income,
+  },
+  accountSummaryExpense: {
+    color: colors.expense,
+  },
   accountTypeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1910,5 +1945,86 @@ export const styles = StyleSheet.create({
     color: colors.primaryText,
     fontSize: 12,
     fontWeight: '700',
+  },
+  // --- Account detail (per-account monthly summary + transactions) ---
+  accountDetailScroll: {
+    marginTop: 8,
+  },
+  accountDetailMonthHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceHover,
+  },
+  accountDetailMonthHeadMonth: {
+    flex: 1.2,
+    color: colors.textDim,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  accountDetailMonthHeadCell: {
+    flex: 1,
+    color: colors.textDim,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  accountDetailMonthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface,
+  },
+  accountDetailMonth: {
+    flex: 1.2,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  accountDetailMonthCell: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  accountDetailNet: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  accountDetailSection: {
+    marginTop: 16,
+  },
+  accountDetailTxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  accountDetailTxDate: {
+    color: colors.textDim,
+    fontSize: 12,
+    width: 78,
+  },
+  accountDetailTxInfo: {
+    flex: 1,
+  },
+  accountDetailTxDesc: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  accountDetailTxMeta: {
+    color: colors.textDim,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  accountDetailActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
   },
 });

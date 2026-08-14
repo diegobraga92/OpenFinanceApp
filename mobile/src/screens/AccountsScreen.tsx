@@ -14,6 +14,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { EmptyState } from '../components/EmptyState';
 import { CreditCardsScreen } from './CreditCardsScreen';
+import { AccountDetailScreen } from './AccountDetailScreen';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../../../shared/i18n';
 
@@ -33,7 +34,6 @@ const ACCOUNT_GROUPS: {
 }[] = [
   { kinds: ['bank', 'cash', 'investment'], labelKey: 'accounts.kindGroup.assets', blurbKey: 'accounts.kindGroup.assetsBlurb', icon: '💰' },
   { kinds: ['card', 'loan'], labelKey: 'accounts.kindGroup.liabilities', blurbKey: 'accounts.kindGroup.liabilitiesBlurb', icon: '💳' },
-  { kinds: ['income', 'expense', 'equity', 'other'], labelKey: 'accounts.kindGroup.system', blurbKey: 'accounts.kindGroup.systemBlurb', icon: '📊' },
 ];
 
 const KIND_OPTIONS: { key: AccountKind; labelKey: TranslationKey; icon: string }[] = [
@@ -73,6 +73,7 @@ export function AccountsScreen({ accounts, categories, onChanged }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [detailAccount, setDetailAccount] = useState<AccountWithBalance | null>(null);
 
   const openCreate = (kind: AccountKind) => {
     setEditingId(null);
@@ -178,13 +179,38 @@ export function AccountsScreen({ accounts, categories, onChanged }: Props) {
     );
   }, [query, accounts]);
 
+  // Lifetime roll-ups for the summary bar. Income accounts carry a negative
+  // ledger balance (credited on income), so use |balance|; expenses are debited.
+  const summary = useMemo(() => {
+    const totalAssets = accounts
+      .filter((a) => a.type === 'asset')
+      .reduce((sum, a) => sum + parseFloat(a.balance), 0);
+    const totalDebt = accounts
+      .filter((a) => a.type === 'liability')
+      .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0);
+    const totalIncome = accounts
+      .filter((a) => a.type === 'income')
+      .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0);
+    const totalExpenses = accounts
+      .filter((a) => a.type === 'expense')
+      .reduce((sum, a) => sum + parseFloat(a.balance), 0);
+    return {
+      totalAssets,
+      totalDebt,
+      totalIncome,
+      totalExpenses,
+      netIncome: totalIncome - totalExpenses,
+    };
+  }, [accounts]);
+
   const renderAccountRow = (a: AccountWithBalance) => {
     const isDebt = a.type === 'liability';
     return (
       <TouchableOpacity
         key={a.id}
         style={styles.accountRow}
-        onPress={() => showActions(a)}
+        onPress={() => setDetailAccount(a)}
+        onLongPress={() => showActions(a)}
         delayLongPress={400}
         accessibilityRole="button"
         accessibilityLabel={`${a.name}. ${t('accounts.form.longPress')}`}
@@ -234,32 +260,69 @@ export function AccountsScreen({ accounts, categories, onChanged }: Props) {
           onAction={() => openCreate('bank')}
         />
       ) : (
-        ACCOUNT_GROUPS.map((group) => {
-          // Credit cards (kind 'card') are managed in the embedded Credit Cards
-          // section; only non-card liabilities (loans) appear in this list.
-          const items = visible.filter(
-            (a) => group.kinds.includes(a.account_kind as AccountKind) && a.account_kind !== 'card',
-          );
-          return (
-            <View key={group.kinds.join('-')} style={styles.accountGroup}>
-              <View style={styles.accountGroupHeader}>
-                <Text style={styles.accountGroupIcon}>{group.icon}</Text>
-                <View style={styles.accountGroupHeaderText}>
-                  <Text style={styles.accountGroupTitle}>{t(group.labelKey)}</Text>
-                  <Text style={styles.accountGroupBlurb}>{t(group.blurbKey)}</Text>
-                </View>
-                <Text style={styles.accountGroupBadge}>{items.length}</Text>
-              </View>
-              {items.length > 0 ? (
-                <View style={styles.accountList}>
-                  {items.map(renderAccountRow)}
-                </View>
-              ) : (
-                <Text style={styles.accountGroupEmpty}>{t('accounts.form.noGroup', { label: t(group.labelKey).toLowerCase() })}</Text>
-              )}
+        <>
+          <View style={styles.accountSummaryBar}>
+            <View style={styles.accountSummaryItem}>
+              <Text style={styles.accountSummaryLabel}>{t('accounts.totalAssets')}</Text>
+              <Text style={styles.accountSummaryValue}>{formatMoney(summary.totalAssets)}</Text>
             </View>
-          );
-        })
+            <View style={styles.accountSummaryItem}>
+              <Text style={styles.accountSummaryLabel}>{t('accounts.totalDebt')}</Text>
+              <Text style={[styles.accountSummaryValue, styles.accountSummaryDebt]}>
+                {formatMoney(summary.totalDebt)}
+              </Text>
+            </View>
+            <View style={styles.accountSummaryItem}>
+              <Text style={styles.accountSummaryLabel}>{t('accounts.totalIncome')}</Text>
+              <Text style={[styles.accountSummaryValue, styles.accountSummaryIncome]}>
+                {formatMoney(summary.totalIncome)}
+              </Text>
+            </View>
+            <View style={styles.accountSummaryItem}>
+              <Text style={styles.accountSummaryLabel}>{t('accounts.totalExpenses')}</Text>
+              <Text style={[styles.accountSummaryValue, styles.accountSummaryExpense]}>
+                {formatMoney(summary.totalExpenses)}
+              </Text>
+            </View>
+            <View style={styles.accountSummaryItem}>
+              <Text style={styles.accountSummaryLabel}>{t('accounts.netIncome')}</Text>
+              <Text
+                style={[
+                  styles.accountSummaryValue,
+                  summary.netIncome >= 0 ? styles.accountSummaryIncome : styles.accountSummaryExpense,
+                ]}
+              >
+                {formatMoney(summary.netIncome)}
+              </Text>
+            </View>
+          </View>
+          {ACCOUNT_GROUPS.map((group) => {
+            // Credit cards (kind 'card') are managed in the embedded Credit Cards
+            // section; only non-card liabilities (loans) appear in this list.
+            const items = visible.filter(
+              (a) => group.kinds.includes(a.account_kind as AccountKind) && a.account_kind !== 'card',
+            );
+            return (
+              <View key={group.kinds.join('-')} style={styles.accountGroup}>
+                <View style={styles.accountGroupHeader}>
+                  <Text style={styles.accountGroupIcon}>{group.icon}</Text>
+                  <View style={styles.accountGroupHeaderText}>
+                    <Text style={styles.accountGroupTitle}>{t(group.labelKey)}</Text>
+                    <Text style={styles.accountGroupBlurb}>{t(group.blurbKey)}</Text>
+                  </View>
+                  <Text style={styles.accountGroupBadge}>{items.length}</Text>
+                </View>
+                {items.length > 0 ? (
+                  <View style={styles.accountList}>
+                    {items.map(renderAccountRow)}
+                  </View>
+                ) : (
+                  <Text style={styles.accountGroupEmpty}>{t('accounts.form.noGroup', { label: t(group.labelKey).toLowerCase() })}</Text>
+                )}
+              </View>
+            );
+          })}
+        </>
       )}
 
       <CreditCardsScreen categories={categories} formatMoney={formatMoney} />
@@ -378,6 +441,24 @@ export function AccountsScreen({ accounts, categories, onChanged }: Props) {
           </View>
         </View>
       </Modal>
+
+      {detailAccount && (
+        <AccountDetailScreen
+          account={detailAccount}
+          categories={categories}
+          onClose={() => setDetailAccount(null)}
+          onEdit={() => {
+            const a = detailAccount;
+            setDetailAccount(null);
+            openEdit(a);
+          }}
+          onDelete={() => {
+            const a = detailAccount;
+            setDetailAccount(null);
+            confirmDelete(a);
+          }}
+        />
+      )}
     </ScrollView>
   );
 }

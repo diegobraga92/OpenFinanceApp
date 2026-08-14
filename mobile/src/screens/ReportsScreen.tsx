@@ -18,6 +18,7 @@ import { useI18n } from '../i18n';
 import { DonutChart } from '../components/DonutChart';
 import { TrendChart } from '../components/TrendChart';
 import { useSnackbar } from '../components/Snackbar';
+import { categoryIcon } from '../../../shared/category-icons';
 
 interface Props {
   formatMoney: (value: string | number) => string;
@@ -157,7 +158,7 @@ export function ReportsScreen({ formatMoney }: Props) {
             <View key={c.category_id || 'none'} style={styles.categoryRow}>
               <View style={styles.categoryLabelRow}>
                 <Text style={styles.categoryName}>
-                  {c.icon ? `${c.icon} ` : ''}{c.category_name || t('common.uncategorised')}
+                  {c.icon ? `${categoryIcon(c.icon)} ` : ''}{c.category_name || t('common.uncategorised')}
                 </Text>
                 <Text style={styles.categoryTotal}>
                   {formatMoney(c.total)} ({Math.round(parseFloat(c.percentage))}%)

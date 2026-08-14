@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import type { AccountWithBalance, Category, Transaction } from '../api';
 import { createTransaction, updateTransaction } from '../api';
 import { useI18n } from '../i18n';
+import { categoryIcon } from '../../../shared/category-icons';
 
 interface Props {
   categories: Category[];
@@ -164,7 +165,7 @@ export function TransactionForm({ categories, accounts, editing, onCancel, onSav
             <option value="">— {t('common.none')} —</option>
             {filteredCategories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.icon ? `${c.icon} ` : ''}{c.name}
+                {c.icon ? `${categoryIcon(c.icon)} ` : ''}{c.name}
               </option>
             ))}
           </select>

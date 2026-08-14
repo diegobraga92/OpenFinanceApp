@@ -10,6 +10,7 @@ import {
 import { Category } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
+import { categoryIcon } from '../../../shared/category-icons';
 import {
   useI18n } from '../i18n';
 import {
@@ -223,7 +224,7 @@ export function NotificationSettingsScreen({ categories }: Props) {
                     settings.defaultCategoryId === c.id && styles.typeButtonTextActive,
                   ]}
                 >
-                  {c.icon} {c.name}
+                  {categoryIcon(c.icon)} {c.name}
                 </Text>
               </TouchableOpacity>
             ))}
