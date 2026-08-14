@@ -82,6 +82,9 @@ pub struct Transaction {
     pub notes: Option<String>,
     /// Installment plan this transaction belongs to (NULL for regular transactions).
     pub installment_plan_id: Option<Uuid>,
+    /// Source account (payment method, e.g. a credit card) used for this
+    /// transaction (NULL when unlinked).
+    pub account_id: Option<Uuid>,
     /// Row creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Last row update timestamp.
@@ -108,6 +111,8 @@ pub struct CreateTransactionRequest {
     pub notes: Option<String>,
     /// Installment plan this transaction belongs to (optional).
     pub installment_plan_id: Option<Uuid>,
+    /// Source account (payment method) for this transaction (optional).
+    pub account_id: Option<Uuid>,
 }
 
 /// Payload for updating an existing transaction.
@@ -130,6 +135,8 @@ pub struct UpdateTransactionRequest {
     pub notes: Option<String>,
     /// Installment plan this transaction belongs to (optional).
     pub installment_plan_id: Option<Uuid>,
+    /// Source account (payment method) for this transaction (optional).
+    pub account_id: Option<Uuid>,
 }
 
 /// Query parameters for listing transactions.
@@ -153,6 +160,8 @@ pub struct TransactionListParams {
     /// Filter by end date (inclusive, ISO `YYYY-MM-DD`).
     #[schema(value_type = String, format = Date)]
     pub end_date: Option<NaiveDate>,
+    /// Filter by source account UUID.
+    pub account_id: Option<Uuid>,
 }
 
 fn default_page_size() -> u32 {
@@ -409,6 +418,8 @@ pub struct InstallmentPlan {
     pub category_color: Option<String>,
     /// First installment due date.
     pub start_date: NaiveDate,
+    /// Source account (payment method, e.g. a credit card) for this plan (optional).
+    pub account_id: Option<Uuid>,
     /// Plan creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Computed progress (paid/pending/total).
@@ -431,6 +442,8 @@ pub struct CreateInstallmentPlanRequest {
     /// First installment due date.
     #[schema(value_type = String, format = Date)]
     pub start_date: NaiveDate,
+    /// Source account (payment method, e.g. a credit card) for this plan (optional).
+    pub account_id: Option<Uuid>,
 }
 
 /// A single installment row within a plan.
@@ -448,6 +461,10 @@ pub struct InstallmentTransaction {
     pub transaction_id: Option<Uuid>,
     /// `pending`, `generated`, or `paid`.
     pub status: String,
+    /// When this installment was anticipated (paid early), NULL otherwise.
+    pub anticipated_at: Option<DateTime<Utc>>,
+    /// Bill that absorbed the anticipated installment, NULL otherwise.
+    pub anticipated_bill_id: Option<Uuid>,
 }
 
 /// Detail view of a plan including all its installment rows.
@@ -475,6 +492,138 @@ pub struct PayInstallmentResponse {
     pub transaction: Transaction,
     /// Whether a new transaction was created or an existing one reused.
     pub created: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Layer 4: Credit cards (billing cycles + installment anticipation)
+// ---------------------------------------------------------------------------
+
+/// A single billing cycle ("fatura") for a credit card.
+#[derive(Debug, Clone, Serialize, FromRow, ToSchema)]
+pub struct CardBill {
+    /// Unique bill identifier.
+    pub id: Uuid,
+    /// Card account this bill belongs to.
+    pub card_id: Uuid,
+    /// First day of the billing cycle.
+    #[schema(value_type = String, format = Date)]
+    pub period_start: NaiveDate,
+    /// Closing date of the billing cycle (fatura fecha).
+    #[schema(value_type = String, format = Date)]
+    pub period_end: NaiveDate,
+    /// Payment deadline (vencimento).
+    #[schema(value_type = String, format = Date)]
+    pub due_date: NaiveDate,
+    /// `open` or `paid`.
+    pub status: String,
+    /// Total amount paid toward this bill.
+    #[schema(value_type = String)]
+    pub paid_amount: Decimal,
+    /// When the bill was fully paid (NULL while open).
+    pub paid_at: Option<DateTime<Utc>>,
+    /// Total charges in the cycle, computed from card transactions in the period.
+    #[schema(value_type = String)]
+    pub total_amount: Decimal,
+    /// Remaining amount = total − paid.
+    #[schema(value_type = String)]
+    pub remaining_amount: Decimal,
+}
+
+/// Summary of a credit-card account with its current open bill.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CardOverview {
+    /// Card account id (an `accounts` row of type `liability`).
+    pub id: Uuid,
+    /// Card display name (e.g., "Nubank Credit Card").
+    pub name: String,
+    /// Closing day of the monthly billing cycle (1-31).
+    pub closing_day: Option<i16>,
+    /// Payment due day of the monthly billing cycle (1-31).
+    pub due_day: Option<i16>,
+    /// Credit limit.
+    #[schema(value_type = Option<String>)]
+    pub credit_limit: Option<Decimal>,
+    /// Outstanding balance (signed; negative for liabilities).
+    #[schema(value_type = String)]
+    pub balance: Decimal,
+    /// The current open bill, if any.
+    pub current_bill: Option<CardBill>,
+}
+
+/// Payload for recording a purchase on a credit card.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateCardPurchaseRequest {
+    /// Human-readable description (e.g., "Lunch at Restaurante X").
+    pub description: String,
+    /// Monetary amount — must be > 0.
+    #[schema(value_type = String, example = "150.00")]
+    pub amount: Decimal,
+    /// Expense category (defaults to Miscellaneous when omitted).
+    pub category_id: Option<Uuid>,
+    /// Purchase date (defaults to today, ISO `YYYY-MM-DD`).
+    #[schema(value_type = Option<String>, format = Date)]
+    pub date: Option<NaiveDate>,
+    /// Optional free-form notes.
+    pub notes: Option<String>,
+    /// Installment plan this purchase belongs to (optional).
+    pub installment_plan_id: Option<Uuid>,
+}
+
+/// Payload for paying a credit-card bill.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct PayCardBillRequest {
+    /// Amount to pay — must be > 0. Defaults to the full remaining amount.
+    #[schema(value_type = Option<String>, example = "250.00")]
+    pub amount: Option<Decimal>,
+    /// Asset account the payment comes from (defaults to "Cash").
+    pub from_account_id: Option<Uuid>,
+    /// Bill to pay (defaults to the oldest open bill).
+    pub bill_id: Option<Uuid>,
+}
+
+/// Response from paying a credit-card bill.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PayCardBillResponse {
+    /// The bill after the payment.
+    pub bill: CardBill,
+    /// Amount applied in this payment.
+    #[schema(value_type = String)]
+    pub amount_paid: Decimal,
+    /// Remaining amount on the bill after this payment.
+    #[schema(value_type = String)]
+    pub remaining: Decimal,
+}
+
+/// Payload for anticipating (paying early) future installments on a card.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AnticipateInstallmentsRequest {
+    /// Installment rows to anticipate (must belong to plans linked to the card).
+    pub installment_ids: Vec<Uuid>,
+    /// Discount as a percentage of the gross amount (0-100). Mutually exclusive
+    /// with `discount_amount`.
+    #[schema(value_type = Option<String>)]
+    pub discount_percent: Option<Decimal>,
+    /// Fixed discount amount. Mutually exclusive with `discount_percent`.
+    #[schema(value_type = Option<String>)]
+    pub discount_amount: Option<Decimal>,
+}
+
+/// Response from anticipating installments.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AnticipateInstallmentsResponse {
+    /// The bill that absorbed the anticipated installments.
+    pub bill_id: Uuid,
+    /// Sum of the anticipated installments before discount.
+    #[schema(value_type = String)]
+    pub gross_amount: Decimal,
+    /// Total discount applied.
+    #[schema(value_type = String)]
+    pub discount_amount: Decimal,
+    /// Amount actually charged on the card (gross − discount).
+    #[schema(value_type = String)]
+    pub net_amount: Decimal,
+    /// Number of installments anticipated.
+    pub installments_anticipated: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -580,6 +729,13 @@ pub struct Account {
     pub r#type: String,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
+    /// Closing day of the monthly billing cycle (credit cards only, 1-31).
+    pub closing_day: Option<i16>,
+    /// Payment due day of the monthly billing cycle (credit cards only, 1-31).
+    pub due_day: Option<i16>,
+    /// Credit limit (credit cards only).
+    #[schema(value_type = Option<String>)]
+    pub credit_limit: Option<Decimal>,
     /// Row creation timestamp.
     pub created_at: DateTime<Utc>,
 }
@@ -594,6 +750,13 @@ pub struct CreateAccountRequest {
     pub r#type: String,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
+    /// Closing day of the monthly billing cycle (credit cards only, 1-31).
+    pub closing_day: Option<i16>,
+    /// Payment due day of the monthly billing cycle (credit cards only, 1-31).
+    pub due_day: Option<i16>,
+    /// Credit limit (credit cards only).
+    #[schema(value_type = Option<String>)]
+    pub credit_limit: Option<Decimal>,
 }
 
 /// Payload for updating an existing account.
@@ -606,6 +769,13 @@ pub struct UpdateAccountRequest {
     pub r#type: String,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
+    /// Closing day of the monthly billing cycle (credit cards only, 1-31).
+    pub closing_day: Option<i16>,
+    /// Payment due day of the monthly billing cycle (credit cards only, 1-31).
+    pub due_day: Option<i16>,
+    /// Credit limit (credit cards only).
+    #[schema(value_type = Option<String>)]
+    pub credit_limit: Option<Decimal>,
 }
 
 /// Account joined with its current computed balance from ledger entries.
@@ -619,6 +789,13 @@ pub struct AccountWithBalance {
     pub r#type: String,
     /// Optional parent account.
     pub parent_id: Option<Uuid>,
+    /// Closing day of the monthly billing cycle (credit cards only, 1-31).
+    pub closing_day: Option<i16>,
+    /// Payment due day of the monthly billing cycle (credit cards only, 1-31).
+    pub due_day: Option<i16>,
+    /// Credit limit (credit cards only).
+    #[schema(value_type = Option<String>)]
+    pub credit_limit: Option<Decimal>,
     /// Row creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Balance = SUM(debit_amount) − SUM(credit_amount) across ledger entries.

@@ -7,6 +7,7 @@ pub mod audit;
 pub mod auth;
 pub mod budgets;
 pub mod categories;
+pub mod credit_cards;
 pub mod installments;
 pub mod ledger;
 pub mod receipts;
@@ -23,6 +24,7 @@ use crate::state::AppState;
 pub fn api_router() -> Router<AppState> {
     Router::new()
         .merge(categories::router())
+        .merge(credit_cards::router())
         .merge(transactions::router())
         .merge(summary::router())
         .merge(budgets::router())

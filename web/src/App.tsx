@@ -26,16 +26,18 @@ import { ReceiptScanner } from './components/ReceiptScanner';
 import { ReconciliationUpload } from './components/ReconciliationUpload';
 import { ReportsDashboard } from './components/ReportsDashboard';
 import { InstallmentManager } from './components/InstallmentManager';
+import { CreditCardManager } from './components/CreditCardManager';
 import { EmptyState } from './components/EmptyState';
 import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
 
-type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit' | 'installments';
+type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit' | 'installments' | 'credit-cards';
 
 const TABS: Tab[] = [
   'dashboard',
   'transactions',
   'accounts',
+  'credit-cards',
   'ledger',
   'budgets',
   'installments',
@@ -55,6 +57,7 @@ const NAV_ITEMS: [Tab, string][] = [
   ['dashboard', 'Dashboard'],
   ['transactions', 'Transactions'],
   ['accounts', 'Accounts'],
+  ['credit-cards', 'Credit Cards'],
   ['ledger', 'Ledger'],
   ['budgets', 'Budgets'],
   ['installments', 'Installments'],
@@ -81,6 +84,14 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false);
   const { toggle: toggleTheme, mode: themeMode } = useTheme();
   const { push: pushToast } = useToast();
+
+  // Allow child views (e.g. CreditCardManager) to request navigating to the
+  // Accounts tab.
+  useEffect(() => {
+    const goAccounts = () => setTab('accounts');
+    window.addEventListener('pudim:go-accounts', goAccounts);
+    return () => window.removeEventListener('pudim:go-accounts', goAccounts);
+  }, []);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -557,6 +568,8 @@ export default function App() {
           <BudgetManager categories={categories} formatMoney={formatMoney} />
         ) : tab === 'installments' ? (
           <InstallmentManager categories={categories} formatMoney={formatMoney} />
+        ) : tab === 'credit-cards' ? (
+          <CreditCardManager categories={categories} formatMoney={formatMoney} />
         ) : tab === 'reports' ? (
           <ReportsDashboard formatMoney={formatMoney} />
         ) : tab === 'reconciliation' ? (

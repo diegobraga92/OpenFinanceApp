@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { createTransaction } from '../api';
+import { Category, createTransaction, fetchCategories } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useSnackbar } from '../components/Snackbar';
@@ -45,15 +45,22 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
   const [pending, setPending] = useState<ParsedTransaction | null>(null);
   const [saving, setSaving] = useState(false);
   const [description, setDescription] = useState('');
+  /** Auto-completed category from the notification; user can change it. */
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const settingsRef = useRef<NotificationSettings | null>(null);
 
   const persistTransaction = useCallback(
-    async (parsed: ParsedTransaction, overrideDescription?: string) => {
+    async (
+      parsed: ParsedTransaction,
+      overrideDescription?: string,
+      overrideCategoryId?: string | null,
+    ) => {
       await createTransaction({
         description: overrideDescription ?? parsed.description,
         amount: parsed.amount,
         type: parsed.type,
-        category_id: parsed.categoryId,
+        category_id: overrideCategoryId ?? parsed.categoryId,
         date: parsed.date,
         notes: 'Captured from push notification',
       });
@@ -79,7 +86,12 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
           });
       } else {
         setDescription(parsed.description);
+        setPendingCategoryId(parsed.categoryId);
         setPending(parsed);
+        // Categories drive the category picker in the confirmation modal.
+        void fetchCategories()
+          .then(setCategories)
+          .catch(() => {});
       }
     },
     [persistTransaction, showSnackbar],
@@ -101,7 +113,7 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
     if (!pending) return;
     setSaving(true);
     try {
-      await persistTransaction(pending, description.trim() || undefined);
+      await persistTransaction(pending, description.trim() || undefined, pendingCategoryId);
       showSnackbar(`✅ Transaction R$ ${pending.amount} created`);
       setPending(null);
     } catch (err) {
@@ -137,6 +149,44 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
               placeholderTextColor={colors.textDim}
               autoFocus
             />
+
+            <Text style={styles.label}>Category</Text>
+            <View style={styles.categoryGrid}>
+              <TouchableOpacity
+                style={[styles.categoryChip, pendingCategoryId === null && styles.categoryChipActive]}
+                onPress={() => setPendingCategoryId(null)}
+              >
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    pendingCategoryId === null && styles.categoryChipTextActive,
+                  ]}
+                >
+                  None
+                </Text>
+              </TouchableOpacity>
+              {categories
+                .filter((c) => c.type === pending?.type)
+                .map((c) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[
+                      styles.categoryChip,
+                      pendingCategoryId === c.id && styles.categoryChipActive,
+                    ]}
+                    onPress={() => setPendingCategoryId(c.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        pendingCategoryId === c.id && styles.categoryChipTextActive,
+                      ]}
+                    >
+                      {c.icon ? `${c.icon} ` : ''}{c.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity

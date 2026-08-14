@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Category, Transaction, createTransaction, updateTransaction } from '../api';
+import { findPreviousTransaction } from '../offline/autocomplete';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 
@@ -47,8 +48,39 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
   const [date, setDate] = useState(editing?.date ?? new Date().toISOString().slice(0, 10));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Hint text shown when description auto-completes amount/category from history. */
+  const [autoFilledHint, setAutoFilledHint] = useState<string | null>(null);
+  /** Latches off once the user manually edits amount/type/category. */
+  const autoFillDisabled = useRef(false);
 
   const categoriesForType = categories.filter((c) => c.type === type);
+
+  /**
+   * Auto-complete from a previously-added transaction: when the typed
+   * description matches history and the amount/category are still untouched,
+   * fill amount + type + category together (they form a consistent tuple).
+   */
+  const handleDescriptionChange = (text: string) => {
+    setDescription(text);
+    if (editing || autoFillDisabled.current) return;
+
+    const prev = findPreviousTransaction(text);
+    if (prev && amount === '' && categoryId === '') {
+      const cat = categories.find((c) => c.id === prev.category_id);
+      setAmount(prev.amount);
+      setType(prev.type);
+      setCategoryId(prev.category_id ?? '');
+      setAutoFilledHint(
+        `↩ Filled from previous: R$ ${prev.amount} · ${
+          cat ? `${cat.icon ? `${cat.icon} ` : ''}${cat.name}` : 'No category'
+        }`,
+      );
+    } else if (!prev) {
+      // No longer matches history — drop the hint (auto-filled values stay
+      // unless the user edits them manually).
+      setAutoFilledHint(null);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!description.trim()) {
@@ -92,16 +124,21 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
         <TextInput
           style={styles.input}
           value={description}
-          onChangeText={setDescription}
+          onChangeText={handleDescriptionChange}
           placeholder="e.g. Lunch at Restaurante X"
           placeholderTextColor={colors.textDim}
         />
+        {autoFilledHint && <Text style={styles.autoFillHint}>{autoFilledHint}</Text>}
 
         <Text style={styles.label}>Amount (R$)</Text>
         <TextInput
           style={styles.input}
           value={amount}
-          onChangeText={setAmount}
+          onChangeText={(v) => {
+            setAmount(v);
+            autoFillDisabled.current = true;
+            setAutoFilledHint(null);
+          }}
           placeholder="0.00"
           placeholderTextColor={colors.textDim}
           keyboardType="decimal-pad"
@@ -166,6 +203,8 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             style={[styles.typeButton, type === 'expense' && styles.typeButtonActive]}
             onPress={() => {
               setType('expense');
+              autoFillDisabled.current = true;
+              setAutoFilledHint(null);
               const cat = categories.find((c) => c.id === categoryId);
               if (cat && cat.type !== 'expense') setCategoryId('');
             }}
@@ -178,6 +217,8 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             style={[styles.typeButton, type === 'income' && styles.typeButtonActive]}
             onPress={() => {
               setType('income');
+              autoFillDisabled.current = true;
+              setAutoFilledHint(null);
               const cat = categories.find((c) => c.id === categoryId);
               if (cat && cat.type !== 'income') setCategoryId('');
             }}
@@ -195,7 +236,11 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
           <View style={styles.categoryGrid}>
             <TouchableOpacity
               style={[styles.categoryChip, !categoryId && styles.categoryChipActive]}
-              onPress={() => setCategoryId('')}
+              onPress={() => {
+                setCategoryId('');
+                autoFillDisabled.current = true;
+                setAutoFilledHint(null);
+              }}
             >
               <Text style={[styles.categoryChipText, !categoryId && styles.categoryChipTextActive]}>
                 None
@@ -205,7 +250,11 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
               <TouchableOpacity
                 key={c.id}
                 style={[styles.categoryChip, categoryId === c.id && styles.categoryChipActive]}
-                onPress={() => setCategoryId(c.id)}
+                onPress={() => {
+                  setCategoryId(c.id);
+                  autoFillDisabled.current = true;
+                  setAutoFilledHint(null);
+                }}
               >
                 <Text style={[styles.categoryChipText, categoryId === c.id && styles.categoryChipTextActive]}>
                   {c.icon ? `${c.icon} ` : ''}{c.name}

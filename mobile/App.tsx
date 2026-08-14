@@ -42,11 +42,12 @@ import { BudgetsScreen } from './src/screens/BudgetsScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 import { InstallmentsScreen } from './src/screens/InstallmentsScreen';
+import { CreditCardsScreen } from './src/screens/CreditCardsScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 import { OfflineBanner } from './src/components/OfflineBanner';
 import { syncAll } from './src/offline/sync-engine';
 
-type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'installments' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'credit-cards' | 'ledger' | 'budgets' | 'installments' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
 
 const DRAWER_ITEMS: {
   key: Screen;
@@ -56,6 +57,7 @@ const DRAWER_ITEMS: {
   { key: 'dashboard', icon: 'stats-chart-outline', label: 'Dashboard' },
   { key: 'transactions', icon: 'swap-horizontal-outline', label: 'Transactions' },
   { key: 'accounts', icon: 'wallet-outline', label: 'Accounts' },
+  { key: 'credit-cards', icon: 'card-outline', label: 'Credit Cards' },
   { key: 'ledger', icon: 'book-outline', label: 'Ledger' },
   { key: 'budgets', icon: 'pie-chart-outline', label: 'Budgets' },
   { key: 'installments', icon: 'calendar-outline', label: 'Installments' },
@@ -265,6 +267,7 @@ function AppContent() {
                 resetForm();
                 setShowAddForm(true);
               }}
+              onQuickSaved={loadData}
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
@@ -288,6 +291,9 @@ function AppContent() {
           )}
           {screen === 'installments' && (
             <InstallmentsScreen categories={categories} formatMoney={formatMoney} />
+          )}
+          {screen === 'credit-cards' && (
+            <CreditCardsScreen categories={categories} formatMoney={formatMoney} />
           )}
           {screen === 'reports' && <ReportsScreen formatMoney={formatMoney} />}
           {screen === 'accounts' && (

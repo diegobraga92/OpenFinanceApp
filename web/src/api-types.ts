@@ -291,6 +291,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/credit-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists credit-card accounts with balances and their current open bill. */
+        get: operations["list_credit_cards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/credit-cards/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a single credit card with its card fields and balance. */
+        get: operations["get_credit_card"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/credit-cards/{id}/anticipate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Anticipates (pays early) future installments on a credit card.
+         * @description Selected future installments are charged on the current bill (optionally
+         *     with a discount, as offered by many providers). Their expense transactions
+         *     are re-dated/re-priced into the current billing period, so they count in
+         *     this month's expenses and disappear from future months/bills.
+         */
+        post: operations["anticipate_installments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/credit-cards/{id}/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists all billing cycles for a credit card with computed totals. */
+        get: operations["list_card_bills"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/credit-cards/{id}/bills/{bill_id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pays a credit-card bill.
+         * @description Records the payment as a transfer (debit the card, credit the paying
+         *     account) — never as an expense — and updates the bill's settlement state.
+         */
+        post: operations["pay_card_bill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/credit-cards/{id}/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Records a purchase on a credit card.
+         * @description Atomically creates the expense `transaction` (dated at purchase time, so it
+         *     counts in that month's expenses), posts balanced ledger entries (debit the
+         *     expense account, credit the card), and attaches it to the matching bill.
+         */
+        post: operations["create_card_purchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/installments": {
         parameters: {
             query?: never;
@@ -727,10 +844,22 @@ export interface components {
         /** @description A chart-of-accounts account. */
         Account: {
             /**
+             * Format: int32
+             * @description Closing day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            closing_day?: number | null;
+            /**
              * Format: date-time
              * @description Row creation timestamp.
              */
             created_at: string;
+            /** @description Credit limit (credit cards only). */
+            credit_limit?: string | null;
+            /**
+             * Format: int32
+             * @description Payment due day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            due_day?: number | null;
             /**
              * Format: uuid
              * @description Unique account identifier.
@@ -755,10 +884,22 @@ export interface components {
              */
             balance: string;
             /**
+             * Format: int32
+             * @description Closing day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            closing_day?: number | null;
+            /**
              * Format: date-time
              * @description Row creation timestamp.
              */
             created_at: string;
+            /** @description Credit limit (credit cards only). */
+            credit_limit?: string | null;
+            /**
+             * Format: int32
+             * @description Payment due day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            due_day?: number | null;
             /**
              * Format: uuid
              * @description Unique account identifier.
@@ -786,6 +927,37 @@ export interface components {
              * @description Number of alerts acknowledged.
              */
             acknowledged: number;
+        };
+        /** @description Payload for anticipating (paying early) future installments on a card. */
+        AnticipateInstallmentsRequest: {
+            /** @description Fixed discount amount. Mutually exclusive with `discount_percent`. */
+            discount_amount?: string | null;
+            /**
+             * @description Discount as a percentage of the gross amount (0-100). Mutually exclusive
+             *     with `discount_amount`.
+             */
+            discount_percent?: string | null;
+            /** @description Installment rows to anticipate (must belong to plans linked to the card). */
+            installment_ids: string[];
+        };
+        /** @description Response from anticipating installments. */
+        AnticipateInstallmentsResponse: {
+            /**
+             * Format: uuid
+             * @description The bill that absorbed the anticipated installments.
+             */
+            bill_id: string;
+            /** @description Total discount applied. */
+            discount_amount: string;
+            /** @description Sum of the anticipated installments before discount. */
+            gross_amount: string;
+            /**
+             * Format: int64
+             * @description Number of installments anticipated.
+             */
+            installments_anticipated: number;
+            /** @description Amount actually charged on the card (gross − discount). */
+            net_amount: string;
         };
         /** @description A monthly budget limit for a category. */
         Budget: {
@@ -955,6 +1127,72 @@ export interface components {
              */
             year: number;
         };
+        /** @description A single billing cycle ("fatura") for a credit card. */
+        CardBill: {
+            /**
+             * Format: uuid
+             * @description Card account this bill belongs to.
+             */
+            card_id: string;
+            /**
+             * Format: date
+             * @description Payment deadline (vencimento).
+             */
+            due_date: string;
+            /**
+             * Format: uuid
+             * @description Unique bill identifier.
+             */
+            id: string;
+            /** @description Total amount paid toward this bill. */
+            paid_amount: string;
+            /**
+             * Format: date-time
+             * @description When the bill was fully paid (NULL while open).
+             */
+            paid_at?: string | null;
+            /**
+             * Format: date
+             * @description Closing date of the billing cycle (fatura fecha).
+             */
+            period_end: string;
+            /**
+             * Format: date
+             * @description First day of the billing cycle.
+             */
+            period_start: string;
+            /** @description Remaining amount = total − paid. */
+            remaining_amount: string;
+            /** @description `open` or `paid`. */
+            status: string;
+            /** @description Total charges in the cycle, computed from card transactions in the period. */
+            total_amount: string;
+        };
+        /** @description Summary of a credit-card account with its current open bill. */
+        CardOverview: {
+            /** @description Outstanding balance (signed; negative for liabilities). */
+            balance: string;
+            /**
+             * Format: int32
+             * @description Closing day of the monthly billing cycle (1-31).
+             */
+            closing_day?: number | null;
+            /** @description Credit limit. */
+            credit_limit?: string | null;
+            current_bill?: null | components["schemas"]["CardBill"];
+            /**
+             * Format: int32
+             * @description Payment due day of the monthly billing cycle (1-31).
+             */
+            due_day?: number | null;
+            /**
+             * Format: uuid
+             * @description Card account id (an `accounts` row of type `liability`).
+             */
+            id: string;
+            /** @description Card display name (e.g., "Nubank Credit Card"). */
+            name: string;
+        };
         /** @description A transaction category (income or expense), optionally nested via `parent_id`. */
         Category: {
             /** @description Hex color code (e.g., `#ef4444`). */
@@ -1047,6 +1285,18 @@ export interface components {
         };
         /** @description Payload for creating a new account. */
         CreateAccountRequest: {
+            /**
+             * Format: int32
+             * @description Closing day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            closing_day?: number | null;
+            /** @description Credit limit (credit cards only). */
+            credit_limit?: string | null;
+            /**
+             * Format: int32
+             * @description Payment due day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            due_day?: number | null;
             /** @description Account display name (e.g., "Nubank Credit Card"). */
             name: string;
             /**
@@ -1083,6 +1333,33 @@ export interface components {
              */
             year: number;
         };
+        /** @description Payload for recording a purchase on a credit card. */
+        CreateCardPurchaseRequest: {
+            /**
+             * @description Monetary amount — must be > 0.
+             * @example 150.00
+             */
+            amount: string;
+            /**
+             * Format: uuid
+             * @description Expense category (defaults to Miscellaneous when omitted).
+             */
+            category_id?: string | null;
+            /**
+             * Format: date
+             * @description Purchase date (defaults to today, ISO `YYYY-MM-DD`).
+             */
+            date?: string | null;
+            /** @description Human-readable description (e.g., "Lunch at Restaurante X"). */
+            description: string;
+            /**
+             * Format: uuid
+             * @description Installment plan this purchase belongs to (optional).
+             */
+            installment_plan_id?: string | null;
+            /** @description Optional free-form notes. */
+            notes?: string | null;
+        };
         /** @description Payload for creating a new category. */
         CreateCategoryRequest: {
             /** @description Hex color code (e.g., `#ef4444`). */
@@ -1104,6 +1381,11 @@ export interface components {
         };
         /** @description Payload for creating a new installment plan. */
         CreateInstallmentPlanRequest: {
+            /**
+             * Format: uuid
+             * @description Source account (payment method, e.g. a credit card) for this plan (optional).
+             */
+            account_id?: string | null;
             /**
              * Format: uuid
              * @description Optional expense category.
@@ -1154,6 +1436,11 @@ export interface components {
         };
         /** @description Payload for creating a new transaction. */
         CreateTransactionRequest: {
+            /**
+             * Format: uuid
+             * @description Source account (payment method) for this transaction (optional).
+             */
+            account_id?: string | null;
             /**
              * @description Monetary amount — must be > 0.
              * @example 150.00
@@ -1222,6 +1509,11 @@ export interface components {
         };
         /** @description An installment plan: a purchase split into N monthly payments. */
         InstallmentPlan: {
+            /**
+             * Format: uuid
+             * @description Source account (payment method, e.g. a credit card) for this plan (optional).
+             */
+            account_id?: string | null;
             /** @description Category hex color (joined, optional). */
             category_color?: string | null;
             /** @description Category icon (joined, optional). */
@@ -1293,6 +1585,16 @@ export interface components {
         };
         /** @description A single installment row within a plan. */
         InstallmentTransaction: {
+            /**
+             * Format: date-time
+             * @description When this installment was anticipated (paid early), NULL otherwise.
+             */
+            anticipated_at?: string | null;
+            /**
+             * Format: uuid
+             * @description Bill that absorbed the anticipated installment, NULL otherwise.
+             */
+            anticipated_bill_id?: string | null;
             /**
              * Format: date
              * @description Due date for this installment.
@@ -1465,6 +1767,33 @@ export interface components {
         OcrRequest: {
             /** @description Raw text extracted by the OCR engine (ML Kit / tesseract.js). */
             raw_text: string;
+        };
+        /** @description Payload for paying a credit-card bill. */
+        PayCardBillRequest: {
+            /**
+             * @description Amount to pay — must be > 0. Defaults to the full remaining amount.
+             * @example 250.00
+             */
+            amount?: string | null;
+            /**
+             * Format: uuid
+             * @description Bill to pay (defaults to the oldest open bill).
+             */
+            bill_id?: string | null;
+            /**
+             * Format: uuid
+             * @description Asset account the payment comes from (defaults to "Cash").
+             */
+            from_account_id?: string | null;
+        };
+        /** @description Response from paying a credit-card bill. */
+        PayCardBillResponse: {
+            /** @description Amount applied in this payment. */
+            amount_paid: string;
+            /** @description The bill after the payment. */
+            bill: components["schemas"]["CardBill"];
+            /** @description Remaining amount on the bill after this payment. */
+            remaining: string;
         };
         /** @description Response for the pay endpoint. */
         PayInstallmentResponse: {
@@ -1708,6 +2037,12 @@ export interface components {
         };
         /** @description A single income or expense transaction. */
         Transaction: {
+            /**
+             * Format: uuid
+             * @description Source account (payment method, e.g. a credit card) used for this
+             *     transaction (NULL when unlinked).
+             */
+            account_id?: string | null;
             /** @description Monetary amount — always positive; `type` determines direction. */
             amount: string;
             /**
@@ -1749,6 +2084,11 @@ export interface components {
         };
         /** @description Query parameters for listing transactions. */
         TransactionListParams: {
+            /**
+             * Format: uuid
+             * @description Filter by source account UUID.
+             */
+            account_id?: string | null;
             /**
              * Format: uuid
              * @description Filter by category UUID.
@@ -1827,6 +2167,18 @@ export interface components {
         };
         /** @description Payload for updating an existing account. */
         UpdateAccountRequest: {
+            /**
+             * Format: int32
+             * @description Closing day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            closing_day?: number | null;
+            /** @description Credit limit (credit cards only). */
+            credit_limit?: string | null;
+            /**
+             * Format: int32
+             * @description Payment due day of the monthly billing cycle (credit cards only, 1-31).
+             */
+            due_day?: number | null;
             /** @description Account display name. */
             name: string;
             /**
@@ -1861,6 +2213,11 @@ export interface components {
         };
         /** @description Payload for updating an existing transaction. */
         UpdateTransactionRequest: {
+            /**
+             * Format: uuid
+             * @description Source account (payment method) for this transaction (optional).
+             */
+            account_id?: string | null;
             /**
              * @description Monetary amount — must be > 0.
              * @example 150.00
@@ -2580,6 +2937,211 @@ export interface operations {
             };
             /** @description Category is in use */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_credit_cards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of credit cards with balances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardOverview"][];
+                };
+            };
+        };
+    };
+    get_credit_card: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card account UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Credit card found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardOverview"];
+                };
+            };
+            /** @description Credit card not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    anticipate_installments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card account UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnticipateInstallmentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Installments anticipated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnticipateInstallmentsResponse"];
+                };
+            };
+            /** @description Invalid anticipation payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Credit card not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_card_bills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card account UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of card bills */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardBill"][];
+                };
+            };
+            /** @description Credit card not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pay_card_bill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card account UUID */
+                id: string;
+                /** @description Bill UUID */
+                bill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayCardBillRequest"];
+            };
+        };
+        responses: {
+            /** @description Bill paid */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayCardBillResponse"];
+                };
+            };
+            /** @description Invalid payment payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Credit card or bill not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_card_purchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card account UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCardPurchaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Purchase recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transaction"];
+                };
+            };
+            /** @description Invalid purchase payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Credit card not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

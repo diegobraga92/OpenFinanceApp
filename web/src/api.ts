@@ -42,6 +42,13 @@ export type Account = components['schemas']['Account'];
 export type AccountWithBalance = components['schemas']['AccountWithBalance'];
 export type CreateAccountRequest = components['schemas']['CreateAccountRequest'];
 export type UpdateAccountRequest = components['schemas']['UpdateAccountRequest'];
+export type CardBill = components['schemas']['CardBill'];
+export type CardOverview = components['schemas']['CardOverview'];
+export type CreateCardPurchaseRequest = components['schemas']['CreateCardPurchaseRequest'];
+export type PayCardBillRequest = components['schemas']['PayCardBillRequest'];
+export type PayCardBillResponse = components['schemas']['PayCardBillResponse'];
+export type AnticipateInstallmentsRequest = components['schemas']['AnticipateInstallmentsRequest'];
+export type AnticipateInstallmentsResponse = components['schemas']['AnticipateInstallmentsResponse'];
 export type CreateLedgerTransactionRequest = components['schemas']['CreateLedgerTransactionRequest'];
 export type CreateLedgerTransactionResponse = components['schemas']['CreateLedgerTransactionResponse'];
 export type LedgerEntry = components['schemas']['LedgerEntry'];
@@ -350,6 +357,51 @@ export async function updateAccount(
 export async function deleteAccount(id: string): Promise<void> {
   return request<void>(`/api/accounts/${id}`, {
     method: 'DELETE',
+  });
+}
+
+// --- Credit cards ---
+
+export async function fetchCreditCards(): Promise<CardOverview[]> {
+  return request<CardOverview[]>('/api/credit-cards');
+}
+
+export async function fetchCreditCard(id: string): Promise<CardOverview> {
+  return request<CardOverview>(`/api/credit-cards/${id}`);
+}
+
+export async function fetchCardBills(id: string): Promise<CardBill[]> {
+  return request<CardBill[]>(`/api/credit-cards/${id}/bills`);
+}
+
+export async function createCardPurchase(
+  id: string,
+  payload: CreateCardPurchaseRequest,
+): Promise<Transaction> {
+  return request<Transaction>(`/api/credit-cards/${id}/purchases`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function payCardBill(
+  id: string,
+  billId: string,
+  payload: PayCardBillRequest,
+): Promise<PayCardBillResponse> {
+  return request<PayCardBillResponse>(`/api/credit-cards/${id}/bills/${billId}/pay`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function anticipateInstallments(
+  id: string,
+  payload: AnticipateInstallmentsRequest,
+): Promise<AnticipateInstallmentsResponse> {
+  return request<AnticipateInstallmentsResponse>(`/api/credit-cards/${id}/anticipate`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

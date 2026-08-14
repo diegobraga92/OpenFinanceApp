@@ -5,6 +5,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { MONTHS } from '../theme/constants';
 import { TransactionRow } from '../components/TransactionRow';
+import { QuickAddWidget } from '../components/QuickAddWidget';
 
 interface Props {
   summary: SummaryResponse | null;
@@ -13,6 +14,7 @@ interface Props {
   formatMoney: (value: string | number) => string;
   refreshControl?: ReactNode;
   onAddTransaction: () => void;
+  onQuickSaved: () => void;
   onEdit: (t: Transaction) => void;
   onDelete: (t: Transaction) => void;
 }
@@ -24,6 +26,7 @@ export function DashboardScreen({
   formatMoney,
   refreshControl,
   onAddTransaction,
+  onQuickSaved,
   onEdit,
   onDelete,
 }: Props) {
@@ -57,6 +60,14 @@ export function DashboardScreen({
         </View>
       </View>
 
+      <QuickAddWidget
+        types={['expense']}
+        showTodayTotal
+        transactions={transactions}
+        formatMoney={formatMoney}
+        onSaved={onQuickSaved}
+      />
+
       {summary && summary.by_category.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Category Breakdown</Text>
@@ -81,6 +92,13 @@ export function DashboardScreen({
           ))}
         </View>
       )}
+
+      <QuickAddWidget
+        types={['expense', 'income']}
+        transactions={transactions}
+        formatMoney={formatMoney}
+        onSaved={onQuickSaved}
+      />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>

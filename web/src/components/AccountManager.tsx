@@ -23,9 +23,12 @@ const ACCOUNT_TYPES: { key: AccountType; label: string; icon: string; blurb: str
 interface FormState {
   name: string;
   type: AccountType;
+  closing_day: string;
+  due_day: string;
+  credit_limit: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', type: 'asset' };
+const EMPTY_FORM: FormState = { name: '', type: 'asset', closing_day: '', due_day: '', credit_limit: '' };
 
 export function AccountManager({ accounts, onAccountsChanged }: Props) {
   const [query, setQuery] = useState('');
@@ -49,14 +52,20 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
 
   const openCreate = (type: AccountType) => {
     setEditingId(null);
-    setForm({ name: '', type });
+    setForm({ name: '', type, closing_day: '', due_day: '', credit_limit: '' });
     setError(null);
     setShowForm(true);
   };
 
   const openEdit = (a: AccountWithBalance) => {
     setEditingId(a.id);
-    setForm({ name: a.name, type: a.type as AccountType });
+    setForm({
+      name: a.name,
+      type: a.type as AccountType,
+      closing_day: a.closing_day != null ? String(a.closing_day) : '',
+      due_day: a.due_day != null ? String(a.due_day) : '',
+      credit_limit: a.credit_limit != null ? String(a.credit_limit) : '',
+    });
     setError(null);
     setShowForm(true);
   };
@@ -70,7 +79,32 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     }
     setSaving(true);
     setError(null);
-    const payload = { name, type: form.type };
+    const isCard = form.type === 'liability';
+    const closingDay = form.closing_day.trim() ? Number(form.closing_day.trim()) : null;
+    const dueDay = form.due_day.trim() ? Number(form.due_day.trim()) : null;
+    const creditLimit = form.credit_limit.trim() ? form.credit_limit.trim() : null;
+    if (isCard && (closingDay === null || dueDay === null)) {
+      setError('Credit cards need a closing day and a due day');
+      setSaving(false);
+      return;
+    }
+    if (closingDay !== null && (closingDay < 1 || closingDay > 31)) {
+      setError('Closing day must be between 1 and 31');
+      setSaving(false);
+      return;
+    }
+    if (dueDay !== null && (dueDay < 1 || dueDay > 31)) {
+      setError('Due day must be between 1 and 31');
+      setSaving(false);
+      return;
+    }
+    const payload = {
+      name,
+      type: form.type,
+      closing_day: isCard ? closingDay : undefined,
+      due_day: isCard ? dueDay : undefined,
+      credit_limit: isCard && creditLimit ? creditLimit : undefined,
+    };
     try {
       if (editingId) {
         await updateAccount(editingId, payload);
@@ -334,6 +368,48 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
                   ))}
                 </div>
               </label>
+
+              {form.type === 'liability' && (
+                <div style={styles.cardFields}>
+                  <p style={styles.cardFieldsHint}>
+                    This account is a credit card. Set its monthly billing cycle so
+                    purchases land on the right bill and the payment deadline is shown.
+                  </p>
+                  <div style={styles.cardFieldsRow}>
+                    <label style={styles.label}>
+                      Closing day (fatura fecha)
+                      <input
+                        style={styles.input}
+                        value={form.closing_day}
+                        onChange={(e) => setForm((f) => ({ ...f, closing_day: e.target.value }))}
+                        placeholder="5"
+                        inputMode="numeric"
+                        maxLength={2}
+                      />
+                    </label>
+                    <label style={styles.label}>
+                      Due day (vencimento)
+                      <input
+                        style={styles.input}
+                        value={form.due_day}
+                        onChange={(e) => setForm((f) => ({ ...f, due_day: e.target.value }))}
+                        placeholder="15"
+                        inputMode="numeric"
+                        maxLength={2}
+                      />
+                    </label>
+                  </div>
+                  <label style={styles.label}>
+                    Credit limit (optional)
+                    <input
+                      style={styles.input}
+                      value={form.credit_limit}
+                      onChange={(e) => setForm((f) => ({ ...f, credit_limit: e.target.value }))}
+                      placeholder="5000.00"
+                    />
+                  </label>
+                </div>
+              )}
 
               <div style={styles.modalActions}>
                 <button
@@ -633,6 +709,23 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     textAlign: 'left',
+  },
+  cardFields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+    backgroundColor: 'var(--color-surface-hover)',
+    borderRadius: '0.625rem',
+    padding: '0.75rem',
+  },
+  cardFieldsHint: {
+    margin: 0,
+    fontSize: '0.75rem',
+    color: 'var(--color-text-dim)',
+  },
+  cardFieldsRow: {
+    display: 'flex',
+    gap: '0.75rem',
   },
   submitButton: {
     alignSelf: 'flex-end',

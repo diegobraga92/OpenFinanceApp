@@ -17,6 +17,7 @@ use crate::models::{
     is_valid_account_type, Account, AccountWithBalance, CreateAccountRequest, UpdateAccountRequest,
 };
 use crate::state::AppState;
+use rust_decimal::Decimal;
 
 /// Returns a sub-router with all account routes mounted under `/api/accounts`.
 pub fn router() -> Router<AppState> {
@@ -41,7 +42,8 @@ pub async fn list_accounts(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AccountWithBalance>>, (StatusCode, Json<serde_json::Value>)> {
     let accounts = sqlx::query_as::<_, AccountWithBalance>(
-        "SELECT a.id, a.name, a.type, a.parent_id, a.created_at,
+        "SELECT a.id, a.name, a.type, a.parent_id, a.closing_day, a.due_day,
+                a.credit_limit, a.created_at,
                 COALESCE(SUM(e.debit_amount) - SUM(e.credit_amount), 0) AS balance,
                 COUNT(e.id) AS transaction_count
          FROM accounts a
@@ -88,7 +90,8 @@ pub async fn get_account(
     Path(id): Path<Uuid>,
 ) -> Result<Json<AccountWithBalance>, (StatusCode, Json<serde_json::Value>)> {
     let account = sqlx::query_as::<_, AccountWithBalance>(
-        "SELECT a.id, a.name, a.type, a.parent_id, a.created_at,
+        "SELECT a.id, a.name, a.type, a.parent_id, a.closing_day, a.due_day,
+                a.credit_limit, a.created_at,
                 COALESCE(SUM(e.debit_amount) - SUM(e.credit_amount), 0) AS balance,
                 COUNT(e.id) AS transaction_count
          FROM accounts a
@@ -151,6 +154,46 @@ async fn validate_parent(
     Ok(())
 }
 
+/// Validates card-specific fields (`closing_day`, `due_day`, `credit_limit`).
+///
+/// These are only meaningful for `liability` (credit card) accounts.
+fn validate_card_fields(
+    ttype: &str,
+    closing_day: Option<i16>,
+    due_day: Option<i16>,
+    credit_limit: Option<Decimal>,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    for (label, day) in [("closing_day", closing_day), ("due_day", due_day)] {
+        if let Some(d) = day {
+            if !(1..=31).contains(&d) {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": format!("{label} must be between 1 and 31") })),
+                ));
+            }
+        }
+    }
+    if let Some(l) = credit_limit {
+        if l < Decimal::ZERO {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "credit_limit must be greater than or equal to zero" })),
+            ));
+        }
+    }
+    if ttype != "liability"
+        && (closing_day.is_some() || due_day.is_some() || credit_limit.is_some())
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "closing_day, due_day, and credit_limit are only valid for liability (credit card) accounts"
+            })),
+        ));
+    }
+    Ok(())
+}
+
 /// Creates a new account.
 ///
 /// Returns `400` if the payload is invalid (missing name, invalid type,
@@ -186,16 +229,26 @@ pub async fn create_account(
         ));
     }
 
+    validate_card_fields(
+        &payload.r#type,
+        payload.closing_day,
+        payload.due_day,
+        payload.credit_limit,
+    )?;
+
     validate_parent(&state, payload.parent_id, None).await?;
 
     let account = sqlx::query_as::<_, Account>(
-        "INSERT INTO accounts (name, type, parent_id)
-         VALUES ($1, $2, $3)
-         RETURNING id, name, type, parent_id, created_at",
+        "INSERT INTO accounts (name, type, parent_id, closing_day, due_day, credit_limit)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, name, type, parent_id, closing_day, due_day, credit_limit, created_at",
     )
     .bind(name)
     .bind(&payload.r#type)
     .bind(payload.parent_id)
+    .bind(payload.closing_day)
+    .bind(payload.due_day)
+    .bind(payload.credit_limit)
     .fetch_one(&state.pg_pool)
     .await
     .map_err(|e| {
@@ -248,15 +301,28 @@ pub async fn update_account(
         ));
     }
 
+    validate_card_fields(
+        &payload.r#type,
+        payload.closing_day,
+        payload.due_day,
+        payload.credit_limit,
+    )?;
+
     validate_parent(&state, payload.parent_id, Some(id)).await?;
 
     let result = sqlx::query_as::<_, Account>(
-        "UPDATE accounts SET name = $1, type = $2, parent_id = $3 WHERE id = $4
-         RETURNING id, name, type, parent_id, created_at",
+        "UPDATE accounts
+         SET name = $1, type = $2, parent_id = $3, closing_day = $4, due_day = $5,
+             credit_limit = $6
+         WHERE id = $7
+         RETURNING id, name, type, parent_id, closing_day, due_day, credit_limit, created_at",
     )
     .bind(name)
     .bind(&payload.r#type)
     .bind(payload.parent_id)
+    .bind(payload.closing_day)
+    .bind(payload.due_day)
+    .bind(payload.credit_limit)
     .bind(id)
     .fetch_optional(&state.pg_pool)
     .await

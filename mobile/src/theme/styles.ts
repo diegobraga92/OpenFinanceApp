@@ -356,6 +356,11 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
   },
+  autoFillHint: {
+    color: colors.primary,
+    fontSize: 12,
+    marginTop: 8,
+  },
   dateButton: {
     backgroundColor: colors.inputBg,
     borderWidth: 1,
@@ -474,6 +479,72 @@ export const styles = StyleSheet.create({
   cancelButtonText: {
     color: colors.textMuted,
     fontSize: 16,
+  },
+  // --- Quick Add widget ---
+  quickAddCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    marginBottom: 16,
+  },
+  quickAddHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  quickAddTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  quickAddToday: {
+    alignItems: 'flex-end',
+  },
+  quickAddTodayLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textTransform: 'uppercase',
+  },
+  quickAddTodayValue: {
+    color: colors.expense,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  quickAddRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  quickAddAmount: {
+    width: 110,
+    fontSize: 16,
+  },
+  quickAddDescription: {
+    flex: 1,
+    fontSize: 16,
+  },
+  quickAddError: {
+    color: colors.dangerText,
+    fontSize: 13,
+    marginTop: 8,
+  },
+  quickAddButton: {
+    backgroundColor: colors.expense,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  quickAddButtonIncome: {
+    backgroundColor: colors.income,
+  },
+  quickAddButtonText: {
+    color: colors.bg,
+    fontSize: 15,
+    fontWeight: '700',
   },
   fab: {
     position: 'absolute',
@@ -944,6 +1015,170 @@ export const styles = StyleSheet.create({
   },
   accountTypeButtonTextActive: {
     color: colors.text,
+  },
+  accountCardFields: {
+    marginTop: 12,
+    backgroundColor: colors.surfaceHover,
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+  },
+  accountCardFieldsHint: {
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  accountCardFieldsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  accountCardField: {
+    flex: 1,
+  },
+  // --- Credit cards (CreditCardsScreen) ---
+  creditCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    padding: 12,
+    marginBottom: 8,
+  },
+  creditCardActive: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  creditCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  creditCardName: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  creditCardBadgeOpen: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  creditCardBadgePaid: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  creditCardBalance: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '700',
+    marginVertical: 6,
+  },
+  creditCardMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  creditCardActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  creditCardCurrentBill: {
+    backgroundColor: colors.surfaceHover,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  creditCardCurrentBillLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  creditCardCurrentBillValue: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '700',
+    marginVertical: 2,
+  },
+  creditCardCurrentBillMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  creditCardBillRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface,
+    gap: 8,
+  },
+  creditCardBillRowText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    flexShrink: 1,
+  },
+  creditCardBillPaid: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  creditCardBillOpen: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sectionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+  },
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: colors.primaryText,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pickerWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.surfaceHover,
+    backgroundColor: colors.bg,
+  },
+  pillActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryHover,
+  },
+  pillText: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  pillTextActive: {
+    color: colors.text,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // --- Settings rows (NotificationSettingsScreen) ---
   settingRow: {

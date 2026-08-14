@@ -2,25 +2,27 @@ use utoipa::OpenApi;
 
 use crate::health;
 use crate::models::{
-    Account, AccountWithBalance, AcknowledgeAlertsResponse, Budget, BudgetAlert,
-    BudgetAlertListResponse, BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse,
-    BudgetWithCategory, Category, CategoryBreakdownItem, CategoryBreakdownResponse,
-    CategorySummary, CreateAccountRequest, CreateBudgetRequest, CreateCategoryRequest,
+    Account, AccountWithBalance, AcknowledgeAlertsResponse, AnticipateInstallmentsRequest,
+    AnticipateInstallmentsResponse, Budget, BudgetAlert, BudgetAlertListResponse,
+    BudgetListResponse, BudgetSummaryItem, BudgetSummaryResponse, BudgetWithCategory, CardBill,
+    CardOverview, Category, CategoryBreakdownItem, CategoryBreakdownResponse, CategorySummary,
+    CreateAccountRequest, CreateBudgetRequest, CreateCardPurchaseRequest, CreateCategoryRequest,
     CreateInstallmentPlanRequest, CreateLedgerTransactionRequest, CreateLedgerTransactionResponse,
     CreateTransactionRequest, GenerateInstallmentsResponse, InstallmentPlan, InstallmentPlanDetail,
     InstallmentProgress, InstallmentTransaction, LedgerEntry, LedgerEntryRequest,
     LedgerTransaction, MigrationResponse, MonthlyReportItem, MonthlyReportResponse,
-    PayInstallmentResponse, ReconciliationItem, ReconciliationUploadRequest,
-    ReconciliationUploadResponse, StatementLine, SummaryResponse, SyncOpResult, SyncOperation,
-    SyncPullRequest, SyncPullResponse, SyncPushRequest, SyncPushResponse, Transaction,
-    TransactionListParams, TransactionListResponse, TrendPoint, TrendsResponse,
-    UpdateAccountRequest, UpdateCategoryRequest, UpdateTransactionRequest,
+    PayCardBillRequest, PayCardBillResponse, PayInstallmentResponse, ReconciliationItem,
+    ReconciliationUploadRequest, ReconciliationUploadResponse, StatementLine, SummaryResponse,
+    SyncOpResult, SyncOperation, SyncPullRequest, SyncPullResponse, SyncPushRequest,
+    SyncPushResponse, Transaction, TransactionListParams, TransactionListResponse, TrendPoint,
+    TrendsResponse, UpdateAccountRequest, UpdateCategoryRequest, UpdateTransactionRequest,
 };
 use crate::routes::accounts;
 use crate::routes::audit;
 use crate::routes::auth::{self, LoginRequest, RefreshRequest, RegisterRequest};
 use crate::routes::budgets;
 use crate::routes::categories::{self, CategoryListParams};
+use crate::routes::credit_cards;
 use crate::routes::installments;
 use crate::routes::ledger;
 use crate::routes::receipts::{
@@ -67,6 +69,12 @@ use crate::routes::transactions;
         accounts::create_account,
         accounts::update_account,
         accounts::delete_account,
+        credit_cards::list_credit_cards,
+        credit_cards::get_credit_card,
+        credit_cards::list_card_bills,
+        credit_cards::create_card_purchase,
+        credit_cards::pay_card_bill,
+        credit_cards::anticipate_installments,
         ledger::create_ledger_transaction,
         ledger::list_ledger_transactions,
         ledger::migrate_single_to_double,
@@ -109,6 +117,13 @@ use crate::routes::transactions;
         AccountWithBalance,
         CreateAccountRequest,
         UpdateAccountRequest,
+        CardBill,
+        CardOverview,
+        CreateCardPurchaseRequest,
+        PayCardBillRequest,
+        PayCardBillResponse,
+        AnticipateInstallmentsRequest,
+        AnticipateInstallmentsResponse,
         CreateLedgerTransactionRequest,
         CreateLedgerTransactionResponse,
         LedgerEntry,
@@ -177,6 +192,7 @@ use crate::routes::transactions;
         (name = "Budgets", description = "Monthly budget limits and budget vs actual tracking"),
         (name = "Reports", description = "Monthly reports, category breakdowns, and trends"),
         (name = "Ledger", description = "Double-entry ledger, event sourcing, and reconciliation"),
+        (name = "Credit Cards", description = "Credit card accounts, billing cycles (faturas), payments, and installment anticipation"),
         (name = "Auth", description = "User registration, login, token refresh, and profile"),
         (name = "Audit", description = "Admin-only audit event search"),
         (name = "Receipts", description = "Receipt scanning (NFC-e QR), price history, and product normalization"),

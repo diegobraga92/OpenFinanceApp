@@ -37,9 +37,12 @@ const ACCOUNT_GROUPS: {
 interface FormState {
   name: string;
   type: AccountType;
+  closing_day: string;
+  due_day: string;
+  credit_limit: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', type: 'asset' };
+const EMPTY_FORM: FormState = { name: '', type: 'asset', closing_day: '', due_day: '', credit_limit: '' };
 
 function formatBalance(balance: string): string {
   const n = Math.abs(parseFloat(balance));
@@ -58,13 +61,19 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
 
   const openCreate = (type: AccountType) => {
     setEditingId(null);
-    setForm({ name: '', type });
+    setForm({ name: '', type, closing_day: '', due_day: '', credit_limit: '' });
     setShowForm(true);
   };
 
   const openEdit = (a: AccountWithBalance) => {
     setEditingId(a.id);
-    setForm({ name: a.name, type: a.type as AccountType });
+    setForm({
+      name: a.name,
+      type: a.type as AccountType,
+      closing_day: a.closing_day != null ? String(a.closing_day) : '',
+      due_day: a.due_day != null ? String(a.due_day) : '',
+      credit_limit: a.credit_limit != null ? String(a.credit_limit) : '',
+    });
     setShowForm(true);
   };
 
@@ -73,9 +82,31 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
       Alert.alert('Validation', 'Name is required');
       return;
     }
+    const isCard = form.type === 'liability';
+    const closingDay = form.closing_day.trim() ? Number(form.closing_day.trim()) : null;
+    const dueDay = form.due_day.trim() ? Number(form.due_day.trim()) : null;
+    const creditLimit = form.credit_limit.trim() ? form.credit_limit.trim() : null;
+    if (isCard && (closingDay === null || dueDay === null)) {
+      Alert.alert('Validation', 'Credit cards need a closing day and a due day');
+      return;
+    }
+    if (closingDay !== null && (closingDay < 1 || closingDay > 31)) {
+      Alert.alert('Validation', 'Closing day must be between 1 and 31');
+      return;
+    }
+    if (dueDay !== null && (dueDay < 1 || dueDay > 31)) {
+      Alert.alert('Validation', 'Due day must be between 1 and 31');
+      return;
+    }
     setSaving(true);
     try {
-      const payload = { name: form.name.trim(), type: form.type };
+      const payload = {
+        name: form.name.trim(),
+        type: form.type,
+        closing_day: isCard ? closingDay : undefined,
+        due_day: isCard ? dueDay : undefined,
+        credit_limit: isCard && creditLimit ? creditLimit : undefined,
+      };
       if (editingId) {
         await updateAccount(editingId, payload);
       } else {
@@ -254,6 +285,52 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {form.type === 'liability' && (
+              <View style={styles.accountCardFields}>
+                <Text style={styles.accountCardFieldsHint}>
+                  Credit card: set its monthly billing cycle so purchases land on
+                  the right bill and the payment deadline is shown.
+                </Text>
+                <View style={styles.accountCardFieldsRow}>
+                  <View style={styles.accountCardField}>
+                    <Text style={styles.label}>Closing day (fatura fecha)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={form.closing_day}
+                      onChangeText={(closing_day) =>
+                        setForm((f) => ({ ...f, closing_day }))
+                      }
+                      placeholder="5"
+                      placeholderTextColor={colors.textDim}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                    />
+                  </View>
+                  <View style={styles.accountCardField}>
+                    <Text style={styles.label}>Due day (vencimento)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={form.due_day}
+                      onChangeText={(due_day) => setForm((f) => ({ ...f, due_day }))}
+                      placeholder="15"
+                      placeholderTextColor={colors.textDim}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                    />
+                  </View>
+                </View>
+                <Text style={styles.label}>Credit limit (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.credit_limit}
+                  onChangeText={(credit_limit) => setForm((f) => ({ ...f, credit_limit }))}
+                  placeholder="5000.00"
+                  placeholderTextColor={colors.textDim}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            )}
 
             <View style={styles.modalActions}>
               <TouchableOpacity

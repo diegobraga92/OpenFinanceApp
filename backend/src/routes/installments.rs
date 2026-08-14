@@ -88,6 +88,7 @@ pub async fn list_installment_plans(
         category_name: Option<String>,
         category_icon: Option<String>,
         category_color: Option<String>,
+        account_id: Option<Uuid>,
         start_date: NaiveDate,
         created_at: chrono::DateTime<Utc>,
         paid_count: i64,
@@ -99,10 +100,10 @@ pub async fn list_installment_plans(
         "SELECT ip.id, ip.description, ip.total_amount, ip.installments,
                 ip.installment_amount, ip.category_id,
                 c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
-                ip.start_date, ip.created_at,
-                COALESCE(SUM(CASE WHEN it.status = 'paid' THEN 1 ELSE 0 END), 0)::bigint AS paid_count,
-                COALESCE(SUM(CASE WHEN it.status <> 'paid' THEN 1 ELSE 0 END), 0)::bigint AS pending_count,
-                COALESCE(SUM(CASE WHEN it.status = 'paid' THEN ip.installment_amount ELSE 0 END), 0)::numeric AS paid_amount
+                ip.account_id, ip.start_date, ip.created_at,
+                COALESCE(SUM(CASE WHEN it.status = 'paid' OR it.anticipated_at IS NOT NULL THEN 1 ELSE 0 END), 0)::bigint AS paid_count,
+                COALESCE(SUM(CASE WHEN it.status <> 'paid' AND it.anticipated_at IS NULL THEN 1 ELSE 0 END), 0)::bigint AS pending_count,
+                COALESCE(SUM(CASE WHEN it.status = 'paid' OR it.anticipated_at IS NOT NULL THEN ip.installment_amount ELSE 0 END), 0)::numeric AS paid_amount
          FROM installment_plans ip
          LEFT JOIN installment_transactions it ON it.plan_id = ip.id
          LEFT JOIN categories c ON c.id = ip.category_id
@@ -131,6 +132,7 @@ pub async fn list_installment_plans(
             category_name: r.category_name,
             category_icon: r.category_icon,
             category_color: r.category_color,
+            account_id: r.account_id,
             start_date: r.start_date,
             created_at: r.created_at,
             progress: InstallmentProgress {
@@ -182,6 +184,28 @@ pub async fn create_installment_plan(
 
     let installment_amount = payload.total_amount / Decimal::from(payload.installments);
 
+    // Validate the linked account exists when provided.
+    if let Some(aid) = payload.account_id {
+        let exists: Option<Uuid> = sqlx::query_scalar("SELECT id FROM accounts WHERE id = $1")
+            .bind(aid)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                error!("Failed to validate account: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to validate account" })),
+                )
+            })?;
+
+        if exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "account_id does not reference an existing account" })),
+            ));
+        }
+    }
+
     // Insert the plan.
     #[derive(sqlx::FromRow)]
     struct Inserted {
@@ -190,8 +214,8 @@ pub async fn create_installment_plan(
     }
     let inserted: Inserted = sqlx::query_as(
         "INSERT INTO installment_plans
-            (description, total_amount, installments, installment_amount, category_id, start_date)
-         VALUES ($1, $2, $3, $4, $5, $6)
+            (description, total_amount, installments, installment_amount, category_id, start_date, account_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, created_at",
     )
     .bind(payload.description.trim())
@@ -200,6 +224,7 @@ pub async fn create_installment_plan(
     .bind(installment_amount)
     .bind(payload.category_id)
     .bind(payload.start_date)
+    .bind(payload.account_id)
     .fetch_one(&state.pg_pool)
     .await
     .map_err(|e| {
@@ -236,6 +261,7 @@ pub async fn create_installment_plan(
             category_name: None,
             category_icon: None,
             category_color: None,
+            account_id: payload.account_id,
             start_date: payload.start_date,
             created_at: inserted.created_at,
             progress: InstallmentProgress {
@@ -277,6 +303,7 @@ pub async fn get_installment_plan(
         category_name: Option<String>,
         category_icon: Option<String>,
         category_color: Option<String>,
+        account_id: Option<Uuid>,
         start_date: NaiveDate,
         created_at: chrono::DateTime<Utc>,
         paid_count: i64,
@@ -288,10 +315,10 @@ pub async fn get_installment_plan(
         "SELECT ip.id, ip.description, ip.total_amount, ip.installments,
                 ip.installment_amount, ip.category_id,
                 c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
-                ip.start_date, ip.created_at,
-                COALESCE(SUM(CASE WHEN it.status = 'paid' THEN 1 ELSE 0 END), 0)::bigint AS paid_count,
-                COALESCE(SUM(CASE WHEN it.status <> 'paid' THEN 1 ELSE 0 END), 0)::bigint AS pending_count,
-                COALESCE(SUM(CASE WHEN it.status = 'paid' THEN ip.installment_amount ELSE 0 END), 0)::numeric AS paid_amount
+                ip.account_id, ip.start_date, ip.created_at,
+                COALESCE(SUM(CASE WHEN it.status = 'paid' OR it.anticipated_at IS NOT NULL THEN 1 ELSE 0 END), 0)::bigint AS paid_count,
+                COALESCE(SUM(CASE WHEN it.status <> 'paid' AND it.anticipated_at IS NULL THEN 1 ELSE 0 END), 0)::bigint AS pending_count,
+                COALESCE(SUM(CASE WHEN it.status = 'paid' OR it.anticipated_at IS NOT NULL THEN ip.installment_amount ELSE 0 END), 0)::numeric AS paid_amount
          FROM installment_plans ip
          LEFT JOIN installment_transactions it ON it.plan_id = ip.id
          LEFT JOIN categories c ON c.id = ip.category_id
@@ -320,7 +347,8 @@ pub async fn get_installment_plan(
     };
 
     let installments: Vec<InstallmentTransaction> = sqlx::query_as(
-        "SELECT id, plan_id, installment_number, due_date, transaction_id, status
+        "SELECT id, plan_id, installment_number, due_date, transaction_id, status,
+                anticipated_at, anticipated_bill_id
          FROM installment_transactions
          WHERE plan_id = $1
          ORDER BY installment_number",
@@ -347,6 +375,7 @@ pub async fn get_installment_plan(
             category_name: row.category_name,
             category_icon: row.category_icon,
             category_color: row.category_color,
+            account_id: row.account_id,
             start_date: row.start_date,
             created_at: row.created_at,
             progress: InstallmentProgress {
@@ -436,6 +465,7 @@ pub async fn generate_installments(
         installments_total: i32,
         installment_amount: Decimal,
         category_id: Option<Uuid>,
+        account_id: Option<Uuid>,
     }
 
     let today = Utc::now().date_naive();
@@ -443,11 +473,12 @@ pub async fn generate_installments(
     let pending: Vec<PendingRow> = sqlx::query_as(
         "SELECT it.id, it.installment_number, it.due_date,
                 ip.description AS plan_description, ip.installments AS installments_total,
-                ip.installment_amount, ip.category_id
+                ip.installment_amount, ip.category_id, ip.account_id
          FROM installment_transactions it
          JOIN installment_plans ip ON ip.id = it.plan_id
          WHERE it.plan_id = $1
            AND it.status = 'pending'
+           AND it.anticipated_at IS NULL
            AND it.due_date <= $2
          ORDER BY it.installment_number",
     )
@@ -489,16 +520,17 @@ pub async fn generate_installments(
         // Create the simple transaction.
         let tx: Transaction = sqlx::query_as(
             "INSERT INTO transactions
-                (description, amount, type, category_id, date, installment_plan_id)
-             VALUES ($1, $2, 'expense', $3, $4, $5)
+                (description, amount, type, category_id, date, installment_plan_id, account_id)
+             VALUES ($1, $2, 'expense', $3, $4, $5, $6)
              RETURNING id, description, amount, type, category_id, date, notes,
-                       installment_plan_id, created_at, updated_at",
+                       installment_plan_id, account_id, created_at, updated_at",
         )
         .bind(&description)
         .bind(row.installment_amount)
         .bind(row.category_id)
         .bind(row.due_date)
         .bind(id)
+        .bind(row.account_id)
         .fetch_one(&state.pg_pool)
         .await
         .map_err(|e| {
@@ -563,12 +595,14 @@ pub async fn pay_installment(
         installments_total: i32,
         installment_amount: Decimal,
         category_id: Option<Uuid>,
+        account_id: Option<Uuid>,
+        anticipated_at: Option<chrono::DateTime<Utc>>,
     }
 
     let row: Option<InstRow> = sqlx::query_as(
-        "SELECT it.id AS row_id, it.transaction_id, it.due_date,
+        "SELECT it.id AS row_id, it.transaction_id, it.due_date, it.anticipated_at,
                 ip.description AS plan_description, ip.installments AS installments_total,
-                ip.installment_amount, ip.category_id
+                ip.installment_amount, ip.category_id, ip.account_id
          FROM installment_transactions it
          JOIN installment_plans ip ON ip.id = it.plan_id
          WHERE it.plan_id = $1 AND it.installment_number = $2",
@@ -595,11 +629,18 @@ pub async fn pay_installment(
         }
     };
 
+    if row.anticipated_at.is_some() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Installment was already anticipated" })),
+        ));
+    }
+
     let (tx, created) = if let Some(tx_id) = row.transaction_id {
         // Reuse the existing linked transaction.
         let tx: Option<Transaction> = sqlx::query_as(
             "SELECT id, description, amount, type, category_id, date, notes,
-                    installment_plan_id, created_at, updated_at
+                    installment_plan_id, account_id, created_at, updated_at
              FROM transactions WHERE id = $1",
         )
         .bind(tx_id)
@@ -623,16 +664,17 @@ pub async fn pay_installment(
                 );
                 let t: Transaction = sqlx::query_as(
                     "INSERT INTO transactions
-                        (description, amount, type, category_id, date, installment_plan_id)
-                     VALUES ($1, $2, 'expense', $3, $4, $5)
+                        (description, amount, type, category_id, date, installment_plan_id, account_id)
+                     VALUES ($1, $2, 'expense', $3, $4, $5, $6)
                      RETURNING id, description, amount, type, category_id, date, notes,
-                               installment_plan_id, created_at, updated_at",
+                               installment_plan_id, account_id, created_at, updated_at",
                 )
                 .bind(&description)
                 .bind(row.installment_amount)
                 .bind(row.category_id)
                 .bind(row.due_date)
                 .bind(id)
+                .bind(row.account_id)
                 .fetch_one(&state.pg_pool)
                 .await
                 .map_err(|e| {
@@ -653,16 +695,17 @@ pub async fn pay_installment(
         );
         let t: Transaction = sqlx::query_as(
             "INSERT INTO transactions
-                (description, amount, type, category_id, date, installment_plan_id)
-             VALUES ($1, $2, 'expense', $3, $4, $5)
+                (description, amount, type, category_id, date, installment_plan_id, account_id)
+             VALUES ($1, $2, 'expense', $3, $4, $5, $6)
              RETURNING id, description, amount, type, category_id, date, notes,
-                       installment_plan_id, created_at, updated_at",
+                       installment_plan_id, account_id, created_at, updated_at",
         )
         .bind(&description)
         .bind(row.installment_amount)
         .bind(row.category_id)
         .bind(row.due_date)
         .bind(id)
+        .bind(row.account_id)
         .fetch_one(&state.pg_pool)
         .await
         .map_err(|e| {

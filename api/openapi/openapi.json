@@ -782,6 +782,265 @@
         }
       }
     },
+    "/api/credit-cards": {
+      "get": {
+        "tags": [
+          "Credit Cards"
+        ],
+        "summary": "Lists credit-card accounts with balances and their current open bill.",
+        "operationId": "list_credit_cards",
+        "responses": {
+          "200": {
+            "description": "List of credit cards with balances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CardOverview"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/credit-cards/{id}": {
+      "get": {
+        "tags": [
+          "Credit Cards"
+        ],
+        "summary": "Returns a single credit card with its card fields and balance.",
+        "operationId": "get_credit_card",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Card account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credit card found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardOverview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Credit card not found"
+          }
+        }
+      }
+    },
+    "/api/credit-cards/{id}/anticipate": {
+      "post": {
+        "tags": [
+          "Credit Cards"
+        ],
+        "summary": "Anticipates (pays early) future installments on a credit card.",
+        "description": "Selected future installments are charged on the current bill (optionally\nwith a discount, as offered by many providers). Their expense transactions\nare re-dated/re-priced into the current billing period, so they count in\nthis month's expenses and disappear from future months/bills.",
+        "operationId": "anticipate_installments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Card account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnticipateInstallmentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Installments anticipated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnticipateInstallmentsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid anticipation payload"
+          },
+          "404": {
+            "description": "Credit card not found"
+          }
+        }
+      }
+    },
+    "/api/credit-cards/{id}/bills": {
+      "get": {
+        "tags": [
+          "Credit Cards"
+        ],
+        "summary": "Lists all billing cycles for a credit card with computed totals.",
+        "operationId": "list_card_bills",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Card account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of card bills",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CardBill"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Credit card not found"
+          }
+        }
+      }
+    },
+    "/api/credit-cards/{id}/bills/{bill_id}/pay": {
+      "post": {
+        "tags": [
+          "Credit Cards"
+        ],
+        "summary": "Pays a credit-card bill.",
+        "description": "Records the payment as a transfer (debit the card, credit the paying\naccount) — never as an expense — and updates the bill's settlement state.",
+        "operationId": "pay_card_bill",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Card account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bill_id",
+            "in": "path",
+            "description": "Bill UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayCardBillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bill paid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayCardBillResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payment payload"
+          },
+          "404": {
+            "description": "Credit card or bill not found"
+          }
+        }
+      }
+    },
+    "/api/credit-cards/{id}/purchases": {
+      "post": {
+        "tags": [
+          "Credit Cards"
+        ],
+        "summary": "Records a purchase on a credit card.",
+        "description": "Atomically creates the expense `transaction` (dated at purchase time, so it\ncounts in that month's expenses), posts balanced ledger entries (debit the\nexpense account, credit the card), and attaches it to the matching bill.",
+        "operationId": "create_card_purchase",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Card account UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCardPurchaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Purchase recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid purchase payload"
+          },
+          "404": {
+            "description": "Credit card not found"
+          }
+        }
+      }
+    },
     "/api/installments": {
       "get": {
         "tags": [
@@ -1816,10 +2075,33 @@
           "created_at"
         ],
         "properties": {
+          "closing_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Closing day of the monthly billing cycle (credit cards only, 1-31)."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "description": "Row creation timestamp."
+          },
+          "credit_limit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Credit limit (credit cards only)."
+          },
+          "due_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Payment due day of the monthly billing cycle (credit cards only, 1-31)."
           },
           "id": {
             "type": "string",
@@ -1860,10 +2142,33 @@
             "type": "string",
             "description": "Balance = SUM(debit_amount) − SUM(credit_amount) across ledger entries.\nPositive for asset/expense accounts, negative for liability/income/equity\nunder standard double-entry semantics."
           },
+          "closing_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Closing day of the monthly billing cycle (credit cards only, 1-31)."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "description": "Row creation timestamp."
+          },
+          "credit_limit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Credit limit (credit cards only)."
+          },
+          "due_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Payment due day of the monthly billing cycle (credit cards only, 1-31)."
           },
           "id": {
             "type": "string",
@@ -1904,6 +2209,72 @@
             "type": "integer",
             "format": "int64",
             "description": "Number of alerts acknowledged."
+          }
+        }
+      },
+      "AnticipateInstallmentsRequest": {
+        "type": "object",
+        "description": "Payload for anticipating (paying early) future installments on a card.",
+        "required": [
+          "installment_ids"
+        ],
+        "properties": {
+          "discount_amount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fixed discount amount. Mutually exclusive with `discount_percent`."
+          },
+          "discount_percent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Discount as a percentage of the gross amount (0-100). Mutually exclusive\nwith `discount_amount`."
+          },
+          "installment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Installment rows to anticipate (must belong to plans linked to the card)."
+          }
+        }
+      },
+      "AnticipateInstallmentsResponse": {
+        "type": "object",
+        "description": "Response from anticipating installments.",
+        "required": [
+          "bill_id",
+          "gross_amount",
+          "discount_amount",
+          "net_amount",
+          "installments_anticipated"
+        ],
+        "properties": {
+          "bill_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The bill that absorbed the anticipated installments."
+          },
+          "discount_amount": {
+            "type": "string",
+            "description": "Total discount applied."
+          },
+          "gross_amount": {
+            "type": "string",
+            "description": "Sum of the anticipated installments before discount."
+          },
+          "installments_anticipated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of installments anticipated."
+          },
+          "net_amount": {
+            "type": "string",
+            "description": "Amount actually charged on the card (gross − discount)."
           }
         }
       },
@@ -2213,6 +2584,130 @@
           }
         }
       },
+      "CardBill": {
+        "type": "object",
+        "description": "A single billing cycle (\"fatura\") for a credit card.",
+        "required": [
+          "id",
+          "card_id",
+          "period_start",
+          "period_end",
+          "due_date",
+          "status",
+          "paid_amount",
+          "total_amount",
+          "remaining_amount"
+        ],
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Card account this bill belongs to."
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Payment deadline (vencimento)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique bill identifier."
+          },
+          "paid_amount": {
+            "type": "string",
+            "description": "Total amount paid toward this bill."
+          },
+          "paid_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the bill was fully paid (NULL while open)."
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "description": "Closing date of the billing cycle (fatura fecha)."
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date",
+            "description": "First day of the billing cycle."
+          },
+          "remaining_amount": {
+            "type": "string",
+            "description": "Remaining amount = total − paid."
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` or `paid`."
+          },
+          "total_amount": {
+            "type": "string",
+            "description": "Total charges in the cycle, computed from card transactions in the period."
+          }
+        }
+      },
+      "CardOverview": {
+        "type": "object",
+        "description": "Summary of a credit-card account with its current open bill.",
+        "required": [
+          "id",
+          "name",
+          "balance"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string",
+            "description": "Outstanding balance (signed; negative for liabilities)."
+          },
+          "closing_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Closing day of the monthly billing cycle (1-31)."
+          },
+          "credit_limit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Credit limit."
+          },
+          "current_bill": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardBill",
+                "description": "The current open bill, if any."
+              }
+            ]
+          },
+          "due_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Payment due day of the monthly billing cycle (1-31)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Card account id (an `accounts` row of type `liability`)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Card display name (e.g., \"Nubank Credit Card\")."
+          }
+        }
+      },
       "Category": {
         "type": "object",
         "description": "A transaction category (income or expense), optionally nested via `parent_id`.",
@@ -2415,6 +2910,29 @@
           "type"
         ],
         "properties": {
+          "closing_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Closing day of the monthly billing cycle (credit cards only, 1-31)."
+          },
+          "credit_limit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Credit limit (credit cards only)."
+          },
+          "due_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Payment due day of the monthly billing cycle (credit cards only, 1-31)."
+          },
           "name": {
             "type": "string",
             "description": "Account display name (e.g., \"Nubank Credit Card\")."
@@ -2465,6 +2983,56 @@
             "type": "integer",
             "format": "int32",
             "description": "Year."
+          }
+        }
+      },
+      "CreateCardPurchaseRequest": {
+        "type": "object",
+        "description": "Payload for recording a purchase on a credit card.",
+        "required": [
+          "description",
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "string",
+            "description": "Monetary amount — must be > 0.",
+            "example": "150.00"
+          },
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Expense category (defaults to Miscellaneous when omitted)."
+          },
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Purchase date (defaults to today, ISO `YYYY-MM-DD`)."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description (e.g., \"Lunch at Restaurante X\")."
+          },
+          "installment_plan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Installment plan this purchase belongs to (optional)."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional free-form notes."
           }
         }
       },
@@ -2519,6 +3087,14 @@
           "start_date"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Source account (payment method, e.g. a credit card) for this plan (optional)."
+          },
           "category_id": {
             "type": [
               "string",
@@ -2615,6 +3191,14 @@
           "date"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Source account (payment method) for this transaction (optional)."
+          },
           "amount": {
             "type": "string",
             "description": "Monetary amount — must be > 0.",
@@ -2750,6 +3334,14 @@
           "progress"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Source account (payment method, e.g. a credit card) for this plan (optional)."
+          },
           "category_color": {
             "type": [
               "string",
@@ -2885,6 +3477,22 @@
           "status"
         ],
         "properties": {
+          "anticipated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When this installment was anticipated (paid early), NULL otherwise."
+          },
+          "anticipated_bill_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Bill that absorbed the anticipated installment, NULL otherwise."
+          },
           "due_date": {
             "type": "string",
             "format": "date",
@@ -3178,6 +3786,59 @@
           "raw_text": {
             "type": "string",
             "description": "Raw text extracted by the OCR engine (ML Kit / tesseract.js)."
+          }
+        }
+      },
+      "PayCardBillRequest": {
+        "type": "object",
+        "description": "Payload for paying a credit-card bill.",
+        "properties": {
+          "amount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Amount to pay — must be > 0. Defaults to the full remaining amount.",
+            "example": "250.00"
+          },
+          "bill_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Bill to pay (defaults to the oldest open bill)."
+          },
+          "from_account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Asset account the payment comes from (defaults to \"Cash\")."
+          }
+        }
+      },
+      "PayCardBillResponse": {
+        "type": "object",
+        "description": "Response from paying a credit-card bill.",
+        "required": [
+          "bill",
+          "amount_paid",
+          "remaining"
+        ],
+        "properties": {
+          "amount_paid": {
+            "type": "string",
+            "description": "Amount applied in this payment."
+          },
+          "bill": {
+            "$ref": "#/components/schemas/CardBill",
+            "description": "The bill after the payment."
+          },
+          "remaining": {
+            "type": "string",
+            "description": "Remaining amount on the bill after this payment."
           }
         }
       },
@@ -3717,6 +4378,14 @@
           "updated_at"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Source account (payment method, e.g. a credit card) used for this\ntransaction (NULL when unlinked)."
+          },
           "amount": {
             "type": "string",
             "description": "Monetary amount — always positive; `type` determines direction."
@@ -3782,6 +4451,14 @@
           "end_date"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Filter by source account UUID."
+          },
           "category_id": {
             "type": [
               "string",
@@ -3924,6 +4601,29 @@
           "type"
         ],
         "properties": {
+          "closing_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Closing day of the monthly billing cycle (credit cards only, 1-31)."
+          },
+          "credit_limit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Credit limit (credit cards only)."
+          },
+          "due_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Payment due day of the monthly billing cycle (credit cards only, 1-31)."
+          },
           "name": {
             "type": "string",
             "description": "Account display name."
@@ -3994,6 +4694,14 @@
           "date"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Source account (payment method) for this transaction (optional)."
+          },
           "amount": {
             "type": "string",
             "description": "Monetary amount — must be > 0.",
@@ -4072,6 +4780,10 @@
     {
       "name": "Ledger",
       "description": "Double-entry ledger, event sourcing, and reconciliation"
+    },
+    {
+      "name": "Credit Cards",
+      "description": "Credit card accounts, billing cycles (faturas), payments, and installment anticipation"
     },
     {
       "name": "Auth",

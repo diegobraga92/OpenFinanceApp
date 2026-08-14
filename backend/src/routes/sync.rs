@@ -58,7 +58,7 @@ pub async fn pull(
 
     let transactions: Vec<Transaction> = sqlx::query_as(
         "SELECT id, description, amount, type, category_id, date, notes,
-                installment_plan_id, created_at, updated_at
+                installment_plan_id, account_id, created_at, updated_at
          FROM transactions
          WHERE updated_at > $1 OR created_at > $1
          ORDER BY updated_at",
@@ -200,13 +200,23 @@ async fn apply_transaction_create(
         .get("notes")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    let account_id: Option<Uuid> = op
+        .payload
+        .get("account_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let installment_plan_id: Option<Uuid> = op
+        .payload
+        .get("installment_plan_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
 
     let tx: Transaction = sqlx::query_as(
         "INSERT INTO transactions
-            (id, description, amount, type, category_id, date, notes, idempotency_key)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (id, description, amount, type, category_id, date, notes, account_id, installment_plan_id, idempotency_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id, description, amount, type, category_id, date, notes,
-                   installment_plan_id, created_at, updated_at",
+                   installment_plan_id, account_id, created_at, updated_at",
     )
     .bind(Uuid::parse_str(&op.client_id).unwrap_or_else(|_| Uuid::new_v4()))
     .bind(&description)
@@ -215,6 +225,8 @@ async fn apply_transaction_create(
     .bind(category_id)
     .bind(date)
     .bind(notes)
+    .bind(account_id)
+    .bind(installment_plan_id)
     .bind(&op.client_id)
     .fetch_one(&state.pg_pool)
     .await
@@ -273,12 +285,22 @@ async fn apply_transaction_update(
         .get("notes")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    let account_id: Option<Uuid> = op
+        .payload
+        .get("account_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let installment_plan_id: Option<Uuid> = op
+        .payload
+        .get("installment_plan_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
 
     let result = sqlx::query(
         "UPDATE transactions
          SET description = $1, amount = $2, type = $3, category_id = $4,
-             date = $5, notes = $6, updated_at = NOW()
-         WHERE id = $7",
+             date = $5, notes = $6, account_id = $7, installment_plan_id = $8, updated_at = NOW()
+         WHERE id = $9",
     )
     .bind(&description)
     .bind(amount)
@@ -286,6 +308,8 @@ async fn apply_transaction_update(
     .bind(category_id)
     .bind(date)
     .bind(notes)
+    .bind(account_id)
+    .bind(installment_plan_id)
     .bind(server_id)
     .execute(&state.pg_pool)
     .await

@@ -149,6 +149,28 @@ Boleto pago R$ 85,75                     → expense 85.75
 > managed Expo workflow).
 
 
+### Credit Cards, Faturas & Antecipação
+
+Credit cards are `liability` accounts with a **closing day** (fatura fecha) and a
+**due day** (vencimento). Card purchases are recorded as expenses dated at
+purchase time — so they count in the month they're made — and post double-entry
+ledger entries (debit expense, credit card), growing the card balance.
+
+Each purchase is attached to the billing cycle it falls into, producing monthly
+**bills** with computed totals and a payment deadline:
+
+- `POST /api/credit-cards/{id}/purchases` — record a card purchase (expense + ledger + bill).
+- `POST /api/credit-cards/{id}/bills/{bill_id}/pay` — pay a bill as a **transfer**
+  (debit card, credit your bank account). Payments are never counted as expenses,
+  so paying the card doesn't inflate monthly spending.
+- `POST /api/credit-cards/{id}/anticipate` — **antecipar parcelas**: bring future
+  installments (of plans linked to the card) onto the current bill, optionally
+  with the discount the provider offers for early payment.
+
+Installment plans accept an optional `account_id`, so their generated installments
+land on the right card and become anticipatable.
+
+
 ---
 
 ## LAN Server Deployment
@@ -310,10 +332,16 @@ Internal container-to-container communication (`postgres:5432`, `backend:3000`,
 | `PUT` | `/api/categories/{id}` | Update category |
 | `DELETE` | `/api/categories/{id}` | Delete category (409 if in use) |
 | `GET` | `/api/accounts` | List chart-of-accounts with computed balances |
-| `POST` | `/api/accounts` | Create account (asset/liability/equity/income/expense) |
+| `POST` | `/api/accounts` | Create account (asset/liability/equity/income/expense; liability = credit card when `closing_day`/`due_day` set) |
 | `GET` | `/api/accounts/{id}` | Get single account with balance |
 | `PUT` | `/api/accounts/{id}` | Update account |
 | `DELETE` | `/api/accounts/{id}` | Delete account (409 if in use) |
+| `GET` | `/api/credit-cards` | List credit cards with balances and current bill |
+| `GET` | `/api/credit-cards/{id}` | Get a credit card with balance and current bill |
+| `GET` | `/api/credit-cards/{id}/bills` | List billing cycles ("faturas") with computed totals |
+| `POST` | `/api/credit-cards/{id}/purchases` | Record a card purchase (expense + ledger entries, attached to its bill) |
+| `POST` | `/api/credit-cards/{id}/bills/{bill_id}/pay` | Pay a bill (transfer — never an expense) |
+| `POST` | `/api/credit-cards/{id}/anticipate` | Anticipate future installments onto the current bill with an optional discount |
 | `GET` | `/api/ledger/transactions` | List double-entry ledger transactions |
 | `POST` | `/api/ledger/transactions` | Create balanced double-entry transaction |
 | `POST` | `/api/migrate/single-to-double` | Migrate simple transactions to double-entry |
