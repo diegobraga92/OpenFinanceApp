@@ -14,11 +14,7 @@ import {
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 import { useToast } from './Toast';
-
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
@@ -44,6 +40,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<BudgetSummaryItem | null>(null);
   const { push: pushToast } = useToast();
+  const { t, monthNames } = useI18n();
 
   const expenseCategories = categories.filter((c) => c.type === 'expense');
 
@@ -54,7 +51,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
       const summ = await fetchBudgetSummary(year, month);
       setSummary(summ);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load budgets');
+      setError(err instanceof Error ? err.message : t('budgets.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -81,9 +78,9 @@ export function BudgetManager({ categories, formatMoney }: Props) {
     try {
       await acknowledgeBudgetAlert(id);
       await loadAlerts();
-      pushToast({ message: 'Alert acknowledged' });
+      pushToast({ message: t('budgets.alertAcknowledged') });
     } catch (err) {
-      pushToast({ message: err instanceof Error ? err.message : 'Failed to acknowledge alert' });
+      pushToast({ message: err instanceof Error ? err.message : t('budgets.failedAck') });
     }
   };
 
@@ -91,9 +88,9 @@ export function BudgetManager({ categories, formatMoney }: Props) {
     try {
       await acknowledgeAllBudgetAlerts();
       await loadAlerts();
-      pushToast({ message: 'All alerts acknowledged' });
+      pushToast({ message: t('budgets.alertsAcknowledged') });
     } catch (err) {
-      pushToast({ message: err instanceof Error ? err.message : 'Failed to acknowledge alerts' });
+      pushToast({ message: err instanceof Error ? err.message : t('budgets.failedAckAll') });
     }
   };
 
@@ -143,9 +140,9 @@ export function BudgetManager({ categories, formatMoney }: Props) {
       });
       setShowForm(false);
       await loadData();
-      pushToast({ message: 'Budget saved' });
+      pushToast({ message: t('budgets.saved') });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save budget');
+      setError(err instanceof Error ? err.message : t('budgets.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -156,9 +153,9 @@ export function BudgetManager({ categories, formatMoney }: Props) {
       await deleteBudget(id);
       setPendingDelete(null);
       await loadData();
-      pushToast({ message: 'Budget deleted' });
+      pushToast({ message: t('budgets.deleted') });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete budget');
+      setError(err instanceof Error ? err.message : t('budgets.failedDelete'));
     }
   };
 
@@ -177,18 +174,18 @@ export function BudgetManager({ categories, formatMoney }: Props) {
     <div>
       <div style={styles.pageHeader}>
         <div>
-          <h2 style={styles.pageTitle}>Budgets</h2>
-          <p style={styles.pageSubtitle}>Set monthly spending limits per category</p>
+          <h2 style={styles.pageTitle}>{t('budgets.title')}</h2>
+          <p style={styles.pageSubtitle}>{t('budgets.subtitle')}</p>
         </div>
         <button style={styles.primaryButton} onClick={openCreate} disabled={expenseCategories.length === 0}>
-          + Add Budget
+          {t('budgets.add')}
         </button>
       </div>
 
       {error && (
         <div style={styles.errorBanner}>
           <p>{error}</p>
-          <button onClick={loadData} style={styles.retryButton}>Retry</button>
+          <button onClick={loadData} style={styles.retryButton}>{t('common.retry')}</button>
         </div>
       )}
 
@@ -196,10 +193,10 @@ export function BudgetManager({ categories, formatMoney }: Props) {
         <div style={styles.alertSection}>
           <div style={styles.alertHeader}>
             <h3 style={styles.alertTitle}>
-              ⚠️ Budget Alerts {alerts.unacknowledged_count > 0 && `(${alerts.unacknowledged_count})`}
+              {t('budgets.alertsTitle')} {alerts.unacknowledged_count > 0 && `(${alerts.unacknowledged_count})`}
             </h3>
             <button style={styles.ackAllButton} onClick={handleAcknowledgeAll}>
-              Acknowledge all
+              {t('budgets.acknowledgeAll')}
             </button>
           </div>
           {alerts.items.map((alert) => {
@@ -214,15 +211,15 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                     {alert.category_icon ? `${alert.category_icon} ` : ''}{alert.category_name}
                   </span>
                   <span style={{ ...styles.alertText, color: overLimit ? 'var(--color-danger)' : 'var(--color-warning-text)' }}>
-                    {formatMoney(alert.actual_spent)} of {formatMoney(alert.amount_limit)} ({pct}%)
-                    {overLimit ? ' — over budget' : ' — near limit'}
+                    {t('budgets.spentOf', { spent: formatMoney(alert.actual_spent), limit: formatMoney(alert.amount_limit), pct })}
+                     — {overLimit ? t('common.overBudget') : t('common.nearLimit')}
                   </span>
                 </div>
                 <button
                   style={styles.ackButton}
                   onClick={() => handleAcknowledge(alert.id)}
                 >
-                  Acknowledge
+                  {t('budgets.acknowledge')}
                 </button>
               </div>
             );
@@ -232,7 +229,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
 
       <div style={styles.monthNav}>
         <button style={styles.navButton} onClick={prevMonth}>←</button>
-        <span style={styles.monthLabel}>{MONTHS[month - 1]} {year}</span>
+        <span style={styles.monthLabel}>{monthNames[month - 1]} {year}</span>
         <button
           style={styles.navButton}
           onClick={nextMonth}
@@ -244,15 +241,15 @@ export function BudgetManager({ categories, formatMoney }: Props) {
 
       {loading ? (
         <div style={styles.loading}>
-          <p>Loading budgets…</p>
+          <p>{t('budgets.loading')}</p>
         </div>
       ) : summary && summary.items.length === 0 ? (
         <div style={styles.emptyCard}>
           <EmptyState
             icon="🎯"
-            title={`No budgets for ${MONTHS[month - 1]} ${year}`}
-            description="Set a spending limit per category to track how much you use each month."
-            actionLabel="+ Add Budget"
+            title={t('budgets.noTitle', { month: monthNames[month - 1], year })}
+            description={t('budgets.noDesc')}
+            actionLabel={t('budgets.add')}
             onAction={openCreate}
           />
         </div>
@@ -260,15 +257,15 @@ export function BudgetManager({ categories, formatMoney }: Props) {
         <div>
           <div style={styles.overviewCards}>
             <div style={styles.overviewCard}>
-              <p style={styles.overviewLabel}>Total Budgeted</p>
+              <p style={styles.overviewLabel}>{t('budgets.totalBudgeted')}</p>
               <p style={styles.overviewValue}>{formatMoney(summary.total_budgeted)}</p>
             </div>
             <div style={styles.overviewCard}>
-              <p style={styles.overviewLabel}>Total Spent</p>
+              <p style={styles.overviewLabel}>{t('budgets.totalSpent')}</p>
               <p style={{ ...styles.overviewValue, color: 'var(--color-expense)' }}>{formatMoney(summary.total_spent)}</p>
             </div>
             <div style={styles.overviewCard}>
-              <p style={styles.overviewLabel}>Remaining</p>
+              <p style={styles.overviewLabel}>{t('budgets.remaining')}</p>
               <p style={{
                 ...styles.overviewValue,
                 color: parseFloat(summary.total_budgeted) - parseFloat(summary.total_spent) >= 0 ? 'var(--color-income)' : 'var(--color-expense)',
@@ -292,13 +289,13 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                       <span style={styles.categoryName}>{item.budget.category_name}</span>
                       {pct >= 80 && (
                         <span style={styles.warningBadge}>
-                          {pct >= 100 ? 'Over budget' : 'Warning'}
+                          {pct >= 100 ? t('budgets.over') : t('budgets.warning')}
                         </span>
                       )}
                     </div>
                     <div style={styles.budgetActions}>
-                      <button style={styles.actionButton} onClick={() => openEdit(item)}>Edit</button>
-                      <button style={styles.deleteButton} onClick={() => setPendingDelete(item)}>Delete</button>
+                      <button style={styles.actionButton} onClick={() => openEdit(item)}>{t('common.edit')}</button>
+                      <button style={styles.deleteButton} onClick={() => setPendingDelete(item)}>{t('common.delete')}</button>
                     </div>
                   </div>
 
@@ -324,11 +321,11 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                   <div style={styles.remainingRow}>
                     {parseFloat(item.remaining) >= 0 ? (
                       <span style={styles.remainingText}>
-                        {formatMoney(item.remaining)} remaining
+                        {t('budgets.remainingAmount', { amount: formatMoney(item.remaining) })}
                       </span>
                     ) : (
                       <span style={styles.overText}>
-                        {formatMoney(Math.abs(parseFloat(item.remaining)))} over budget
+                        {t('budgets.overAmount', { amount: formatMoney(Math.abs(parseFloat(item.remaining))) })}
                       </span>
                     )}
                   </div>
@@ -343,15 +340,15 @@ export function BudgetManager({ categories, formatMoney }: Props) {
         <div style={styles.overlay}>
           <form style={styles.form} onSubmit={handleSubmit}>
             <h3 style={styles.formTitle}>
-              {editing ? `Edit Budget — ${editing.budget.category_name}` : 'Add Budget'}
+              {editing ? t('budgets.form.edit', { name: editing.budget.category_name }) : t('budgets.form.add')}
             </h3>
 
             {expenseCategories.length === 0 && (
-              <p style={styles.formWarning}>No expense categories available. Create one first.</p>
+              <p style={styles.formWarning}>{t('budgets.form.noCategories')}</p>
             )}
 
             <label style={styles.label}>
-              Category
+              {t('budgets.form.category')}
               <select
                 style={styles.input}
                 value={form.category_id}
@@ -359,7 +356,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                 required
                 disabled={!!editing}
               >
-                <option value="">— Select category —</option>
+                <option value="">{t('budgets.form.selectCategory')}</option>
                 {expenseCategories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.icon ? `${c.icon} ` : ''}{c.name}
@@ -369,7 +366,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
             </label>
 
             <label style={styles.label}>
-              Monthly Limit (R$)
+              {t('budgets.form.monthlyLimit')}
               <input
                 style={styles.input}
                 type="number"
@@ -383,7 +380,7 @@ export function BudgetManager({ categories, formatMoney }: Props) {
             </label>
 
             <div style={styles.monthPreview}>
-              Applies to: <strong>{MONTHS[month - 1]} {year}</strong>
+              {t('common.appliesTo', { month: monthNames[month - 1], year })}
             </div>
 
             {error && (
@@ -399,14 +396,14 @@ export function BudgetManager({ categories, formatMoney }: Props) {
                 onClick={() => setShowForm(false)}
                 disabled={saving}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
                 style={styles.submitButton}
                 disabled={saving || expenseCategories.length === 0}
               >
-                {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Budget'}
+                {saving ? t('common.saving') : editing ? t('budgets.form.saveChanges') : t('budgets.form.create')}
               </button>
             </div>
           </form>
@@ -415,10 +412,10 @@ export function BudgetManager({ categories, formatMoney }: Props) {
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="Delete budget?"
+        title={t('budgets.deleteTitle')}
         message={
           pendingDelete
-            ? `The budget for ${pendingDelete.budget.category_name} (${MONTHS[month - 1]} ${year}) will be removed. This action cannot be undone.`
+            ? t('budgets.deleteMessage', { category: pendingDelete.budget.category_name, month: monthNames[month - 1], year })
             : ''
         }
         onConfirm={() => pendingDelete && handleDelete(pendingDelete.budget.id)}

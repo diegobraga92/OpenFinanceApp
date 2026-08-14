@@ -11,6 +11,8 @@ import { Category } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import {
+  useI18n } from '../i18n';
+import {
   KNOWN_APPS,
   NotificationSettings,
   configureNotifications,
@@ -23,6 +25,7 @@ interface Props {
 }
 
 export function NotificationSettingsScreen({ categories }: Props) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
 
@@ -57,14 +60,13 @@ export function NotificationSettingsScreen({ categories }: Props) {
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Notification Capture</Text>
+        <Text style={styles.pageTitle}>{t('notifications.title')}</Text>
       </View>
 
       {permissionGranted === false && (
         <View style={styles.reconErrorBox}>
           <Text style={styles.reconErrorText}>
-            Notification access was denied. Enable it in your device settings to
-            capture transactions automatically.
+            {t('notifications.permissionDenied')}
           </Text>
         </View>
       )}
@@ -72,10 +74,9 @@ export function NotificationSettingsScreen({ categories }: Props) {
       <View style={styles.section}>
         <View style={styles.settingRow}>
           <View style={styles.settingRowText}>
-            <Text style={styles.settingRowTitle}>Auto-capture transactions</Text>
+            <Text style={styles.settingRowTitle}>{t('notifications.autoCapture')}</Text>
             <Text style={styles.settingRowDesc}>
-              Parse incoming bank and payment notifications and save them as
-              transactions.
+              {t('notifications.autoCaptureDesc')}
             </Text>
           </View>
           <Switch
@@ -87,8 +88,8 @@ export function NotificationSettingsScreen({ categories }: Props) {
                   if (g) update({ enabled: true });
                   else
                     Alert.alert(
-                      'Permission needed',
-                      'Allow notifications to enable auto-capture.',
+                      t('notifications.permissionNeeded'),
+                      t('notifications.permissionNeededDesc'),
                     );
                 });
               } else {
@@ -102,7 +103,7 @@ export function NotificationSettingsScreen({ categories }: Props) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Monitored Apps</Text>
+        <Text style={styles.sectionTitle}>{t('notifications.monitoredApps')}</Text>
         <Text style={styles.settingRowDesc}>
           When a selected app sends a notification, PudimFinance will try to
           extract the transaction.
@@ -133,23 +134,23 @@ export function NotificationSettingsScreen({ categories }: Props) {
         >
           <Text style={styles.settingRowDesc}>
             {settings.monitoredApps.length === 0
-              ? '✓ Watching all apps (no filter)'
-              : 'Clear selection — watch all apps'}
+              ? t('notifications.watchingAll')
+              : t('notifications.clearSelection')}
           </Text>
         </TouchableOpacity>
       </View>
 
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Capture Mode</Text>
+        <Text style={styles.sectionTitle}>{t('notifications.captureMode')}</Text>
         <TouchableOpacity
           style={styles.settingRow}
           onPress={() => update({ mode: 'ask' })}
         >
           <View style={styles.settingRowText}>
-            <Text style={styles.settingRowTitle}>Ask before creating</Text>
+            <Text style={styles.settingRowTitle}>{t('notifications.askBefore')}</Text>
             <Text style={styles.settingRowDesc}>
-              Shows a confirmation dialog with the parsed data first.
+              {t('notifications.askBeforeDesc')}
             </Text>
           </View>
           <View
@@ -166,9 +167,9 @@ export function NotificationSettingsScreen({ categories }: Props) {
           onPress={() => update({ mode: 'auto' })}
         >
           <View style={styles.settingRowText}>
-            <Text style={styles.settingRowTitle}>Auto-create</Text>
+            <Text style={styles.settingRowTitle}>{t('notifications.autoCreate')}</Text>
             <Text style={styles.settingRowDesc}>
-              Creates transactions immediately without confirmation.
+              {t('notifications.autoCreateDesc')}
             </Text>
           </View>
           <View
@@ -183,9 +184,9 @@ export function NotificationSettingsScreen({ categories }: Props) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Default Category</Text>
+        <Text style={styles.sectionTitle}>{t('notifications.defaultCategory')}</Text>
         <Text style={styles.settingRowDesc}>
-          Used when the merchant can't be matched to an existing category.
+          {t('notifications.defaultCategoryDesc')}
         </Text>
         <View style={styles.typeToggle}>
           <TouchableOpacity
@@ -201,7 +202,7 @@ export function NotificationSettingsScreen({ categories }: Props) {
                 settings.defaultCategoryId === null && styles.typeButtonTextActive,
               ]}
             >
-              None
+              {t('common.none')}
             </Text>
           </TouchableOpacity>
           {categories

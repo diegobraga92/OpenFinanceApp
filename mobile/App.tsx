@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -29,6 +29,9 @@ import { SnackbarProvider, useSnackbar } from './src/components/Snackbar';
 import { BiometricLock } from './src/components/BiometricLock';
 import { OnboardingGate } from './src/screens/OnboardingScreen';
 import { AuthGate, useAuthUser } from './src/auth/AuthGate';
+import { I18nProvider, useI18n } from './src/i18n';
+import { LanguageToggle } from './src/components/LanguageToggle';
+import type { TranslationKey } from '../shared/i18n';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
@@ -52,43 +55,57 @@ type Screen = 'dashboard' | 'transactions' | 'accounts' | 'credit-cards' | 'ledg
 const DRAWER_ITEMS: {
   key: Screen;
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  label: string;
+  labelKey: TranslationKey;
 }[] = [
-  { key: 'dashboard', icon: 'stats-chart-outline', label: 'Dashboard' },
-  { key: 'transactions', icon: 'swap-horizontal-outline', label: 'Transactions' },
-  { key: 'accounts', icon: 'wallet-outline', label: 'Accounts' },
-  { key: 'credit-cards', icon: 'card-outline', label: 'Credit Cards' },
-  { key: 'ledger', icon: 'book-outline', label: 'Ledger' },
-  { key: 'budgets', icon: 'pie-chart-outline', label: 'Budgets' },
-  { key: 'installments', icon: 'calendar-outline', label: 'Installments' },
-  { key: 'reports', icon: 'trending-up-outline', label: 'Reports' },
-  { key: 'reconciliation', icon: 'sync-outline', label: 'Reconciliation' },
-  { key: 'categories', icon: 'pricetags-outline', label: 'Categories' },
-  { key: 'receipts', icon: 'receipt-outline', label: 'Receipts' },
-  { key: 'audit', icon: 'list-outline', label: 'Audit Log' },
-  { key: 'notifications', icon: 'notifications-outline', label: 'Notification Capture' },
-  { key: 'server', icon: 'server-outline', label: 'Server' },
+  { key: 'dashboard', icon: 'stats-chart-outline', labelKey: 'nav.dashboard' },
+  { key: 'transactions', icon: 'swap-horizontal-outline', labelKey: 'nav.transactions' },
+  { key: 'accounts', icon: 'wallet-outline', labelKey: 'nav.accounts' },
+  { key: 'credit-cards', icon: 'card-outline', labelKey: 'nav.creditCards' },
+  { key: 'ledger', icon: 'book-outline', labelKey: 'nav.ledger' },
+  { key: 'budgets', icon: 'pie-chart-outline', labelKey: 'nav.budgets' },
+  { key: 'installments', icon: 'calendar-outline', labelKey: 'nav.installments' },
+  { key: 'reports', icon: 'trending-up-outline', labelKey: 'nav.reports' },
+  { key: 'reconciliation', icon: 'sync-outline', labelKey: 'nav.reconciliation' },
+  { key: 'categories', icon: 'pricetags-outline', labelKey: 'nav.categories' },
+  { key: 'receipts', icon: 'receipt-outline', labelKey: 'nav.receipts' },
+  { key: 'audit', icon: 'list-outline', labelKey: 'nav.audit' },
+  { key: 'notifications', icon: 'notifications-outline', labelKey: 'nav.notifications' },
+  { key: 'server', icon: 'server-outline', labelKey: 'nav.server' },
 ];
 
 export default function App() {
   return (
-    <SnackbarProvider>
-      <NotificationCaptureProvider>
-        <AuthGate>
-          <BiometricLock>
-            <OnboardingGate>
-              <AppContent />
-            </OnboardingGate>
-          </BiometricLock>
-        </AuthGate>
-      </NotificationCaptureProvider>
-    </SnackbarProvider>
+    <I18nProvider>
+      <SnackbarProvider>
+        <NotificationCaptureProvider>
+          <AuthGate>
+            <BiometricGate>
+              <OnboardingGate>
+                <AppContent />
+              </OnboardingGate>
+            </BiometricGate>
+          </AuthGate>
+        </NotificationCaptureProvider>
+      </SnackbarProvider>
+    </I18nProvider>
   );
+}
+
+/**
+ * Wraps the app content in the biometric lock. `restored` is true for a
+ * session restored from storage (any launch after the first login), which is
+ * when the lock should engage automatically. Right after a fresh password
+ * login the app stays unlocked for that session.
+ */
+function BiometricGate({ children }: { children: ReactNode }) {
+  const { restored } = useAuthUser();
+  return <BiometricLock lockOnMount={restored}>{children}</BiometricLock>;
 }
 
 function AppContent() {
   const { show: showSnackbar } = useSnackbar();
   const { user, logout } = useAuthUser();
+  const { t, formatMoney } = useI18n();
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
@@ -135,11 +152,11 @@ function AppContent() {
       setTransactions(txns.items);
       setAccounts(accnts);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setError(err instanceof Error ? err.message : t('errors.loadData'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadData();
@@ -184,11 +201,6 @@ function AppContent() {
     />
   );
 
-  const formatMoney = (value: string | number) => {
-    const n = typeof value === 'string' ? parseFloat(value) : value;
-    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
   const expenseCategories = categories.filter((c) => c.type === 'expense');
   const incomeCategories = categories.filter((c) => c.type === 'income');
 
@@ -198,29 +210,29 @@ function AppContent() {
     setShowAddForm(false);
   };
 
-  const handleDelete = (t: Transaction) => {
-    deleteTransaction(t.id)
+  const handleDelete = (tx: Transaction) => {
+    deleteTransaction(tx.id)
       .then(async () => {
         await loadData();
-        showSnackbar(`Transaction "${t.description}" deleted`, 'Undo', async () => {
+        showSnackbar(t('transactions.deleted', { description: tx.description }), t('transactions.undo'), async () => {
           try {
             await createTransaction({
-              description: t.description,
-              amount: t.amount,
-              type: t.type === 'income' ? 'income' : 'expense',
-              category_id: t.category_id || null,
-              date: t.date,
-              notes: t.notes || null,
+              description: tx.description,
+              amount: tx.amount,
+              type: tx.type === 'income' ? 'income' : 'expense',
+              category_id: tx.category_id || null,
+              date: tx.date,
+              notes: tx.notes || null,
             });
             await loadData();
-            showSnackbar('Transaction restored');
+            showSnackbar(t('transactions.restored'));
           } catch (err) {
-            showSnackbar(err instanceof Error ? err.message : 'Could not restore transaction');
+            showSnackbar(err instanceof Error ? err.message : t('transactions.couldNotRestore'));
           }
         });
       })
       .catch((err) => {
-        showSnackbar(err instanceof Error ? err.message : 'Failed to delete');
+        showSnackbar(err instanceof Error ? err.message : t('transactions.failedToDelete'));
       });
   };
 
@@ -234,7 +246,7 @@ function AppContent() {
       <StatusBar style="light" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuButton} accessibilityLabel="Open menu">
+        <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuButton} accessibilityLabel={t('nav.ariaOpenMenu')}>
           <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>🏦 PudimFinance</Text>
@@ -244,13 +256,13 @@ function AppContent() {
       {loading && !error ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading…</Text>
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.addButton} onPress={loadData}>
-            <Text style={styles.addButtonText}>Retry</Text>
+            <Text style={styles.addButtonText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -339,7 +351,7 @@ function AppContent() {
                 resetForm();
                 setShowAddForm(true);
               }}
-              accessibilityLabel="Add transaction"
+              accessibilityLabel={t('transactions.add')}
               accessibilityRole="button"
             >
               <Ionicons name="add" size={28} color={colors.primaryText} />
@@ -362,7 +374,7 @@ function AppContent() {
           >
             <View style={styles.drawerHeader}>
               <Text style={styles.drawerTitle}>🏦 PudimFinance</Text>
-              <TouchableOpacity onPress={() => setDrawerOpen(false)} style={styles.drawerClose} accessibilityLabel="Close menu">
+              <TouchableOpacity onPress={() => setDrawerOpen(false)} style={styles.drawerClose} accessibilityLabel={t('nav.ariaCloseMenu')}>
                 <Ionicons name="close" size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -381,7 +393,7 @@ function AppContent() {
                     color={active ? colors.primary : colors.textMuted}
                   />
                   <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
-                    {item.label}
+                    {t(item.labelKey)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -393,6 +405,10 @@ function AppContent() {
                   {user?.email}
                 </Text>
               </View>
+              <View style={styles.drawerLangRow}>
+                <Text style={styles.drawerLangLabel}>{t('app.language')}</Text>
+                <LanguageToggle />
+              </View>
               <TouchableOpacity
                 style={styles.drawerItem}
                 onPress={() => {
@@ -402,7 +418,7 @@ function AppContent() {
                 accessibilityRole="button"
               >
                 <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-                <Text style={[styles.drawerItemText, { color: colors.danger }]}>Sign out</Text>
+                <Text style={[styles.drawerItemText, { color: colors.danger }]}>{t('nav.signOut')}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

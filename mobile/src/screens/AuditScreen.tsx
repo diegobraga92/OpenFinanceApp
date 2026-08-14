@@ -10,10 +10,12 @@ import {
 import { AuditEvent, fetchAuditEvents } from '../api';
 import { getAccessToken } from '../auth';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import { styles } from '../theme/styles';
 import { EmptyState } from '../components/EmptyState';
 
 export function AuditScreen() {
+  const { t, formatDateTime } = useI18n();
   const [items, setItems] = useState<AuditEvent[]>([]);
   const [eventType, setEventType] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -33,7 +35,7 @@ export function AuditScreen() {
         });
         setItems(res.items);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load audit events');
+        setError(err instanceof Error ? err.message : t('audit.failedLoad'));
       } finally {
         setLoading(false);
       }
@@ -48,10 +50,10 @@ export function AuditScreen() {
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Audit Log</Text>
+        <Text style={styles.pageTitle}>{t('audit.title')}</Text>
       </View>
       <Text style={styles.receiptHint}>
-        Admin-only view of the immutable event trail.
+        {t('audit.subtitle')}
       </Text>
 
       {error && (
@@ -65,7 +67,7 @@ export function AuditScreen() {
           style={styles.auditFilterInput}
           value={eventType}
           onChangeText={setEventType}
-          placeholder="Filter by event type (e.g. TransactionRecorded)"
+          placeholder={t('audit.filterPlaceholder')}
           placeholderTextColor={colors.textDim}
           autoCapitalize="none"
           autoCorrect={false}
@@ -78,7 +80,7 @@ export function AuditScreen() {
           {loading ? (
             <ActivityIndicator color={colors.primaryText} size="small" />
           ) : (
-            <Text style={styles.submitButtonText}>Apply</Text>
+            <Text style={styles.submitButtonText}>{t('common.apply')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -87,8 +89,8 @@ export function AuditScreen() {
         <EmptyState
           compact
           icon="📜"
-          title="No audit events found"
-          description="Try adjusting the event type filter or check back after more activity."
+          title={t('audit.noEventsTitle')}
+          description={t('audit.noEventsDesc')}
         />
       ) : (
         <View style={styles.auditList}>
@@ -100,7 +102,7 @@ export function AuditScreen() {
                 style={styles.auditRow}
                 onPress={() => setExpandedId(expanded ? null : e.id)}
                 accessibilityRole="button"
-                accessibilityLabel={`${e.event_type} event`}
+                accessibilityLabel={t('audit.eventAria', { type: e.event_type })}
               >
                 <View style={styles.auditRowHeader}>
                   <View style={styles.auditRowLeft}>
@@ -110,7 +112,7 @@ export function AuditScreen() {
                     </Text>
                   </View>
                   <Text style={styles.auditTime}>
-                    {new Date(e.occurred_at).toLocaleString()}
+                    {formatDateTime(e.occurred_at)}
                   </Text>
                 </View>
                 {expanded && (

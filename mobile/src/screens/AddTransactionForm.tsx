@@ -15,6 +15,7 @@ import { Category, Transaction, createTransaction, updateTransaction } from '../
 import { findPreviousTransaction } from '../offline/autocomplete';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
+import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
@@ -39,6 +40,7 @@ function toIsoDate(d: Date) {
 }
 
 export function AddTransactionForm({ categories, editing, onSaved, onCancel }: Props) {
+  const { t } = useI18n();
   const [description, setDescription] = useState(editing?.description ?? '');
   const [amount, setAmount] = useState(editing?.amount ?? '');
   const [type, setType] = useState<'income' | 'expense'>(
@@ -71,9 +73,10 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
       setType(prev.type);
       setCategoryId(prev.category_id ?? '');
       setAutoFilledHint(
-        `↩ Filled from previous: R$ ${prev.amount} · ${
-          cat ? `${cat.icon ? `${cat.icon} ` : ''}${cat.name}` : 'No category'
-        }`,
+        t('transactions.form.filledPrevious', {
+          amount: `R$ ${prev.amount}`,
+          category: cat ? `${cat.icon ? `${cat.icon} ` : ''}${cat.name}` : t('transactions.form.noCategory'),
+        }),
       );
     } else if (!prev) {
       // No longer matches history — drop the hint (auto-filled values stay
@@ -84,11 +87,11 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
 
   const handleSubmit = async () => {
     if (!description.trim()) {
-      Alert.alert('Validation', 'Description is required');
+      Alert.alert(t('common.validation'), t('transactions.form.validationDesc'));
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Validation', 'Amount must be greater than zero');
+      Alert.alert(t('common.validation'), t('transactions.form.validationAmount'));
       return;
     }
 
@@ -109,7 +112,7 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
       }
       await onSaved();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save transaction');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('transactions.form.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -118,19 +121,19 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.formCard}>
-        <Text style={styles.formTitle}>{editing ? 'Edit Transaction' : 'Add Transaction'}</Text>
+        <Text style={styles.formTitle}>{editing ? t('transactions.form.edit') : t('transactions.form.add')}</Text>
 
-        <Text style={styles.label}>Description</Text>
+        <Text style={styles.label}>{t('common.description')}</Text>
         <TextInput
           style={styles.input}
           value={description}
           onChangeText={handleDescriptionChange}
-          placeholder="e.g. Lunch at Restaurante X"
+          placeholder={t('transactions.form.descriptionPlaceholder')}
           placeholderTextColor={colors.textDim}
         />
         {autoFilledHint && <Text style={styles.autoFillHint}>{autoFilledHint}</Text>}
 
-        <Text style={styles.label}>Amount (R$)</Text>
+        <Text style={styles.label}>{t('transactions.form.amount')}</Text>
         <TextInput
           style={styles.input}
           value={amount}
@@ -139,16 +142,16 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             autoFillDisabled.current = true;
             setAutoFilledHint(null);
           }}
-          placeholder="0.00"
+          placeholder={t('transactions.form.amountPlaceholder')}
           placeholderTextColor={colors.textDim}
           keyboardType="decimal-pad"
         />
 
-        <Text style={styles.label}>Date</Text>
+        <Text style={styles.label}>{t('common.date')}</Text>
         <TouchableOpacity
           style={styles.dateButton}
           onPress={() => setShowDatePicker(true)}
-          accessibilityLabel="Pick transaction date"
+          accessibilityLabel={t('transactions.form.openDate')}
           accessibilityRole="button"
         >
           <Text style={styles.dateButtonText}>📅 {formatDateDisplay(date)}</Text>
@@ -160,11 +163,11 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
               <View style={styles.datePickerModal}>
                 <View style={styles.datePickerHeader}>
                   <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                    <Text style={styles.datePickerCancel}>{t('common.cancel')}</Text>
                   </TouchableOpacity>
-                  <Text style={styles.datePickerTitle}>Select Date</Text>
+                  <Text style={styles.datePickerTitle}>{t('common.date')}</Text>
                   <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                    <Text style={styles.datePickerDone}>Done</Text>
+                    <Text style={styles.datePickerDone}>{t('common.done')}</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
@@ -197,7 +200,7 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             }}
           />
         )}
-        <Text style={styles.label}>Type</Text>
+        <Text style={styles.label}>{t('common.type')}</Text>
         <View style={styles.typeToggle}>
           <TouchableOpacity
             style={[styles.typeButton, type === 'expense' && styles.typeButtonActive]}
@@ -210,7 +213,7 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             }}
           >
             <Text style={[styles.typeButtonText, type === 'expense' && styles.typeButtonTextActive]}>
-              Expense
+              {t('common.expense')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -224,14 +227,14 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             }}
           >
             <Text style={[styles.typeButtonText, type === 'income' && styles.typeButtonTextActive]}>
-              Income
+              {t('common.income')}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>Category</Text>
+        <Text style={styles.label}>{t('common.category')}</Text>
         {categoriesForType.length === 0 ? (
-          <Text style={styles.emptyText}>No {type} categories. Create one in the Categories screen!</Text>
+          <Text style={styles.emptyText}>{t('transactions.form.noCategories', { type: t(type === 'expense' ? 'common.expense' : 'common.income') })}</Text>
         ) : (
           <View style={styles.categoryGrid}>
             <TouchableOpacity
@@ -243,7 +246,7 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
               }}
             >
               <Text style={[styles.categoryChipText, !categoryId && styles.categoryChipTextActive]}>
-                None
+                {t('common.none')}
               </Text>
             </TouchableOpacity>
             {categoriesForType.map((c) => (
@@ -273,14 +276,14 @@ export function AddTransactionForm({ categories, editing, onSaved, onCancel }: P
             <ActivityIndicator color={colors.primaryText} />
           ) : (
             <Text style={styles.submitButtonText}>
-              {editing ? 'Save Changes' : 'Add Transaction'}
+              {editing ? t('transactions.form.saveChanges') : t('transactions.form.add')}
             </Text>
           )}
         </TouchableOpacity>
 
         {editing && (
           <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         )}
       </View>

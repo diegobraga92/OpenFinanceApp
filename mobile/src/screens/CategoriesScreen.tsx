@@ -14,6 +14,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '../theme/constants';
 import { EmptyState } from '../components/EmptyState';
+import { useI18n } from '../i18n';
 
 interface Props {
   expenseCategories: Category[];
@@ -53,6 +54,7 @@ function formFromCategory(c: Category): FormState {
 }
 
 export function CategoriesScreen({ expenseCategories, incomeCategories, onCreated }: Props) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('expense');
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormState>(emptyForm('expense'));
@@ -74,7 +76,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
 
   const handleCategorySubmit = async () => {
     if (!form.name.trim()) {
-      Alert.alert('Validation', 'Name is required');
+      Alert.alert(t('common.validation'), t('common.nameRequired'));
       return;
     }
     setSaving(true);
@@ -93,7 +95,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
       setShowForm(false);
       await onCreated();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save category');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('categories.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -101,12 +103,12 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
 
   const confirmDelete = (c: Category) => {
     Alert.alert(
-      `Delete "${c.name}"?`,
-      'This will permanently remove the category. It can only be deleted if no transactions use it.',
+      t('categories.deleteTitle', { name: c.name }),
+      t('categories.deleteMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -114,8 +116,8 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
               await onCreated();
             } catch (err) {
               Alert.alert(
-                'Error',
-                err instanceof Error ? err.message : 'Failed to delete category',
+                t('common.error'),
+                err instanceof Error ? err.message : t('categories.failedDelete'),
               );
             }
           },
@@ -126,9 +128,9 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
 
   const showActions = (c: Category) => {
     Alert.alert(c.name, undefined, [
-      { text: 'Edit', onPress: () => openEdit(c) },
-      { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(c) },
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('common.edit'), onPress: () => openEdit(c) },
+      { text: t('common.delete'), style: 'destructive', onPress: () => confirmDelete(c) },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -152,7 +154,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
         onPress={() => showActions(c)}
         delayLongPress={400}
         accessibilityRole="button"
-        accessibilityLabel={`${c.name}. Long press for actions.`}
+        accessibilityLabel={`${c.name}. ${t('accounts.form.longPress')}`}
       >
         <View style={[styles.categoryIconCircle, { backgroundColor: c.color || colors.surfaceHover }]}>
           <Text style={styles.categoryIconText}>{c.icon || '•'}</Text>
@@ -161,10 +163,10 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
           <Text style={styles.categoryListTitle}>{c.name}</Text>
           <Text style={styles.categoryCardSub}>
             {c.parent_id
-              ? 'Subcategory'
+              ? t('common.subcategory')
               : childCount > 0
-                ? `${childCount} subcategor${childCount === 1 ? 'y' : 'ies'}`
-                : 'Top-level'}
+                ? t(childCount === 1 ? 'common.subcategory' : 'common.subcategories', { count: childCount })
+                : t('common.topLevel')}
           </Text>
         </View>
         <Text style={styles.categoryMore}>⋯</Text>
@@ -175,9 +177,9 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Categories</Text>
+        <Text style={styles.pageTitle}>{t('categories.title')}</Text>
         <TouchableOpacity style={styles.addButton} onPress={() => openCreate(tab)}>
-          <Text style={styles.addButtonText}>+ New</Text>
+          <Text style={styles.addButtonText}>{t('categories.new')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -185,7 +187,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
         style={styles.categorySearch}
         value={query}
         onChangeText={setQuery}
-        placeholder="Search categories…"
+        placeholder={t('categories.search')}
         placeholderTextColor={colors.textDim}
         autoCapitalize="none"
         autoCorrect={false}
@@ -197,7 +199,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
           onPress={() => setTab('expense')}
         >
           <Text style={[styles.categoryTabText, tab === 'expense' && styles.categoryTabTextActive]}>
-            Expenses ({expenseCategories.length})
+            {t('categories.tabExpenses')} ({expenseCategories.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -205,7 +207,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
           onPress={() => setTab('income')}
         >
           <Text style={[styles.categoryTabText, tab === 'income' && styles.categoryTabTextActive]}>
-            Income ({incomeCategories.length})
+            {t('categories.tabIncome')} ({incomeCategories.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -216,13 +218,15 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
           <EmptyState
             compact
             icon={tab === 'expense' ? '🛒' : '💰'}
-            title={query ? 'No matching categories' : `No ${tab} categories yet`}
+            title={query ? t('categories.noMatchingTitle') : (tab === 'expense' ? t('categories.noExpenseTitle') : t('categories.noIncomeTitle'))}
             description={
               query
-                ? `Nothing matched "${query}". Try a different search term.`
-                : `Tap below to create your first ${tab} category.`
+                ? t('categories.noMatchingDesc', { query })
+                : tab === 'expense'
+                  ? t('categories.noExpenseDesc')
+                  : t('categories.noIncomeDesc')
             }
-            actionLabel="+ New Category"
+            actionLabel={t('categories.new')}
             onAction={() => openCreate(tab)}
           />
         )}
@@ -237,19 +241,19 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingId ? 'Edit Category' : 'New Category'}</Text>
+            <Text style={styles.modalTitle}>{editingId ? t('categories.form.edit') : t('categories.form.new')}</Text>
 
-            <Text style={styles.label}>Name</Text>
+            <Text style={styles.label}>{t('categories.form.name')}</Text>
             <TextInput
               style={styles.input}
               value={form.name}
               onChangeText={(name) => setForm((f) => ({ ...f, name }))}
-              placeholder="e.g. Pets"
+              placeholder={t('categories.form.namePlaceholder')}
               placeholderTextColor={colors.textDim}
               autoFocus
             />
 
-            <Text style={styles.label}>Type</Text>
+            <Text style={styles.label}>{t('categories.form.type')}</Text>
             <View style={styles.typeToggle}>
               <TouchableOpacity
                 style={[styles.typeButton, form.type === 'expense' && styles.typeButtonActive]}
@@ -260,7 +264,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
                 <Text
                   style={[styles.typeButtonText, form.type === 'expense' && styles.typeButtonTextActive]}
                 >
-                  Expense
+                  {t('common.expense')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -272,12 +276,12 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
                 <Text
                   style={[styles.typeButtonText, form.type === 'income' && styles.typeButtonTextActive]}
                 >
-                  Income
+                  {t('common.income')}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.label}>Icon</Text>
+            <Text style={styles.label}>{t('categories.form.icon')}</Text>
             <View style={styles.iconGrid}>
               {CATEGORY_ICONS.map((ic) => (
                 <TouchableOpacity
@@ -290,7 +294,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
               ))}
             </View>
 
-            <Text style={styles.label}>Color</Text>
+            <Text style={styles.label}>{t('categories.form.color')}</Text>
             <View style={styles.colorGrid}>
               {CATEGORY_COLORS.map((col) => (
                 <TouchableOpacity
@@ -311,7 +315,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
                 onPress={() => setShowForm(false)}
                 disabled={saving}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitButton, saving && styles.submitButtonDisabled]}
@@ -322,7 +326,7 @@ export function CategoriesScreen({ expenseCategories, incomeCategories, onCreate
                   <ActivityIndicator color={colors.primaryText} />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {editingId ? 'Save' : 'Create'}
+                    {editingId ? t('common.save') : t('common.create')}
                   </Text>
                 )}
               </TouchableOpacity>

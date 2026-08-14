@@ -8,6 +8,7 @@ import {
   uploadReconciliationFile,
 } from '../api';
 import { useToast } from './Toast';
+import { useI18n } from '../i18n';
 
 interface Props {
   formatMoney: (value: string | number) => string;
@@ -20,7 +21,7 @@ interface CsvRow {
 }
 
 export function ReconciliationUpload({ formatMoney }: Props) {
-  const [statementName, setStatementName] = useState('Bank Statement');
+  const [statementName, setStatementName] = useState('');
   const [rawCsv, setRawCsv] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [autoCreateUnmatched, setAutoCreateUnmatched] = useState(false);
@@ -29,6 +30,7 @@ export function ReconciliationUpload({ formatMoney }: Props) {
   const [result, setResult] = useState<ReconciliationUploadResponse | null>(null);
   const [history, setHistory] = useState<ReconciliationHistoryItem[]>([]);
   const { push: pushToast } = useToast();
+  const { t, formatDateTime } = useI18n();
 
   const loadHistory = useCallback(async () => {
     try {
@@ -80,13 +82,13 @@ export function ReconciliationUpload({ formatMoney }: Props) {
 
     const rows = parseCsv(rawCsv);
     if (rows.length === 0) {
-      setError('CSV is empty or malformed. Expected columns: date,description,amount');
+      setError(t('recon.validation.empty'));
       return;
     }
 
     try {
       const payload: ReconciliationUploadRequest = {
-        statement_name: statementName.trim() || 'Bank Statement',
+        statement_name: statementName.trim() || t('recon.bankStatement'),
         lines: rows.map((r) => ({
           date: r.date,
           description: r.description,
@@ -98,11 +100,11 @@ export function ReconciliationUpload({ formatMoney }: Props) {
       const res = await uploadReconciliation(payload);
       setResult(res);
       pushToast({
-        message: `Reconciliation done: ${res.matched_rows} matched, ${res.unmatched_rows} unmatched`,
+        message: t('recon.done', { matched: res.matched_rows, unmatched: res.unmatched_rows }),
       });
       loadHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload reconciliation');
+      setError(err instanceof Error ? err.message : t('recon.failedUpload'));
     } finally {
       setLoading(false);
     }
@@ -121,11 +123,11 @@ export function ReconciliationUpload({ formatMoney }: Props) {
       });
       setResult(res);
       pushToast({
-        message: `Reconciliation done: ${res.matched_rows} matched, ${res.unmatched_rows} unmatched`,
+        message: t('recon.done', { matched: res.matched_rows, unmatched: res.unmatched_rows }),
       });
       loadHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload statement file');
+      setError(err instanceof Error ? err.message : t('recon.failedFile'));
     } finally {
       setLoading(false);
     }
@@ -141,27 +143,27 @@ export function ReconciliationUpload({ formatMoney }: Props) {
     <div>
       <div style={styles.pageHeader}>
         <div>
-          <h2 style={styles.pageTitle}>Reconciliation</h2>
+          <h2 style={styles.pageTitle}>{t('recon.title')}</h2>
           <p style={styles.pageSubtitle}>
-            Upload a bank statement (CSV or OFX) or paste CSV to match against your transactions
+            {t('recon.subtitle')}
           </p>
         </div>
       </div>
 
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Upload Statement File (.csv / .ofx)</h3>
+        <h3 style={styles.sectionTitle}>{t('recon.uploadFileTitle')}</h3>
         <form onSubmit={handleFileUpload} style={styles.form}>
           <label style={styles.label}>
-            Statement Name
+            {t('recon.statementName')}
             <input
               style={styles.input}
               value={statementName}
               onChange={(e) => setStatementName(e.target.value)}
-              placeholder="e.g. Nubank August 2026"
+              placeholder={t('recon.statementNamePlaceholder')}
             />
           </label>
           <label style={styles.fileLabel}>
-            Choose file
+            {t('recon.chooseFile')}
             <input
               type="file"
               accept=".csv,.ofx,.qfx,text/csv,application/x-ofx"
@@ -170,7 +172,7 @@ export function ReconciliationUpload({ formatMoney }: Props) {
             />
           </label>
           {selectedFile && (
-            <p style={styles.fileHint}>Selected: {selectedFile.name} ({selectedFile.size} bytes)</p>
+            <p style={styles.fileHint}>{t('recon.selected', { name: selectedFile.name, size: selectedFile.size })}</p>
           )}
           <label style={styles.checkboxLabel}>
             <input
@@ -179,16 +181,16 @@ export function ReconciliationUpload({ formatMoney }: Props) {
               onChange={(e) => setAutoCreateUnmatched(e.target.checked)}
               style={styles.checkbox}
             />
-            Auto-create transactions for unmatched rows (as expenses, uncategorized)
+            {t('recon.autoCreate')}
           </label>
           <button type="submit" style={styles.submitButton} disabled={loading || !selectedFile}>
-            {loading ? 'Reconciling…' : 'Upload & Reconcile'}
+            {loading ? t('recon.reconciling') : t('recon.uploadReconcile')}
           </button>
         </form>
       </div>
 
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Or Paste CSV Manually</h3>
+        <h3 style={styles.sectionTitle}>{t('recon.pasteCsv')}</h3>
         {error && (
           <div style={styles.errorBanner}>
             <p>{error}</p>
@@ -198,12 +200,12 @@ export function ReconciliationUpload({ formatMoney }: Props) {
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>
-            CSV Data
+            {t('recon.csvData')}
             <textarea
               style={styles.csvInput}
               value={rawCsv}
               onChange={(e) => setRawCsv(e.target.value)}
-              placeholder={`date,description,amount\n2026-08-01,Supermarket,150.00\n2026-08-02,Salary,2500.00\n...\n\nFormat: date (YYYY-MM-DD), description, amount. Negative amounts = expenses.`}
+              placeholder={t('recon.csvPlaceholder')}
               spellCheck={false}
             />
           </label>
@@ -215,29 +217,29 @@ export function ReconciliationUpload({ formatMoney }: Props) {
               onChange={(e) => setAutoCreateUnmatched(e.target.checked)}
               style={styles.checkbox}
             />
-            Auto-create transactions for unmatched rows
+            {t('recon.autoCreateShort')}
           </label>
 
           <button type="submit" style={styles.submitButton} disabled={loading}>
-            {loading ? 'Reconciling…' : 'Upload & Reconcile'}
+            {loading ? t('recon.reconciling') : t('recon.uploadReconcile')}
           </button>
         </form>
       </div>
 
       {result && (
         <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>Results</h3>
+          <h3 style={styles.sectionTitle}>{t('recon.results')}</h3>
           <div style={styles.summaryCards}>
             <div style={styles.summaryCard}>
-              <p style={styles.summaryLabel}>Total Rows</p>
+              <p style={styles.summaryLabel}>{t('recon.totalRows')}</p>
               <p style={styles.summaryValue}>{result.total_rows}</p>
             </div>
             <div style={styles.summaryCard}>
-              <p style={{ ...styles.summaryLabel, color: 'var(--color-income)' }}>Matched</p>
+              <p style={{ ...styles.summaryLabel, color: 'var(--color-income)' }}>{t('recon.matched')}</p>
               <p style={{ ...styles.summaryValue, color: 'var(--color-income)' }}>{result.matched_rows}</p>
             </div>
             <div style={styles.summaryCard}>
-              <p style={{ ...styles.summaryLabel, color: 'var(--color-expense)' }}>Unmatched</p>
+              <p style={{ ...styles.summaryLabel, color: 'var(--color-expense)' }}>{t('recon.unmatched')}</p>
               <p style={{ ...styles.summaryValue, color: 'var(--color-expense)' }}>{result.unmatched_rows}</p>
             </div>
           </div>
@@ -246,11 +248,11 @@ export function ReconciliationUpload({ formatMoney }: Props) {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Date</th>
-                  <th style={styles.th}>Description</th>
-                  <th style={styles.th} align="right">Amount</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Confidence</th>
+                  <th style={styles.th}>{t('transactions.table.date')}</th>
+                  <th style={styles.th}>{t('transactions.table.description')}</th>
+                  <th style={styles.th} align="right">{t('transactions.table.amount')}</th>
+                  <th style={styles.th}>{t('recon.status')}</th>
+                  <th style={styles.th}>{t('recon.confidence')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,24 +287,24 @@ export function ReconciliationUpload({ formatMoney }: Props) {
 
       {history.length > 0 && (
         <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>History</h3>
+          <h3 style={styles.sectionTitle}>{t('recon.history')}</h3>
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Uploaded</th>
-                  <th style={styles.th} align="right">Total</th>
-                  <th style={styles.th} align="right">Matched</th>
-                  <th style={styles.th} align="right">Unmatched</th>
-                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>{t('recon.name')}</th>
+                  <th style={styles.th}>{t('recon.uploaded')}</th>
+                  <th style={styles.th} align="right">{t('common.total')}</th>
+                  <th style={styles.th} align="right">{t('recon.matched')}</th>
+                  <th style={styles.th} align="right">{t('recon.unmatched')}</th>
+                  <th style={styles.th}>{t('recon.status')}</th>
                 </tr>
               </thead>
               <tbody>
                 {history.map((h) => (
                   <tr key={h.id} style={styles.tr}>
                     <td style={styles.td}>{h.statement_name}</td>
-                    <td style={styles.td}>{new Date(h.uploaded_at).toLocaleString('pt-BR')}</td>
+                    <td style={styles.td}>{formatDateTime(h.uploaded_at)}</td>
                     <td style={{ ...styles.td, ...styles.numCell }}>{h.total_rows}</td>
                     <td style={{ ...styles.td, ...styles.numCell }}>{h.matched_rows}</td>
                     <td style={{ ...styles.td, ...styles.numCell }}>{h.unmatched_rows}</td>

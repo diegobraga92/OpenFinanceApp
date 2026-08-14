@@ -14,7 +14,7 @@ import {
 } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
-import { SHORT_MONTHS } from '../theme/constants';
+import { useI18n } from '../i18n';
 import { DonutChart } from '../components/DonutChart';
 import { TrendChart } from '../components/TrendChart';
 import { useSnackbar } from '../components/Snackbar';
@@ -25,6 +25,7 @@ interface Props {
 
 export function ReportsScreen({ formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
+  const { t, shortMonthNames } = useI18n();
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReportResponse | null>(null);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdownResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,7 +51,7 @@ export function ReportsScreen({ formatMoney }: Props) {
       setMonthlyReport(monthly);
       setCategoryBreakdown(breakdown);
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to load reports');
+      showSnackbar(err instanceof Error ? err.message : t('reports.failedLoad'));
     }
   }, [showSnackbar]);
 
@@ -75,14 +76,14 @@ export function ReportsScreen({ formatMoney }: Props) {
   const donutData = (categoryBreakdown?.categories ?? [])
     .slice(0, 6)
     .map((c) => ({
-      label: c.category_name || 'Uncategorised',
+      label: c.category_name || t('common.uncategorised'),
       value: parseFloat(c.total),
       color: c.color || '#6366f1',
     }));
   const totalSpent = donutData.reduce((s, d) => s + d.value, 0);
 
   const trendData = (monthlyReport?.months ?? []).map((m) => ({
-    label: `${SHORT_MONTHS[m.month - 1]}/${String(m.year).slice(2)}`,
+    label: `${shortMonthNames[m.month - 1]}/${String(m.year).slice(2)}`,
     income: parseFloat(m.income_total),
     expense: parseFloat(m.expense_total),
   }));
@@ -106,34 +107,34 @@ export function ReportsScreen({ formatMoney }: Props) {
       }
     >
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Reports</Text>
+        <Text style={styles.pageTitle}>{t('reports.title')}</Text>
       </View>
 
       <View style={styles.overviewCards}>
         <View style={styles.overviewCard}>
-          <Text style={styles.overviewLabel}>Income</Text>
+          <Text style={styles.overviewLabel}>{t('reports.income')}</Text>
           <Text style={[styles.overviewValue, { color: colors.income }]}>{formatMoney(totalIncome)}</Text>
         </View>
         <View style={styles.overviewCard}>
-          <Text style={styles.overviewLabel}>Expenses</Text>
+          <Text style={styles.overviewLabel}>{t('reports.expenses')}</Text>
           <Text style={[styles.overviewValue, { color: colors.expense }]}>{formatMoney(totalExpense)}</Text>
         </View>
         <View style={styles.overviewCard}>
-          <Text style={styles.overviewLabel}>Net</Text>
+          <Text style={styles.overviewLabel}>{t('reports.netShort')}</Text>
           <Text style={[styles.overviewValue, { color: net >= 0 ? colors.income : colors.expense }]}>{formatMoney(net)}</Text>
         </View>
       </View>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Category Spending (This Month)</Text>
+        <Text style={styles.sectionTitle}>{t('reports.categorySpending')}</Text>
         {(categoryBreakdown?.categories ?? []).length === 0 ? (
-          <Text style={styles.emptyText}>No expenses this month.</Text>
+          <Text style={styles.emptyText}>{t('reports.noExpensesMonth')}</Text>
         ) : (
           <>
             <View style={styles.chartArea}>
               <DonutChart
                 data={donutData}
                 centerValue={formatMoney(totalSpent)}
-                centerLabel="Spent"
+                centerLabel={t('reports.spent')}
               />
             </View>
             <View style={styles.donutLegend}>
@@ -156,7 +157,7 @@ export function ReportsScreen({ formatMoney }: Props) {
             <View key={c.category_id || 'none'} style={styles.categoryRow}>
               <View style={styles.categoryLabelRow}>
                 <Text style={styles.categoryName}>
-                  {c.icon ? `${c.icon} ` : ''}{c.category_name || 'Uncategorised'}
+                  {c.icon ? `${c.icon} ` : ''}{c.category_name || t('common.uncategorised')}
                 </Text>
                 <Text style={styles.categoryTotal}>
                   {formatMoney(c.total)} ({Math.round(parseFloat(c.percentage))}%)
@@ -177,9 +178,9 @@ export function ReportsScreen({ formatMoney }: Props) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Monthly Income vs Expenses</Text>
+        <Text style={styles.sectionTitle}>{t('reports.monthlyIncomeExpenses')}</Text>
         {(monthlyReport?.months ?? []).length === 0 ? (
-          <Text style={styles.emptyText}>No monthly data yet.</Text>
+          <Text style={styles.emptyText}>{t('reports.noMonthlyData')}</Text>
         ) : (
           <>
             <View style={styles.chartArea}>
@@ -191,7 +192,7 @@ export function ReportsScreen({ formatMoney }: Props) {
               return (
                 <View key={`${m.year}-${m.month}`} style={styles.trendRow}>
                   <Text style={styles.trendLabel}>
-                    {SHORT_MONTHS[m.month - 1]} {String(m.year).slice(2)}
+                    {shortMonthNames[m.month - 1]} {String(m.year).slice(2)}
                   </Text>
                   <View style={styles.trendValues}>
                     <Text style={styles.trendIncomeText}>+{formatMoney(income)}</Text>

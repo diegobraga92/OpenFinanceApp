@@ -1,21 +1,55 @@
-import React, { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 
 interface Props {
   children: ReactNode;
+  /**
+   * Start the app locked behind biometrics on mount. True for a restored
+   * session (i.e. any launch after the first login); false right after the
+   * user logs in with a password so no redundant prompt appears.
+   */
+  lockOnMount: boolean;
 }
 
 /**
  * Locks the app behind the device's biometric authentication (Face ID /
- * fingerprint). If biometrics are unavailable or not enrolled, the app opens
- * normally. Otherwise a lock screen is shown until the user authenticates.
+ * fingerprint) once the user has logged in at least once.
+ *
+ * - After the first login the app stays unlocked for that session.
+ * - On any later launch (restored session) it starts locked and auto-prompts.
+ * - Every time the app returns from the background it re-locks and prompts.
+ * - If biometrics are unavailable or not enrolled, the app opens normally.
  */
-export function BiometricLock({ children }: Props) {
-  const [supported, setSupported] = useState(true);
-  const [locked, setLocked] = useState(true);
+export function BiometricLock({ children, lockOnMount }: Props) {
+  const { t } = useI18n();
+  const [supported, setSupported] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [ready, setReady] = useState(false);
+  const prompting = useRef(false);
+  const didAutoPrompt = useRef(false);
+  const prevAppState = useRef(AppState.currentState);
 
+  const prompt = useCallback(async () => {
+    if (prompting.current) return;
+    prompting.current = true;
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: t('biometric.promptMessage'),
+        cancelLabel: t('common.cancel'),
+        disableDeviceFallback: false,
+      });
+      if (result.success) setLocked(false);
+    } catch {
+      // Stay locked if the prompt fails for any reason.
+    } finally {
+      prompting.current = false;
+    }
+  }, []);
+
+  // Check for biometric hardware/enrollment and decide the initial lock state.
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -24,43 +58,60 @@ export function BiometricLock({ children }: Props) {
           LocalAuthentication.hasHardwareAsync(),
           LocalAuthentication.isEnrolledAsync(),
         ]);
+        const isSupported = hasHardware && enrolled;
         if (!mounted) return;
-        setSupported(hasHardware && enrolled);
-        if (!(hasHardware && enrolled)) setLocked(false);
+        setSupported(isSupported);
+        setLocked(isSupported && lockOnMount);
       } catch {
         if (mounted) {
           setSupported(false);
           setLocked(false);
         }
+      } finally {
+        if (mounted) setReady(true);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [lockOnMount]);
 
-  const unlock = useCallback(async () => {
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Unlock PudimFinance',
-        cancelLabel: 'Cancel',
-        disableDeviceFallback: false,
-      });
-      if (result.success) setLocked(false);
-    } catch {
-      // Stay locked if the prompt fails for any reason.
-    }
-  }, []);
+  // Auto-prompt once when the app opens locked (restored session).
+  useEffect(() => {
+    if (didAutoPrompt.current) return;
+    if (!ready || !supported || !locked) return;
+    didAutoPrompt.current = true;
+    void prompt();
+  }, [ready, supported, locked, prompt]);
+
+  // Re-lock on background and auto-prompt when returning to the foreground.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      const prev = prevAppState.current;
+      prevAppState.current = next;
+      if (next === 'background') {
+        if (supported) setLocked(true);
+      } else if (next === 'active' && prev === 'background') {
+        if (supported) {
+          setLocked(true);
+          void prompt();
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [supported, prompt]);
+
+  if (!ready) return null;
 
   if (!supported || !locked) return <>{children}</>;
 
   return (
     <View style={styles.container}>
       <Text style={styles.icon}>🔒</Text>
-      <Text style={styles.title}>PudimFinance is locked</Text>
-      <Text style={styles.subtitle}>Authenticate to view your finances</Text>
-      <TouchableOpacity style={styles.button} onPress={unlock} accessibilityRole="button">
-        <Text style={styles.buttonText}>Unlock</Text>
+      <Text style={styles.title}>{t('biometric.lockedTitle')}</Text>
+      <Text style={styles.subtitle}>{t('biometric.lockedSubtitle')}</Text>
+      <TouchableOpacity style={styles.button} onPress={prompt} accessibilityRole="button">
+        <Text style={styles.buttonText}>{t('biometric.unlock')}</Text>
       </TouchableOpacity>
     </View>
   );

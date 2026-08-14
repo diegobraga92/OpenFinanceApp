@@ -20,6 +20,7 @@ import {
   payCardBill,
 } from '../api';
 import { useToast } from './Toast';
+import { useI18n } from '../i18n';
 import { EmptyState } from './EmptyState';
 
 interface Props {
@@ -50,6 +51,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bills, setBills] = useState<CardBill[]>([]);
   const { push: pushToast } = useToast();
+  const { t } = useI18n();
 
   const [showPurchase, setShowPurchase] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState<PurchaseForm>({
@@ -81,7 +83,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
       setCards(data);
       setSelectedId((prev) => prev ?? data[0]?.id ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load credit cards');
+      setError(err instanceof Error ? err.message : t('creditCards.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -134,7 +136,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
       setAnticipatable(items);
       setShowAnticipate(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load installments');
+      setError(err instanceof Error ? err.message : t('creditCards.failedLoadInstallments'));
     }
   };
 
@@ -145,8 +147,8 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
     setError(null);
     try {
       const amount = parseFloat(purchaseForm.amount);
-      if (!purchaseForm.description.trim()) throw new Error('Description is required');
-      if (!amount || amount <= 0) throw new Error('Amount must be greater than zero');
+      if (!purchaseForm.description.trim()) throw new Error(t('creditCards.validation.desc'));
+      if (!amount || amount <= 0) throw new Error(t('creditCards.validation.amount'));
       await createCardPurchase(selected.id, {
         description: purchaseForm.description.trim(),
         amount: purchaseForm.amount,
@@ -161,9 +163,9 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
         date: new Date().toISOString().slice(0, 10),
       });
       await refreshCards();
-      pushToast({ message: 'Purchase recorded on card' });
+      pushToast({ message: t('creditCards.recorded') });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to record purchase');
+      setError(err instanceof Error ? err.message : t('creditCards.failedRecord'));
     } finally {
       setSaving(false);
     }
@@ -179,7 +181,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
         payBillId ||
         selected.current_bill?.id ||
         bills.find((b) => b.status === 'open')?.id;
-      if (!billId) throw new Error('No open bill to pay');
+      if (!billId) throw new Error(t('creditCards.noOpenBill'));
       const res = await payCardBill(selected.id, billId, {
         amount: payAmount ? payAmount : undefined,
         from_account_id: payFromAccount || undefined,
@@ -188,10 +190,10 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
       setPayAmount('');
       await refreshCards();
       pushToast({
-        message: `Bill paid — ${formatMoney(res.amount_paid)} applied, ${formatMoney(res.remaining)} remaining`,
+        message: t('creditCards.billPaid', { amount: formatMoney(res.amount_paid), remaining: formatMoney(res.remaining) }),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to pay bill');
+      setError(err instanceof Error ? err.message : t('creditCards.failedPay'));
     } finally {
       setSaving(false);
     }
@@ -203,7 +205,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
     setSaving(true);
     setError(null);
     try {
-      if (checkedInstallments.length === 0) throw new Error('Select at least one installment');
+      if (checkedInstallments.length === 0) throw new Error(t('creditCards.validation.installment'));
       const payload: { installment_ids: string[]; discount_percent?: string } = {
         installment_ids: checkedInstallments,
       };
@@ -216,31 +218,31 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
       setAnticipatable([]);
       await refreshCards();
       pushToast({
-        message: `${res.installments_anticipated} installment(s) anticipated — discount ${formatMoney(res.discount_amount)}`,
+        message: t('creditCards.anticipated', { count: res.installments_anticipated, amount: formatMoney(res.discount_amount) }),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to anticipate installments');
+      setError(err instanceof Error ? err.message : t('creditCards.failedAnticipate'));
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div style={styles.emptyText}>Loading credit cards…</div>;
+    return <div style={styles.emptyText}>{t('creditCards.loading')}</div>;
   }
 
   return (
     <div>
       <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>Credit Cards</h2>
+        <h2 style={styles.pageTitle}>{t('creditCards.title')}</h2>
       </div>
 
       {cards.length === 0 ? (
         <EmptyState
           icon="💳"
-          title="No credit cards yet"
-          description="Create a liability account with a closing day and due day (Accounts tab). Card purchases, bills and installment anticipation will appear here."
-          actionLabel="Go to Accounts"
+          title={t('creditCards.noTitle')}
+          description={t('creditCards.noDesc')}
+          actionLabel={t('common.goToAccounts')}
           onAction={() => window.dispatchEvent(new CustomEvent('pudim:go-accounts'))}
         />
       ) : (
@@ -261,9 +263,9 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                 <div style={styles.cardTop}>
                   <span style={styles.cardName}>{c.name}</span>
                   {c.current_bill?.status === 'paid' ? (
-                    <span style={styles.badgePaid}>paid</span>
+                    <span style={styles.badgePaid}>{t('common.paid')}</span>
                   ) : (
-                    <span style={styles.badgeOpen}>open</span>
+                    <span style={styles.badgeOpen}>{t('common.open')}</span>
                   )}
                 </div>
                 <div style={styles.cardBalance}>
@@ -272,13 +274,13 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                 <div style={styles.cardMeta}>
                   {c.current_bill ? (
                     <>
-                      <span>Due {c.current_bill.due_date}</span>
-                      <span>Bill {formatMoney(c.current_bill.remaining_amount)}</span>
+                      <span>{t('common.due', { date: c.current_bill.due_date })}</span>
+                      <span>{t('common.bill', { amount: formatMoney(c.current_bill.remaining_amount) })}</span>
                     </>
                   ) : (
-                    <span>No purchases yet</span>
+                    <span>{t('common.noPurchasesYet')}</span>
                   )}
-                  {c.credit_limit ? <span>Limit {formatMoney(c.credit_limit)}</span> : null}
+                  {c.credit_limit ? <span>{t('common.limit', { amount: formatMoney(c.credit_limit) })}</span> : null}
                 </div>
               </button>
             ))}
@@ -290,13 +292,13 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                 <h3 style={styles.detailTitle}>{selected.name}</h3>
                 <div style={styles.pageActions}>
                   <button type="button" style={styles.secondaryButton} onClick={openAnticipate}>
-                    ⏩ Antecipar parcelas
+                    {t('creditCards.anticipate')}
                   </button>
                   <button type="button" style={styles.secondaryButton} onClick={() => setShowPay(true)}>
-                    💸 Pay bill
+                    {t('creditCards.payBill')}
                   </button>
                   <button type="button" style={styles.primaryButton} onClick={() => setShowPurchase(true)}>
-                    + Purchase
+                    {t('creditCards.purchase')}
                   </button>
                 </div>
               </div>
@@ -304,40 +306,40 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
               {selected.current_bill && (
                 <div style={styles.currentBill}>
                   <div>
-                    <span style={styles.dim}>Current bill</span>
+                    <span style={styles.dim}>{t('creditCards.currentBill')}</span>
                     <strong style={styles.currentBillAmount}>
                       {formatMoney(selected.current_bill.remaining_amount)}
                     </strong>
                   </div>
                   <div>
-                    <span style={styles.dim}>Due date</span>
+                    <span style={styles.dim}>{t('common.date')}</span>
                     <strong>{selected.current_bill.due_date}</strong>
                   </div>
                   <div>
-                    <span style={styles.dim}>Total</span>
+                    <span style={styles.dim}>{t('common.total')}</span>
                     <strong>{formatMoney(selected.current_bill.total_amount)}</strong>
                   </div>
                   <div>
-                    <span style={styles.dim}>Paid</span>
+                    <span style={styles.dim}>{t('common.paid')}</span>
                     <strong>{formatMoney(selected.current_bill.paid_amount)}</strong>
                   </div>
                 </div>
               )}
 
-              <h4 style={styles.sectionTitle}>Billing cycles</h4>
+              <h4 style={styles.sectionTitle}>{t('creditCards.billingCycles')}</h4>
               {bills.length === 0 ? (
-                <p style={styles.emptyText}>No billing cycles yet.</p>
+                <p style={styles.emptyText}>{t('creditCards.noCycles')}</p>
               ) : (
                 <div style={styles.table}>
                   {bills.map((b) => (
                     <div key={b.id} style={styles.row}>
                       <span>
-                        {b.period_start} → {b.period_end}
+                        {t('creditCards.periodRange', { start: b.period_start, end: b.period_end })}
                       </span>
-                      <span>Due {b.due_date}</span>
+                      <span>{t('common.due', { date: b.due_date })}</span>
                       <span>{formatMoney(b.total_amount)}</span>
                       <span style={b.status === 'paid' ? styles.paidText : styles.dangerText}>
-                        {b.status === 'paid' ? 'Paid' : formatMoney(b.remaining_amount)}
+                        {b.status === 'paid' ? t('common.paid') : formatMoney(b.remaining_amount)}
                       </span>
                     </div>
                   ))}
@@ -350,7 +352,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
 
       {/* Purchase modal */}
       {showPurchase && selected && (
-        <Modal title="Record card purchase" onClose={() => setShowPurchase(false)}>
+        <Modal title={t('creditCards.purchaseModalTitle')} onClose={() => setShowPurchase(false)}>
           {error && (
             <div style={styles.error}>
               <p>{error}</p>
@@ -358,18 +360,18 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
           )}
           <form onSubmit={handlePurchase} style={styles.form}>
             <label style={styles.label}>
-              Description
+              {t('common.description')}
               <input
                 style={styles.input}
                 value={purchaseForm.description}
                 onChange={(e) => setPurchaseForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="e.g. Dinner at Churrascaria"
+                placeholder={t('creditCards.descPlaceholder')}
                 required
                 autoFocus
               />
             </label>
             <label style={styles.label}>
-              Amount (R$)
+              {t('transactions.form.amount')}
               <input
                 style={styles.input}
                 value={purchaseForm.amount}
@@ -379,13 +381,13 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
               />
             </label>
             <label style={styles.label}>
-              Category
+              {t('common.category')}
               <select
                 style={styles.input}
                 value={purchaseForm.category_id}
                 onChange={(e) => setPurchaseForm((f) => ({ ...f, category_id: e.target.value }))}
               >
-                <option value="">Miscellaneous</option>
+                <option value="">{t('common.miscellaneous')}</option>
                 {expenseCategories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -394,7 +396,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
               </select>
             </label>
             <label style={styles.label}>
-              Date
+              {t('common.date')}
               <input
                 type="date"
                 style={styles.input}
@@ -409,10 +411,10 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                 onClick={() => setShowPurchase(false)}
                 disabled={saving}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="submit" style={styles.submitButton} disabled={saving}>
-                {saving ? 'Saving…' : 'Record purchase'}
+                {saving ? t('common.saving') : t('creditCards.recordPurchase')}
               </button>
             </div>
           </form>
@@ -422,7 +424,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
 
       {/* Pay modal */}
       {showPay && selected && (
-        <Modal title="Pay card bill" onClose={() => setShowPay(false)}>
+        <Modal title={t('creditCards.payModalTitle')} onClose={() => setShowPay(false)}>
           {error && (
             <div style={styles.error}>
               <p>{error}</p>
@@ -430,24 +432,24 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
           )}
           <form onSubmit={handlePay} style={styles.form}>
             <label style={styles.label}>
-              Bill
+              {t('creditCards.bill')}
               <select
                 style={styles.input}
                 value={payBillId}
                 onChange={(e) => setPayBillId(e.target.value)}
               >
-                <option value="">Current open bill (default)</option>
+                <option value="">{t('creditCards.currentOpenBill')}</option>
                 {bills
                   .filter((b) => b.status === 'open')
                   .map((b) => (
                     <option key={b.id} value={b.id}>
-                      Due {b.due_date} — {formatMoney(b.remaining_amount)} remaining
+                      {t('common.due', { date: b.due_date })} — {t('budgets.remainingAmount', { amount: formatMoney(b.remaining_amount) })}
                     </option>
                   ))}
               </select>
             </label>
             <label style={styles.label}>
-              Amount (R$) — leave empty to pay the full remaining amount
+              {t('creditCards.payAmountHint')}
               <input
                 style={styles.input}
                 value={payAmount}
@@ -456,7 +458,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
               />
             </label>
             <label style={styles.label}>
-              From account (optional, defaults to Cash)
+              {t('creditCards.fromAccount')}
               <input
                 style={styles.input}
                 value={payFromAccount}
@@ -471,10 +473,10 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                 onClick={() => setShowPay(false)}
                 disabled={saving}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="submit" style={styles.submitButton} disabled={saving}>
-                {saving ? 'Paying…' : 'Pay bill'}
+                {saving ? t('common.saving') : t('creditCards.payBill')}
               </button>
             </div>
           </form>
@@ -484,18 +486,17 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
 
       {/* Anticipate modal */}
       {showAnticipate && selected && (
-        <Modal title="Antecipar parcelas" onClose={() => setShowAnticipate(false)}>
+        <Modal title={t('creditCards.anticipateTitle')} onClose={() => setShowAnticipate(false)}>
           {error && (
             <div style={styles.error}>
               <p>{error}</p>
             </div>
           )}
           <p style={styles.hint}>
-            Pay future installments early on the current bill. Many providers offer a
-            discount for this — enter the one you received.
+            {t('creditCards.anticipateDesc')}
           </p>
           {anticipatable.length === 0 ? (
-            <p style={styles.emptyText}>No future installments linked to this card.</p>
+            <p style={styles.emptyText}>{t('creditCards.noFutureInstallments')}</p>
           ) : (
             <form onSubmit={handleAnticipate} style={styles.form}>
               <div style={styles.checkList}>
@@ -513,16 +514,16 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                       }
                     />
                     <span>
-                      Parcela {it.number}/{it.total} — {it.planDescription}
+                      {t('creditCards.installmentItem', { number: it.number, total: it.total, description: it.planDescription })}
                     </span>
                     <span style={styles.checkRowRight}>
-                      {formatMoney(it.amount)} · due {it.dueDate}
+                      {formatMoney(it.amount)} · {t('common.due', { date: it.dueDate })}
                     </span>
                   </label>
                 ))}
               </div>
               <label style={styles.label}>
-                Discount % (provider early-payment incentive, e.g. 5)
+                {t('creditCards.discountLabel')}
                 <input
                   style={styles.input}
                   value={discountPercent}
@@ -544,7 +545,7 @@ export function CreditCardManager({ categories, formatMoney }: Props) {
                   Cancel
                 </button>
                 <button type="submit" style={styles.submitButton} disabled={saving}>
-                  {saving ? 'Anticipating…' : 'Anticipate installments'}
+                  {saving ? t('common.saving') : t('creditCards.anticipate')}
                 </button>
               </div>
             </form>
@@ -564,6 +565,7 @@ function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div
       style={styles.overlay}
@@ -577,7 +579,7 @@ function Modal({
           <h3 id="card-modal-title" style={styles.modalTitle}>
             {title}
           </h3>
-          <button type="button" style={styles.modalClose} onClick={onClose} aria-label="Close">
+          <button type="button" style={styles.modalClose} onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>

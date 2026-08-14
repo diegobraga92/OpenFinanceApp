@@ -4,6 +4,8 @@ import { createAccount, deleteAccount, updateAccount } from '../api';
 import { useToast } from './Toast';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
+import { useI18n } from '../i18n';
+import type { TranslationKey } from '../../../shared/i18n';
 
 interface Props {
   accounts: AccountWithBalance[];
@@ -12,12 +14,17 @@ interface Props {
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
 
-const ACCOUNT_TYPES: { key: AccountType; label: string; icon: string; blurb: string }[] = [
-  { key: 'asset', label: 'Assets', icon: '💰', blurb: 'Cash, bank accounts and savings' },
-  { key: 'liability', label: 'Liabilities & Credit Cards', icon: '💳', blurb: 'Credit cards, loans and debts' },
-  { key: 'equity', label: 'Equity', icon: '🏛️', blurb: 'Net worth and capital' },
-  { key: 'income', label: 'Income', icon: '📥', blurb: 'Salary and earnings sources' },
-  { key: 'expense', label: 'Expense', icon: '📤', blurb: 'Spending categories' },
+const ACCOUNT_TYPES: {
+  key: AccountType;
+  labelKey: TranslationKey;
+  blurbKey: TranslationKey;
+  icon: string;
+}[] = [
+  { key: 'asset', labelKey: 'accounts.type.asset', blurbKey: 'accounts.type.assetBlurb', icon: '💰' },
+  { key: 'liability', labelKey: 'accounts.type.liability', blurbKey: 'accounts.type.liabilityBlurb', icon: '💳' },
+  { key: 'equity', labelKey: 'accounts.type.equity', blurbKey: 'accounts.type.equityBlurb', icon: '🏛️' },
+  { key: 'income', labelKey: 'accounts.type.income', blurbKey: 'accounts.type.incomeBlurb', icon: '📥' },
+  { key: 'expense', labelKey: 'accounts.type.expense', blurbKey: 'accounts.type.expenseBlurb', icon: '📤' },
 ];
 
 interface FormState {
@@ -31,6 +38,7 @@ interface FormState {
 const EMPTY_FORM: FormState = { name: '', type: 'asset', closing_day: '', due_day: '', credit_limit: '' };
 
 export function AccountManager({ accounts, onAccountsChanged }: Props) {
+  const { t, formatMoney } = useI18n();
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -74,7 +82,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     e.preventDefault();
     const name = form.name.trim();
     if (!name) {
-      setError('Name is required');
+      setError(t('accounts.validation.name'));
       return;
     }
     setSaving(true);
@@ -84,17 +92,17 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     const dueDay = form.due_day.trim() ? Number(form.due_day.trim()) : null;
     const creditLimit = form.credit_limit.trim() ? form.credit_limit.trim() : null;
     if (isCard && (closingDay === null || dueDay === null)) {
-      setError('Credit cards need a closing day and a due day');
+      setError(t('accounts.validation.cardDays'));
       setSaving(false);
       return;
     }
     if (closingDay !== null && (closingDay < 1 || closingDay > 31)) {
-      setError('Closing day must be between 1 and 31');
+      setError(t('accounts.validation.closingDay'));
       setSaving(false);
       return;
     }
     if (dueDay !== null && (dueDay < 1 || dueDay > 31)) {
-      setError('Due day must be between 1 and 31');
+      setError(t('accounts.validation.dueDay'));
       setSaving(false);
       return;
     }
@@ -108,15 +116,15 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     try {
       if (editingId) {
         await updateAccount(editingId, payload);
-        pushToast({ message: `Account "${name}" updated` });
+        pushToast({ message: t('accounts.updated', { name }) });
       } else {
         await createAccount(payload);
-        pushToast({ message: `Account "${name}" created` });
+        pushToast({ message: t('accounts.created', { name }) });
       }
       setShowForm(false);
       await onAccountsChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save account');
+      setError(err instanceof Error ? err.message : t('accounts.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -126,13 +134,13 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
     if (!deleting) return;
     try {
       await deleteAccount(deleting.id);
-      pushToast({ message: `Account "${deleting.name}" deleted` });
+      pushToast({ message: t('accounts.deleted', { name: deleting.name }) });
       setDeleting(null);
       await onAccountsChanged();
     } catch (err) {
       setDeleting(null);
       pushToast({
-        message: err instanceof Error ? err.message : 'Failed to delete account',
+        message: err instanceof Error ? err.message : t('accounts.failedDelete'),
       });
     }
   };
@@ -147,10 +155,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
 
   const formatBalance = (a: AccountWithBalance) => {
     const n = Math.abs(parseFloat(a.balance));
-    return n.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
+    return formatMoney(n);
   };
 
   const renderAccountCard = (a: AccountWithBalance) => {
@@ -174,7 +179,12 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
         <div style={styles.cardInfo}>
           <p style={styles.cardName}>{a.name}</p>
           <p style={styles.cardMeta}>
-            {a.transaction_count} ledger entr{a.transaction_count === 1 ? 'y' : 'ies'}
+            {t(
+              a.transaction_count === 1
+                ? 'accounts.form.countEntries_one'
+                : 'accounts.form.countEntries_other',
+              { count: a.transaction_count },
+            )}
           </p>
         </div>
         <div style={styles.balanceWrap}>
@@ -187,8 +197,8 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
             type="button"
             style={styles.iconAction}
             onClick={() => openEdit(a)}
-            aria-label={`Edit ${a.name}`}
-            title="Edit"
+            aria-label={t('common.edit') + ' ' + a.name}
+            title={t('common.edit')}
           >
             ✏️
           </button>
@@ -196,8 +206,8 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
             type="button"
             style={styles.iconActionDanger}
             onClick={() => setDeleting(a)}
-            aria-label={`Delete ${a.name}`}
-            title="Delete"
+            aria-label={t('common.delete') + ' ' + a.name}
+            title={t('common.delete')}
           >
             🗑️
           </button>
@@ -215,16 +225,16 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
             {group.icon}
           </span>
           <div style={styles.groupHeaderText}>
-            <h4 style={styles.groupTitle}>{group.label}</h4>
-            <p style={styles.groupBlurb}>{group.blurb}</p>
+            <h4 style={styles.groupTitle}>{t(group.labelKey)}</h4>
+            <p style={styles.groupBlurb}>{t(group.blurbKey)}</p>
           </div>
           <span style={styles.groupBadge}>{items.length}</span>
           <button
             type="button"
             style={styles.groupAdd}
             onClick={() => openCreate(group.key)}
-            aria-label={`Add ${group.label}`}
-            title="Add account"
+            aria-label={t('accounts.form.addAccount')}
+            title={t('accounts.form.addAccount')}
           >
             +
           </button>
@@ -232,7 +242,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
         {items.length > 0 ? (
           <div style={styles.list}>{items.map(renderAccountCard)}</div>
         ) : (
-          <p style={styles.groupEmpty}>No {group.label.toLowerCase()} yet.</p>
+          <p style={styles.groupEmpty}>{t('accounts.form.noGroup', { label: t(group.labelKey).toLowerCase() })}</p>
         )}
       </div>
     );
@@ -241,9 +251,9 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
   return (
     <div>
       <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>Accounts</h2>
+        <h2 style={styles.pageTitle}>{t('accounts.title')}</h2>
         <button type="button" style={styles.primaryButton} onClick={() => openCreate('asset')}>
-          + New Account
+          {t('accounts.new')}
         </button>
       </div>
 
@@ -253,15 +263,15 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
             style={styles.searchInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search accounts…"
-            aria-label="Search accounts"
+            placeholder={t('accounts.search')}
+            aria-label={t('accounts.searchAria')}
           />
           {query && (
             <button
               type="button"
               style={styles.searchClear}
               onClick={() => setQuery('')}
-              aria-label="Clear search"
+              aria-label={t('common.clearSearch')}
             >
               ✕
             </button>
@@ -272,29 +282,31 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
       {accounts.length === 0 ? (
         <EmptyState
           icon="🏦"
-          title="No accounts yet"
-          description="Create your first account — a checking account, credit card or savings — to start tracking balances."
-          actionLabel="+ New Account"
+          title={t('accounts.noTitle')}
+          description={t('accounts.noDesc')}
+          actionLabel={t('accounts.new')}
           onAction={() => openCreate('asset')}
         />
       ) : (
         <div style={styles.summaryBar}>
           <div style={styles.summaryItem}>
-            <span style={styles.summaryLabel}>💰 Total assets</span>
+            <span style={styles.summaryLabel}>{t('accounts.totalAssets')}</span>
             <span style={styles.summaryValue}>
-              {accounts
-                .filter((a) => a.type === 'asset')
-                .reduce((sum, a) => sum + parseFloat(a.balance), 0)
-                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatMoney(
+                accounts
+                  .filter((a) => a.type === 'asset')
+                  .reduce((sum, a) => sum + parseFloat(a.balance), 0),
+              )}
             </span>
           </div>
           <div style={styles.summaryItem}>
-            <span style={styles.summaryLabel}>💳 Total debt</span>
+            <span style={styles.summaryLabel}>{t('accounts.totalDebt')}</span>
             <span style={{ ...styles.summaryValue, ...styles.summaryDebt }}>
-              {accounts
-                .filter((a) => a.type === 'liability')
-                .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0)
-                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatMoney(
+                accounts
+                  .filter((a) => a.type === 'liability')
+                  .reduce((sum, a) => sum + Math.abs(parseFloat(a.balance)), 0),
+              )}
             </span>
           </div>
         </div>
@@ -320,13 +332,13 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
           >
             <div style={styles.modalHeader}>
               <h3 id="account-form-title" style={styles.modalTitle}>
-                {editingId ? 'Edit Account' : 'New Account'}
+                {editingId ? t('accounts.form.edit') : t('accounts.form.new')}
               </h3>
               <button
                 type="button"
                 style={styles.modalClose}
                 onClick={() => setShowForm(false)}
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 ✕
               </button>
@@ -340,30 +352,30 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
 
             <form onSubmit={handleSubmit} style={styles.form}>
               <label style={styles.label}>
-                Name
+                {t('accounts.form.name')}
                 <input
                   style={styles.input}
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Nubank Credit Card"
+                  placeholder={t('accounts.form.namePlaceholder')}
                   required
                   autoFocus
                 />
               </label>
 
               <label style={styles.label}>
-                Type
+                {t('accounts.form.type')}
                 <div style={styles.typeGrid}>
-                  {ACCOUNT_TYPES.map((t) => (
+                  {ACCOUNT_TYPES.map((accountType) => (
                     <button
-                      key={t.key}
+                      key={accountType.key}
                       type="button"
                       style={
-                        form.type === t.key ? styles.typeButtonActive : styles.typeButton
+                        form.type === accountType.key ? styles.typeButtonActive : styles.typeButton
                       }
-                      onClick={() => setForm((f) => ({ ...f, type: t.key }))}
+                      onClick={() => setForm((f) => ({ ...f, type: accountType.key }))}
                     >
-                      {t.icon} {t.label}
+                      {accountType.icon} {t(accountType.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -372,12 +384,11 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
               {form.type === 'liability' && (
                 <div style={styles.cardFields}>
                   <p style={styles.cardFieldsHint}>
-                    This account is a credit card. Set its monthly billing cycle so
-                    purchases land on the right bill and the payment deadline is shown.
+                    {t('accounts.form.cardHint')}
                   </p>
                   <div style={styles.cardFieldsRow}>
                     <label style={styles.label}>
-                      Closing day (fatura fecha)
+                      {t('accounts.form.closingDay')}
                       <input
                         style={styles.input}
                         value={form.closing_day}
@@ -388,7 +399,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
                       />
                     </label>
                     <label style={styles.label}>
-                      Due day (vencimento)
+                      {t('accounts.form.dueDay')}
                       <input
                         style={styles.input}
                         value={form.due_day}
@@ -400,7 +411,7 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
                     </label>
                   </div>
                   <label style={styles.label}>
-                    Credit limit (optional)
+                    {t('accounts.form.creditLimit')}
                     <input
                       style={styles.input}
                       value={form.credit_limit}
@@ -418,10 +429,14 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
                   onClick={() => setShowForm(false)}
                   disabled={saving}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" style={styles.submitButton} disabled={saving}>
-                  {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create account'}
+                  {saving
+                    ? t('common.saving')
+                    : editingId
+                      ? t('accounts.form.saveChanges')
+                      : t('accounts.form.createAccount')}
                 </button>
               </div>
             </form>
@@ -431,9 +446,8 @@ export function AccountManager({ accounts, onAccountsChanged }: Props) {
 
       <ConfirmDialog
         open={deleting !== null}
-        title={`Delete "${deleting?.name}"?`}
-        message="This will permanently remove the account. It can only be deleted if no ledger entries or sub-accounts reference it."
-        confirmLabel="Delete"
+        title={deleting ? t('accounts.deleteTitle', { name: deleting.name }) : ''}
+        message={t('accounts.deleteMessage')}
         onConfirm={handleDelete}
         onCancel={() => setDeleting(null)}
       />

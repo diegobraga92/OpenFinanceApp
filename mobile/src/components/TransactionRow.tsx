@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Category, Transaction } from '../api';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import { styles } from '../theme/styles';
 
 interface Props {
@@ -20,6 +21,7 @@ export function TransactionRow({
   onEdit,
   onDelete,
 }: Props) {
+  const { t: tr } = useI18n();
   const isIncome = t.type === 'income';
   return (
     <View style={styles.transactionRow}>
@@ -34,12 +36,12 @@ export function TransactionRow({
             <Text style={styles.transactionDescription}>{t.description}</Text>
             {t.installment_plan_id && (
               <View style={styles.installmentTag}>
-                <Text style={styles.installmentTagText}>parcela</Text>
+                <Text style={styles.installmentTagText}>{tr('transactions.installment')}</Text>
               </View>
             )}
           </View>
           <Text style={styles.transactionMeta}>
-            {cat?.name || 'Uncategorised'} • {t.date}
+            {cat?.name || tr('common.uncategorised')} • {t.date}
           </Text>
         </View>
       </View>
@@ -50,10 +52,10 @@ export function TransactionRow({
       </View>
       <View style={styles.transactionActions}>
         <TouchableOpacity onPress={() => onEdit(t)} style={styles.editButton}>
-          <Text style={styles.editButtonText}>Edit</Text>
+          <Text style={styles.editButtonText}>{tr('transactions.edit')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => onDelete(t)} style={styles.deleteButton}>
-          <Text style={styles.deleteButtonText}>Del</Text>
+          <Text style={styles.deleteButtonText}>{tr('transactions.del')}</Text>
         </TouchableOpacity>
       </View>
     </View>

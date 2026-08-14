@@ -13,7 +13,7 @@ import {
 import { BudgetAlertListResponse, BudgetSummaryItem, BudgetSummaryResponse, Category, acknowledgeBudgetAlert, createBudget, deleteBudget, fetchBudgetAlerts, fetchBudgetSummary } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
-import { MONTHS } from '../theme/constants';
+import { useI18n } from '../i18n';
 import { EmptyState } from '../components/EmptyState';
 import { useSnackbar } from '../components/Snackbar';
 
@@ -24,6 +24,7 @@ interface Props {
 
 export function BudgetsScreen({ categories, formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
+  const { t, monthNames } = useI18n();
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummaryResponse | null>(null);
   const [alerts, setAlerts] = useState<BudgetAlertListResponse | null>(null);
   const [budgetMonth, setBudgetMonth] = useState(new Date().getMonth() + 1);
@@ -42,7 +43,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       const summ = await fetchBudgetSummary(budgetYear, budgetMonth);
       setBudgetSummary(summ);
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to load budgets');
+      showSnackbar(err instanceof Error ? err.message : t('budgets.failedLoad'));
     }
     try {
       const alertData = await fetchBudgetAlerts({ acknowledged: false });
@@ -99,11 +100,11 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
 
   const handleBudgetSubmit = async () => {
     if (!budgetCategoryId) {
-      Alert.alert('Validation', 'Select a category');
+      Alert.alert(t('common.validation'), t('budgets.validation.category'));
       return;
     }
     if (!budgetAmountLimit || parseFloat(budgetAmountLimit) <= 0) {
-      Alert.alert('Validation', 'Amount limit must be greater than zero');
+      Alert.alert(t('common.validation'), t('budgets.validation.amount'));
       return;
     }
 
@@ -118,24 +119,24 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       setShowBudgetForm(false);
       await loadBudgets();
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to save budget');
+      showSnackbar(err instanceof Error ? err.message : t('budgets.failedSave'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleBudgetDelete = (id: string) => {
-    Alert.alert('Delete Budget', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('budgets.deleteTitle'), t('budgets.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await deleteBudget(id);
             await loadBudgets();
           } catch (err) {
-            showSnackbar(err instanceof Error ? err.message : 'Failed to delete budget');
+            showSnackbar(err instanceof Error ? err.message : t('budgets.failedDelete'));
           }
         },
       },
@@ -147,9 +148,9 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       await acknowledgeBudgetAlert(id);
       const alertData = await fetchBudgetAlerts({ acknowledged: false });
       setAlerts(alertData);
-      showSnackbar('Alert acknowledged');
+      showSnackbar(t('budgets.alertAcknowledged'));
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to acknowledge alert');
+      showSnackbar(err instanceof Error ? err.message : t('budgets.failedAck'));
     }
   };
 
@@ -167,9 +168,9 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       }
     >
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Budgets</Text>
+        <Text style={styles.pageTitle}>{t('budgets.title')}</Text>
         <TouchableOpacity style={styles.addButton} onPress={openBudgetCreate}>
-          <Text style={styles.addButtonText}>+ Add</Text>
+          <Text style={styles.addButtonText}>{t('budgets.add')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -177,7 +178,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
         <TouchableOpacity style={styles.navButton} onPress={prevBudgetMonth}>
           <Text style={styles.navButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.monthLabel}>{MONTHS[budgetMonth - 1]} {budgetYear}</Text>
+        <Text style={styles.monthLabel}>{monthNames[budgetMonth - 1]} {budgetYear}</Text>
         <TouchableOpacity style={styles.navButton} onPress={nextBudgetMonth}>
           <Text style={styles.navButtonText}>→</Text>
         </TouchableOpacity>
@@ -186,7 +187,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
       {alerts && alerts.items.length > 0 && (
         <View style={styles.alertSection}>
           <Text style={styles.alertTitle}>
-            ⚠️ Budget Alerts {alerts.unacknowledged_count > 0 && `(${alerts.unacknowledged_count})`}
+            {t('budgets.alertsTitle')} {alerts.unacknowledged_count > 0 && `(${alerts.unacknowledged_count})`}
           </Text>
           {alerts.items.map((alert) => {
             const pct = Math.round(
@@ -200,12 +201,12 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
                     {alert.category_icon ? `${alert.category_icon} ` : ''}{alert.category_name}
                   </Text>
                   <Text style={[styles.alertText, { color: overLimit ? colors.danger : colors.warningText }]}>
-                    {formatMoney(alert.actual_spent)} of {formatMoney(alert.amount_limit)} ({pct}%)
-                    {overLimit ? ' — over budget' : ' — near limit'}
+                    {t('budgets.spentOf', { spent: formatMoney(alert.actual_spent), limit: formatMoney(alert.amount_limit), pct })}
+                    {overLimit ? t('common.overBudget') : t('common.nearLimit')}
                   </Text>
                 </View>
                 <TouchableOpacity style={styles.ackButton} onPress={() => handleAcknowledge(alert.id)}>
-                  <Text style={styles.ackButtonText}>Acknowledge</Text>
+                  <Text style={styles.ackButtonText}>{t('budgets.acknowledge')}</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -222,9 +223,9 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
         <View style={styles.emptyCard}>
           <EmptyState
             icon="🎯"
-            title={`No budgets for ${MONTHS[budgetMonth - 1]} ${budgetYear}`}
-            description="Set a spending limit per category to track how much you use each month."
-            actionLabel="+ Add Budget"
+            title={t('budgets.noTitle', { month: monthNames[budgetMonth - 1], year: budgetYear })}
+            description={t('budgets.noDesc')}
+            actionLabel={t('budgets.add')}
             onAction={openBudgetCreate}
           />
         </View>
@@ -232,17 +233,17 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
         <>
           <View style={styles.overviewCards}>
             <View style={styles.overviewCard}>
-              <Text style={styles.overviewLabel}>Budgeted</Text>
+              <Text style={styles.overviewLabel}>{t('budgets.totalBudgeted')}</Text>
               <Text style={styles.overviewValue}>{formatMoney(budgetSummary.total_budgeted)}</Text>
             </View>
             <View style={styles.overviewCard}>
-              <Text style={styles.overviewLabel}>Spent</Text>
+              <Text style={styles.overviewLabel}>{t('budgets.totalSpent')}</Text>
               <Text style={[styles.overviewValue, { color: colors.expense }]}>
                 {formatMoney(budgetSummary.total_spent)}
               </Text>
             </View>
             <View style={styles.overviewCard}>
-              <Text style={styles.overviewLabel}>Remaining</Text>
+              <Text style={styles.overviewLabel}>{t('budgets.remaining')}</Text>
               <Text style={[
                 styles.overviewValue,
                 {
@@ -270,17 +271,17 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
                     {pct >= 80 && (
                       <View style={[styles.warningBadge, { backgroundColor: pct >= 100 ? colors.dangerBg : colors.warningBg }]}>
                         <Text style={{ color: pct >= 100 ? colors.danger : colors.warningText, fontSize: 10, fontWeight: '600' }}>
-                          {pct >= 100 ? 'OVER' : 'WARN'}
+                          {pct >= 100 ? t('budgets.over') : t('budgets.warning')}
                         </Text>
                       </View>
                     )}
                   </View>
                   <View style={styles.budgetItemActions}>
                     <TouchableOpacity onPress={() => openBudgetEdit(item)} style={styles.editButton}>
-                      <Text style={styles.editButtonText}>Edit</Text>
+                      <Text style={styles.editButtonText}>{t('common.edit')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleBudgetDelete(item.budget.id)} style={styles.deleteButton}>
-                      <Text style={styles.deleteButtonText}>Del</Text>
+                      <Text style={styles.deleteButtonText}>{t('common.delete')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -298,10 +299,10 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
 
                 <View>
                   {parseFloat(item.remaining) >= 0 ? (
-                    <Text style={styles.remainingText}>{formatMoney(item.remaining)} remaining</Text>
+                    <Text style={styles.remainingText}>{t('budgets.remainingAmount', { amount: formatMoney(item.remaining) })}</Text>
                   ) : (
                     <Text style={styles.overText}>
-                      {formatMoney(Math.abs(parseFloat(item.remaining)))} over budget
+                      {t('budgets.overAmount', { amount: formatMoney(Math.abs(parseFloat(item.remaining))) })}
                     </Text>
                   )}
                 </View>
@@ -320,12 +321,12 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>
-                {editingBudget ? `Edit ${editingBudget.budget.category_name} Budget` : 'Add Budget'}
+                {editingBudget ? t('budgets.form.edit', { name: editingBudget.budget.category_name }) : t('budgets.form.add')}
               </Text>
 
               <Text style={styles.label}>Category</Text>
               {expenseCategories.length === 0 ? (
-                <Text style={styles.emptyText}>No expense categories. Create one first.</Text>
+                <Text style={styles.emptyText}>{t('budgets.form.noCategories')}</Text>
               ) : editingBudget ? (
                 <View style={styles.readOnlyField}>
                   <Text style={styles.readOnlyText}>
@@ -348,7 +349,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
                 </View>
               )}
 
-              <Text style={styles.label}>Monthly Limit (R$)</Text>
+              <Text style={styles.label}>{t('budgets.form.monthlyLimit')}</Text>
               <TextInput
                 style={styles.input}
                 value={budgetAmountLimit}
@@ -359,7 +360,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
               />
 
               <Text style={styles.monthPreview}>
-                Applies to: {MONTHS[budgetMonth - 1]} {budgetYear}
+                {t('common.appliesTo', { month: monthNames[budgetMonth - 1], year: budgetYear })}
               </Text>
 
               <View style={styles.modalActions}>
@@ -368,7 +369,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
                   onPress={() => setShowBudgetForm(false)}
                   disabled={saving}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.submitButton, saving && styles.submitButtonDisabled]}
@@ -379,7 +380,7 @@ export function BudgetsScreen({ categories, formatMoney }: Props) {
                     <ActivityIndicator color={colors.primaryText} />
                   ) : (
                     <Text style={styles.submitButtonText}>
-                      {editingBudget ? 'Save' : 'Create'}
+                      {editingBudget ? t('common.save') : t('common.create')}
                     </Text>
                   )}
                 </TouchableOpacity>

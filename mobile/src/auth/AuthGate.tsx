@@ -15,9 +15,18 @@ import { LoginScreen } from '../screens/LoginScreen';
 interface AuthContextValue {
   user: AuthUser | null;
   logout: () => void;
+  /**
+   * True when the session was restored from storage on startup (returning
+   * user) as opposed to a fresh password login in this session.
+   */
+  restored: boolean;
 }
 
-const AuthUserContext = createContext<AuthContextValue>({ user: null, logout: () => {} });
+const AuthUserContext = createContext<AuthContextValue>({
+  user: null,
+  logout: () => {},
+  restored: false,
+});
 
 /** Access the signed-in user and logout action from anywhere in the app. */
 export function useAuthUser(): AuthContextValue {
@@ -32,6 +41,7 @@ export function useAuthUser(): AuthContextValue {
 export function AuthGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [restored, setRestored] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -43,7 +53,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }
       try {
         const me = await fetchMe(token);
-        if (mounted) setUser(me);
+        if (mounted) {
+          setRestored(true);
+          setUser(me);
+        }
       } catch {
         // fetchMe already attempted a refresh; a hard failure cleared the session.
         if (mounted) {
@@ -60,11 +73,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, []);
 
   const handleAuthenticated = useCallback((next: AuthUser) => {
+    setRestored(false);
     setUser(next);
   }, []);
 
   const handleLogout = useCallback(async () => {
     await clearAuthSession();
+    setRestored(false);
     setUser(null);
   }, []);
 
@@ -82,7 +97,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthUserContext.Provider value={{ user, logout: handleLogout }}>
+    <AuthUserContext.Provider value={{ user, logout: handleLogout, restored }}>
       {children}
     </AuthUserContext.Provider>
   );

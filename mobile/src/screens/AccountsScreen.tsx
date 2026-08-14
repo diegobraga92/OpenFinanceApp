@@ -13,6 +13,8 @@ import { AccountWithBalance, createAccount, deleteAccount, updateAccount } from 
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { EmptyState } from '../components/EmptyState';
+import { useI18n } from '../i18n';
+import type { TranslationKey } from '../../../shared/i18n';
 
 interface Props {
   accounts: AccountWithBalance[];
@@ -23,15 +25,15 @@ type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
 
 const ACCOUNT_GROUPS: {
   key: AccountType;
-  label: string;
+  labelKey: TranslationKey;
+  blurbKey: TranslationKey;
   icon: string;
-  blurb: string;
 }[] = [
-  { key: 'asset', label: 'Assets', icon: '💰', blurb: 'Cash, bank accounts and savings' },
-  { key: 'liability', label: 'Liabilities & Credit Cards', icon: '💳', blurb: 'Credit cards, loans and debts' },
-  { key: 'equity', label: 'Equity', icon: '🏛️', blurb: 'Net worth and capital' },
-  { key: 'income', label: 'Income', icon: '📥', blurb: 'Salary and earnings sources' },
-  { key: 'expense', label: 'Expense', icon: '📤', blurb: 'Spending categories' },
+  { key: 'asset', labelKey: 'accounts.type.asset', blurbKey: 'accounts.type.assetBlurb', icon: '💰' },
+  { key: 'liability', labelKey: 'accounts.type.liability', blurbKey: 'accounts.type.liabilityBlurb', icon: '💳' },
+  { key: 'equity', labelKey: 'accounts.type.equity', blurbKey: 'accounts.type.equityBlurb', icon: '🏛️' },
+  { key: 'income', labelKey: 'accounts.type.income', blurbKey: 'accounts.type.incomeBlurb', icon: '📥' },
+  { key: 'expense', labelKey: 'accounts.type.expense', blurbKey: 'accounts.type.expenseBlurb', icon: '📤' },
 ];
 
 interface FormState {
@@ -44,15 +46,8 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: '', type: 'asset', closing_day: '', due_day: '', credit_limit: '' };
 
-function formatBalance(balance: string): string {
-  const n = Math.abs(parseFloat(balance));
-  return n.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  });
-}
-
 export function AccountsScreen({ accounts, onChanged }: Props) {
+  const { t, formatMoney } = useI18n();
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -79,7 +74,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
-      Alert.alert('Validation', 'Name is required');
+      Alert.alert(t('common.validation'), t('accounts.validation.name'));
       return;
     }
     const isCard = form.type === 'liability';
@@ -87,15 +82,15 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
     const dueDay = form.due_day.trim() ? Number(form.due_day.trim()) : null;
     const creditLimit = form.credit_limit.trim() ? form.credit_limit.trim() : null;
     if (isCard && (closingDay === null || dueDay === null)) {
-      Alert.alert('Validation', 'Credit cards need a closing day and a due day');
+      Alert.alert(t('common.validation'), t('accounts.validation.cardDays'));
       return;
     }
     if (closingDay !== null && (closingDay < 1 || closingDay > 31)) {
-      Alert.alert('Validation', 'Closing day must be between 1 and 31');
+      Alert.alert(t('common.validation'), t('accounts.validation.closingDay'));
       return;
     }
     if (dueDay !== null && (dueDay < 1 || dueDay > 31)) {
-      Alert.alert('Validation', 'Due day must be between 1 and 31');
+      Alert.alert(t('common.validation'), t('accounts.validation.dueDay'));
       return;
     }
     setSaving(true);
@@ -115,7 +110,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
       setShowForm(false);
       await onChanged();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save account');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('accounts.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -123,12 +118,12 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
 
   const confirmDelete = (a: AccountWithBalance) => {
     Alert.alert(
-      `Delete "${a.name}"?`,
-      'This will permanently remove the account. It can only be deleted if no ledger entries or sub-accounts reference it.',
+      t('accounts.deleteTitle', { name: a.name }),
+      t('accounts.deleteMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -137,7 +132,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
             } catch (err) {
               Alert.alert(
                 'Error',
-                err instanceof Error ? err.message : 'Failed to delete account',
+                err instanceof Error ? err.message : t('accounts.failedDelete'),
               );
             }
           },
@@ -171,7 +166,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
         onPress={() => showActions(a)}
         delayLongPress={400}
         accessibilityRole="button"
-        accessibilityLabel={`${a.name}. Long press for actions.`}
+        accessibilityLabel={`${a.name}. ${t('accounts.form.longPress')}`}
       >
         <View style={[styles.accountIconCircle, isDebt && styles.accountIconDebt]}>
           <Text style={styles.accountIconText}>{isDebt ? '💳' : '🏦'}</Text>
@@ -179,11 +174,11 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
         <View style={styles.accountRowInfo}>
           <Text style={styles.accountRowName}>{a.name}</Text>
           <Text style={styles.accountRowMeta}>
-            {a.transaction_count} ledger entr{a.transaction_count === 1 ? 'y' : 'ies'}
+            {t(a.transaction_count === 1 ? 'accounts.form.countEntries_one' : 'accounts.form.countEntries_other', { count: a.transaction_count })}
           </Text>
         </View>
         <Text style={isDebt ? styles.accountBalanceDebt : styles.accountBalance}>
-          {formatBalance(a.balance)}
+          {formatMoney(a.balance)}
         </Text>
       </TouchableOpacity>
     );
@@ -192,9 +187,9 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Accounts</Text>
+        <Text style={styles.pageTitle}>{t('accounts.title')}</Text>
         <TouchableOpacity style={styles.addButton} onPress={() => openCreate('asset')}>
-          <Text style={styles.addButtonText}>+ New</Text>
+          <Text style={styles.addButtonText}>{t('accounts.new')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -202,7 +197,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
         style={styles.accountSearch}
         value={query}
         onChangeText={setQuery}
-        placeholder="Search accounts…"
+        placeholder={t('accounts.search')}
         placeholderTextColor={colors.textDim}
         autoCapitalize="none"
         autoCorrect={false}
@@ -212,9 +207,9 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
         <EmptyState
           compact
           icon="🏦"
-          title="No accounts yet"
-          description="Create your first account — a checking account, credit card or savings — to start tracking balances."
-          actionLabel="+ New Account"
+          title={t('accounts.noTitle')}
+          description={t('accounts.noDesc')}
+          actionLabel={t('accounts.new')}
           onAction={() => openCreate('asset')}
         />
       ) : (
@@ -225,8 +220,8 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
               <View style={styles.accountGroupHeader}>
                 <Text style={styles.accountGroupIcon}>{group.icon}</Text>
                 <View style={styles.accountGroupHeaderText}>
-                  <Text style={styles.accountGroupTitle}>{group.label}</Text>
-                  <Text style={styles.accountGroupBlurb}>{group.blurb}</Text>
+                  <Text style={styles.accountGroupTitle}>{t(group.labelKey)}</Text>
+                  <Text style={styles.accountGroupBlurb}>{t(group.blurbKey)}</Text>
                 </View>
                 <Text style={styles.accountGroupBadge}>{items.length}</Text>
               </View>
@@ -235,7 +230,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
                   {items.map(renderAccountRow)}
                 </View>
               ) : (
-                <Text style={styles.accountGroupEmpty}>No {group.label.toLowerCase()} yet.</Text>
+                <Text style={styles.accountGroupEmpty}>{t('accounts.form.noGroup', { label: t(group.labelKey).toLowerCase() })}</Text>
               )}
             </View>
           );
@@ -251,36 +246,36 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingId ? 'Edit Account' : 'New Account'}</Text>
+            <Text style={styles.modalTitle}>{editingId ? t('accounts.form.edit') : t('accounts.form.new')}</Text>
 
-            <Text style={styles.label}>Name</Text>
+            <Text style={styles.label}>{t('accounts.form.name')}</Text>
             <TextInput
               style={styles.input}
               value={form.name}
               onChangeText={(name) => setForm((f) => ({ ...f, name }))}
-              placeholder="e.g. Nubank Credit Card"
+              placeholder={t('accounts.form.namePlaceholder')}
               placeholderTextColor={colors.textDim}
               autoFocus
             />
 
-            <Text style={styles.label}>Type</Text>
+            <Text style={styles.label}>{t('accounts.form.type')}</Text>
             <View style={styles.accountTypeGrid}>
-              {ACCOUNT_GROUPS.map((t) => (
+              {ACCOUNT_GROUPS.map((groupType) => (
                 <TouchableOpacity
-                  key={t.key}
+                  key={groupType.key}
                   style={[
                     styles.accountTypeButton,
-                    form.type === t.key && styles.accountTypeButtonActive,
+                    form.type === groupType.key && styles.accountTypeButtonActive,
                   ]}
-                  onPress={() => setForm((f) => ({ ...f, type: t.key }))}
+                  onPress={() => setForm((f) => ({ ...f, type: groupType.key }))}
                 >
                   <Text
                     style={[
                       styles.accountTypeButtonText,
-                      form.type === t.key && styles.accountTypeButtonTextActive,
+                      form.type === groupType.key && styles.accountTypeButtonTextActive,
                     ]}
                   >
-                    {t.icon} {t.label}
+                    {groupType.icon} {t(groupType.labelKey)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -289,12 +284,11 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
             {form.type === 'liability' && (
               <View style={styles.accountCardFields}>
                 <Text style={styles.accountCardFieldsHint}>
-                  Credit card: set its monthly billing cycle so purchases land on
-                  the right bill and the payment deadline is shown.
+                  {t('accounts.form.cardHint')}
                 </Text>
                 <View style={styles.accountCardFieldsRow}>
                   <View style={styles.accountCardField}>
-                    <Text style={styles.label}>Closing day (fatura fecha)</Text>
+                    <Text style={styles.label}>{t('accounts.form.closingDay')}</Text>
                     <TextInput
                       style={styles.input}
                       value={form.closing_day}
@@ -308,7 +302,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
                     />
                   </View>
                   <View style={styles.accountCardField}>
-                    <Text style={styles.label}>Due day (vencimento)</Text>
+                    <Text style={styles.label}>{t('accounts.form.dueDay')}</Text>
                     <TextInput
                       style={styles.input}
                       value={form.due_day}
@@ -320,7 +314,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
                     />
                   </View>
                 </View>
-                <Text style={styles.label}>Credit limit (optional)</Text>
+                <Text style={styles.label}>{t('accounts.form.creditLimit')}</Text>
                 <TextInput
                   style={styles.input}
                   value={form.credit_limit}
@@ -338,7 +332,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
                 onPress={() => setShowForm(false)}
                 disabled={saving}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitButton, saving && styles.submitButtonDisabled]}
@@ -349,7 +343,7 @@ export function AccountsScreen({ accounts, onChanged }: Props) {
                   <ActivityIndicator color={colors.primaryText} />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {editingId ? 'Save' : 'Create'}
+                    {editingId ? t('common.save') : t('common.create')}
                   </Text>
                 )}
               </TouchableOpacity>

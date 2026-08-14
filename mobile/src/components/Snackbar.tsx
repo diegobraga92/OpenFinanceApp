@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 
 interface SnackbarItem {
   id: number;
@@ -23,6 +24,7 @@ interface SnackbarContextValue {
 const SnackbarContext = createContext<SnackbarContextValue | undefined>(undefined);
 
 export function SnackbarProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [item, setItem] = useState<SnackbarItem | null>(null);
   const idRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,7 +65,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
                   <Text style={styles.actionText}>{item.actionLabel}</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.dismiss} onPress={dismiss} accessibilityLabel="Dismiss">
+              <TouchableOpacity style={styles.dismiss} onPress={dismiss} accessibilityLabel={t('toast.dismiss')}>
                 <Text style={styles.dismissText}>✕</Text>
               </TouchableOpacity>
             </View>

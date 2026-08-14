@@ -3,6 +3,7 @@ import type { Category, Transaction } from '../api';
 import { deleteTransaction } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useI18n } from '../i18n';
 
 interface Props {
   transactions: Transaction[];
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function TransactionTable({ transactions, categories, formatMoney, onEdit, onDelete }: Props) {
+  const { t, formatDate } = useI18n();
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -25,27 +27,25 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
       setPendingDelete(null);
       onDelete(deleted);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to delete');
+      window.alert(err instanceof Error ? err.message : t('transactions.failedToDelete'));
     } finally {
       setDeleting(false);
     }
   };
 
-  const formatDate = (date: string) => {
-    const d = new Date(date + 'T00:00:00');
-    return d.toLocaleDateString('pt-BR');
-  };
-
   const deleteDialog = (
     <ConfirmDialog
       open={pendingDelete !== null}
-      title="Delete transaction?"
+      title={t('transactions.deleteTitle')}
       message={
         pendingDelete
-          ? `"${pendingDelete.description}" (${formatMoney(pendingDelete.amount)}) will be deleted. You can undo this within a few seconds.`
+          ? t('transactions.deleteMessage', {
+              description: pendingDelete.description,
+              amount: formatMoney(pendingDelete.amount),
+            })
           : ''
       }
-      confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+      confirmLabel={deleting ? t('common.deleting') : t('common.delete')}
       onConfirm={() => pendingDelete && handleDelete(pendingDelete)}
       onCancel={() => !deleting && setPendingDelete(null)}
     />
@@ -54,25 +54,25 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
   if (isMobile) {
     return (
       <div style={styles.cardList}>
-        {transactions.map((t) => {
-          const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
-          const isIncome = t.type === 'income';
+        {transactions.map((tx) => {
+          const cat = tx.category_id ? categoryById.get(tx.category_id) : undefined;
+          const isIncome = tx.type === 'income';
           return (
-            <div key={t.id} className="card" style={styles.card}>
+            <div key={tx.id} className="card" style={styles.card}>
               <div style={styles.cardTop}>
-                <span style={styles.cardDate}>{formatDate(t.date)}</span>
+                <span style={styles.cardDate}>{formatDate(tx.date)}</span>
                 <span
                   style={{
                     ...styles.cardAmount,
                     color: isIncome ? 'var(--color-income)' : 'var(--color-expense)',
                   }}
                 >
-                  {isIncome ? '+' : '-'}{formatMoney(t.amount)}
+                  {isIncome ? '+' : '-'}{formatMoney(tx.amount)}
                 </span>
               </div>
-              <div style={styles.cardDescription}>{t.description}</div>
-              {t.installment_plan_id && (
-                <span style={styles.installmentBadge}>Parcela</span>
+              <div style={styles.cardDescription}>{tx.description}</div>
+              {tx.installment_plan_id && (
+                <span style={styles.installmentBadge}>{t('transactions.installment')}</span>
               )}
               <div style={styles.cardBottom}>
                 {cat ? (
@@ -84,8 +84,8 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
                   <span style={{ color: 'var(--color-text-dim)' }}>—</span>
                 )}
                 <div style={styles.cardActions}>
-                  <button style={styles.actionButton} onClick={() => onEdit(t)}>Edit</button>
-                  <button style={styles.deleteButton} onClick={() => setPendingDelete(t)}>Delete</button>
+                  <button style={styles.actionButton} onClick={() => onEdit(tx)}>{t('transactions.edit')}</button>
+                  <button style={styles.deleteButton} onClick={() => setPendingDelete(tx)}>{t('common.delete')}</button>
                 </div>
               </div>
             </div>
@@ -101,25 +101,25 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={styles.th}>Date</th>
-            <th style={styles.th}>Description</th>
-            <th style={styles.th}>Category</th>
-            <th style={styles.th} align="right">Amount</th>
-            <th style={styles.th} align="right">Actions</th>
+            <th style={styles.th}>{t('transactions.table.date')}</th>
+            <th style={styles.th}>{t('transactions.table.description')}</th>
+            <th style={styles.th}>{t('transactions.table.category')}</th>
+            <th style={styles.th} align="right">{t('transactions.table.amount')}</th>
+            <th style={styles.th} align="right">{t('transactions.table.actions')}</th>
           </tr>
         </thead>
         <tbody>
-          {transactions.map((t) => {
-            const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
-            const isIncome = t.type === 'income';
+          {transactions.map((tx) => {
+            const cat = tx.category_id ? categoryById.get(tx.category_id) : undefined;
+            const isIncome = tx.type === 'income';
             return (
-              <tr key={t.id} style={styles.tr}>
-                <td style={styles.td}>{formatDate(t.date)}</td>
+              <tr key={tx.id} style={styles.tr}>
+                <td style={styles.td}>{formatDate(tx.date)}</td>
                 <td style={styles.td}>
                   <div style={styles.descCell}>
-                    {t.description}
-                    {t.installment_plan_id && (
-                      <span style={styles.installmentBadge}>Parcela</span>
+                    {tx.description}
+                    {tx.installment_plan_id && (
+                      <span style={styles.installmentBadge}>{t('transactions.installment')}</span>
                     )}
                   </div>
                 </td>
@@ -134,11 +134,11 @@ export function TransactionTable({ transactions, categories, formatMoney, onEdit
                   )}
                 </td>
                 <td style={{ ...styles.td, ...styles.amount, color: isIncome ? 'var(--color-income)' : 'var(--color-expense)' }}>
-                  {isIncome ? '+' : '-'}{formatMoney(t.amount)}
+                  {isIncome ? '+' : '-'}{formatMoney(tx.amount)}
                 </td>
                 <td style={styles.td} align="right">
-                  <button style={styles.actionButton} onClick={() => onEdit(t)}>Edit</button>
-                  <button style={styles.deleteButton} onClick={() => setPendingDelete(t)}>Delete</button>
+                  <button style={styles.actionButton} onClick={() => onEdit(tx)}>{t('transactions.edit')}</button>
+                  <button style={styles.deleteButton} onClick={() => setPendingDelete(tx)}>{t('common.delete')}</button>
                 </td>
               </tr>
             );

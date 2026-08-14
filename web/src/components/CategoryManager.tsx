@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from
 import type { Category, CreateCategoryRequest } from '../api';
 import { createCategory, deleteCategory, updateCategory } from '../api';
 import { useToast } from './Toast';
+import { useI18n } from '../i18n';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 
@@ -52,6 +53,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { push: pushToast } = useToast();
+  const { t } = useI18n();
 
   // Close the modal on Escape for keyboard users.
   useEffect(() => {
@@ -91,7 +93,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
     e.preventDefault();
     const name = form.name.trim();
     if (!name) {
-      setError('Name is required');
+      setError(t('common.nameRequired'));
       return;
     }
     setSaving(true);
@@ -105,15 +107,15 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
     try {
       if (editingId) {
         await updateCategory(editingId, payload);
-        pushToast({ message: `Category "${name}" updated` });
+        pushToast({ message: t('categories.updated', { name }) });
       } else {
         await createCategory(payload);
-        pushToast({ message: `Category "${name}" created` });
+        pushToast({ message: t('categories.created', { name }) });
       }
       setShowForm(false);
       await onCategoriesChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save category');
+      setError(err instanceof Error ? err.message : t('categories.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -123,13 +125,13 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
     if (!deleting) return;
     try {
       await deleteCategory(deleting.id);
-      pushToast({ message: `Category "${deleting.name}" deleted` });
+      pushToast({ message: t('categories.deleted', { name: deleting.name }) });
       setDeleting(null);
       await onCategoriesChanged();
     } catch (err) {
       setDeleting(null);
       pushToast({
-        message: err instanceof Error ? err.message : 'Failed to delete category',
+        message: err instanceof Error ? err.message : t('categories.failedDelete'),
       });
     }
   };
@@ -171,12 +173,12 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
         <div style={styles.cardInfo}>
           <p style={styles.cardName}>{c.name}</p>
           {c.parent_id ? (
-            <p style={styles.cardParent}>Subcategory</p>
+            <p style={styles.cardParent}>{t('common.subcategory')}</p>
           ) : (
             <p style={styles.cardCount}>
               {childCount > 0
-                ? `${childCount} subcategor${childCount === 1 ? 'y' : 'ies'}`
-                : 'Top-level'}
+                ? t(childCount === 1 ? 'common.subcategory' : 'common.subcategories', { count: childCount })
+                : t('common.topLevel')}
             </p>
           )}
         </div>
@@ -185,8 +187,8 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
             type="button"
             style={styles.iconAction}
             onClick={() => openEdit(c)}
-            aria-label={`Edit ${c.name}`}
-            title="Edit"
+            aria-label={t('common.edit') + ' ' + c.name}
+            title={t('common.edit')}
           >
             ✏️
           </button>
@@ -194,8 +196,8 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
             type="button"
             style={styles.iconActionDanger}
             onClick={() => setDeleting(c)}
-            aria-label={`Delete ${c.name}`}
-            title="Delete"
+            aria-label={t('common.delete') + ' ' + c.name}
+            title={t('common.delete')}
           >
             🗑️
           </button>
@@ -207,13 +209,13 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
   return (
     <div>
       <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>Categories</h2>
+        <h2 style={styles.pageTitle}>{t('categories.title')}</h2>
         <div style={styles.pageActions}>
           <button type="button" style={styles.secondaryButton} onClick={() => openCreate('income')}>
-            + Income
+            {t('categories.newIncome')}
           </button>
           <button type="button" style={styles.primaryButton} onClick={() => openCreate('expense')}>
-            + Expense
+            {t('categories.newExpense')}
           </button>
         </div>
       </div>
@@ -224,15 +226,15 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
             style={styles.searchInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search categories…"
-            aria-label="Search categories"
+            placeholder={t('categories.search')}
+            aria-label={t('categories.searchAria')}
           />
           {query && (
             <button
               type="button"
               style={styles.searchClear}
               onClick={() => setQuery('')}
-              aria-label="Clear search"
+              aria-label={t('common.clearSearch')}
             >
               ✕
             </button>
@@ -240,7 +242,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
         </div>
       </div>
 
-      <div style={styles.tabs} role="tablist" aria-label="Category type">
+      <div style={styles.tabs} role="tablist" aria-label={t('categories.typeAria')}>
         <button
           type="button"
           role="tab"
@@ -248,7 +250,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
           style={tab === 'expense' ? styles.tabActive : styles.tab}
           onClick={() => setTab('expense')}
         >
-          Expenses
+          {t('categories.tabExpenses')}
           <span style={styles.tabBadge}>{expenseCategories.length}</span>
         </button>
         <button
@@ -258,7 +260,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
           style={tab === 'income' ? styles.tabActive : styles.tab}
           onClick={() => setTab('income')}
         >
-          Income
+          {t('categories.tabIncome')}
           <span style={styles.tabBadge}>{incomeCategories.length}</span>
         </button>
       </div>
@@ -269,15 +271,15 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
         ) : (
           <EmptyState
             icon={tab === 'expense' ? '🛒' : '💰'}
-            title={query ? 'No matching categories' : `No ${tab} categories yet`}
+            title={query ? t('categories.noMatchingTitle') : (tab === 'expense' ? t('categories.noExpenseTitle') : t('categories.noIncomeTitle'))}
             description={
               query
-                ? `Nothing matched "${query}". Try a different search term.`
-                : `Create your first ${tab} category to start organizing your ${
-                    tab === 'expense' ? 'spending' : 'earnings'
-                  }.`
+                ? t('categories.noMatchingDesc', { query })
+                : tab === 'expense'
+                  ? t('categories.noExpenseDesc')
+                  : t('categories.noIncomeDesc')
             }
-            actionLabel="+ New Category"
+            actionLabel={t('categories.new')}
             onAction={() => openCreate(tab)}
           />
         )}
@@ -298,13 +300,13 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
           >
             <div style={styles.modalHeader}>
               <h3 id="category-form-title" style={styles.modalTitle}>
-                {editingId ? 'Edit Category' : 'New Category'}
+                {editingId ? t('categories.form.edit') : t('categories.form.new')}
               </h3>
               <button
                 type="button"
                 style={styles.modalClose}
                 onClick={() => setShowForm(false)}
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 ✕
               </button>
@@ -318,41 +320,41 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
 
             <form onSubmit={handleSubmit} style={styles.form}>
               <label style={styles.label}>
-                Name
+                {t('categories.form.name')}
                 <input
                   style={styles.input}
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Pets"
+                  placeholder={t('categories.form.namePlaceholder')}
                   required
                   autoFocus
                 />
               </label>
 
               <label style={styles.label}>
-                Type
+                {t('categories.form.type')}
                 <div style={styles.typeToggle}>
-                  {(['expense', 'income'] as const).map((t) => (
+                  {(['expense', 'income'] as const).map((type) => (
                     <button
-                      key={t}
+                      key={type}
                       type="button"
-                      style={form.type === t ? styles.typeActive : styles.typeButton}
+                      style={form.type === type ? styles.typeActive : styles.typeButton}
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
-                          type: t,
-                          icon: t === 'expense' ? DEFAULT_EXPENSE_ICON : DEFAULT_INCOME_ICON,
+                          type,
+                          icon: type === 'expense' ? DEFAULT_EXPENSE_ICON : DEFAULT_INCOME_ICON,
                         }))
                       }
                     >
-                      {t === 'expense' ? 'Expense' : 'Income'}
+                      {type === 'expense' ? t('common.expense') : t('common.income')}
                     </button>
                   ))}
                 </div>
               </label>
 
               <label style={styles.label}>
-                Icon
+                {t('categories.form.icon')}
                 <div style={styles.iconGrid}>
                   {ICONS.map((ic) => (
                     <button
@@ -360,7 +362,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
                       type="button"
                       style={form.icon === ic ? styles.iconButtonActive : styles.iconButton}
                       onClick={() => setForm((f) => ({ ...f, icon: ic }))}
-                      aria-label={`Icon ${ic}`}
+                      aria-label={t('categories.form.iconAria', { icon: ic })}
                     >
                       {ic}
                     </button>
@@ -369,7 +371,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
               </label>
 
               <label style={styles.label}>
-                Color
+                {t('categories.form.color')}
                 <div style={styles.colorGrid}>
                   {COLORS.map((col) => (
                     <button
@@ -381,7 +383,7 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
                         ...(form.color === col ? styles.colorButtonActive : {}),
                       }}
                       onClick={() => setForm((f) => ({ ...f, color: col }))}
-                      aria-label={`Color ${col}`}
+                      aria-label={t('categories.form.colorAria', { color: col })}
                     />
                   ))}
                 </div>
@@ -394,10 +396,14 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
                   onClick={() => setShowForm(false)}
                   disabled={saving}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" style={styles.submitButton} disabled={saving}>
-                  {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create category'}
+                  {saving
+                    ? t('common.saving')
+                    : editingId
+                      ? t('categories.form.saveChanges')
+                      : t('categories.form.create')}
                 </button>
               </div>
             </form>
@@ -407,9 +413,8 @@ export function CategoryManager({ categories, onCategoriesChanged }: Props) {
 
       <ConfirmDialog
         open={deleting !== null}
-        title={`Delete "${deleting?.name}"?`}
-        message="This will permanently remove the category. It can only be deleted if no transactions use it."
-        confirmLabel="Delete"
+        title={deleting ? t('categories.deleteTitle', { name: deleting.name }) : ''}
+        message={t('categories.deleteMessage')}
         onConfirm={handleDelete}
         onCancel={() => setDeleting(null)}
       />

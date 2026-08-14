@@ -9,6 +9,7 @@ import {
   migrateSingleToDouble,
 } from '../api';
 import { useToast } from './Toast';
+import { useI18n } from '../i18n';
 import { EmptyState } from './EmptyState';
 
 interface Props {
@@ -38,6 +39,7 @@ export function LedgerManager({ formatMoney }: Props) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [entry, setEntry] = useState<EntryForm>(EMPTY_ENTRY);
   const { push: pushToast } = useToast();
+  const { t } = useI18n();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +52,7 @@ export function LedgerManager({ formatMoney }: Props) {
       setTransactions(txns);
       setAccounts(accts);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load ledger data');
+      setError(err instanceof Error ? err.message : t('ledger.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -64,11 +66,11 @@ export function LedgerManager({ formatMoney }: Props) {
     e.preventDefault();
     const amt = parseFloat(entry.amount);
     if (!description.trim() || !entry.debitAccountId || !entry.creditAccountId || !(amt > 0)) {
-      setError('Fill in description, both accounts and a positive amount');
+      setError(t('ledger.validation.fill'));
       return;
     }
     if (entry.debitAccountId === entry.creditAccountId) {
-      setError('Debit and credit accounts must be different');
+      setError(t('ledger.validation.different'));
       return;
     }
     setSaving(true);
@@ -78,17 +80,17 @@ export function LedgerManager({ formatMoney }: Props) {
         description: description.trim(),
         date,
         entries: [
-          { account_id: entry.debitAccountId, debit_amount: String(amt), credit_amount: '0', description: 'Debit' },
-          { account_id: entry.creditAccountId, debit_amount: '0', credit_amount: String(amt), description: 'Credit' },
+          { account_id: entry.debitAccountId, debit_amount: String(amt), credit_amount: '0', description: t('ledger.debit') },
+          { account_id: entry.creditAccountId, debit_amount: '0', credit_amount: String(amt), description: t('ledger.credit') },
         ],
       });
-      pushToast({ message: 'Ledger transaction created' });
+      pushToast({ message: t('ledger.created') });
       setShowForm(false);
       setDescription('');
       setEntry(EMPTY_ENTRY);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create ledger transaction');
+      setError(err instanceof Error ? err.message : t('ledger.failedCreate'));
     } finally {
       setSaving(false);
     }
@@ -98,12 +100,12 @@ export function LedgerManager({ formatMoney }: Props) {
     try {
       const res = await migrateSingleToDouble();
       pushToast({
-        message: `Migrated ${res.migrated} of ${res.total_processed} transactions`,
+        message: t('ledger.migrated', { migrated: res.migrated, total: res.total_processed }),
       });
       await load();
     } catch (err) {
       pushToast({
-        message: err instanceof Error ? err.message : 'Migration failed',
+        message: err instanceof Error ? err.message : t('ledger.migrationFailed'),
       });
     }
   };
@@ -136,13 +138,13 @@ export function LedgerManager({ formatMoney }: Props) {
   return (
     <div>
       <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>Ledger</h2>
+        <h2 style={styles.pageTitle}>{t('ledger.title')}</h2>
         <div style={styles.pageActions}>
           <button type="button" style={styles.secondaryButton} onClick={handleMigrate}>
-            ⬆ Migrate single→double
+            {t('ledger.migrate')}
           </button>
           <button type="button" style={styles.primaryButton} onClick={() => setShowForm(true)}>
-            + New Ledger Entry
+            {t('ledger.newEntry')}
           </button>
         </div>
       </div>
@@ -158,9 +160,9 @@ export function LedgerManager({ formatMoney }: Props) {
       ) : transactions.length === 0 ? (
         <EmptyState
           icon="📒"
-          title="No ledger transactions yet"
-          description="Double-entry transactions keep a balanced, immutable record of every movement. Create one to get started."
-          actionLabel="+ New Ledger Entry"
+          title={t('ledger.noTitle')}
+          description={t('ledger.noDesc')}
+          actionLabel={t('ledger.newEntry')}
           onAction={() => setShowForm(true)}
         />
       ) : (
@@ -177,8 +179,8 @@ export function LedgerManager({ formatMoney }: Props) {
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div style={styles.modalHeader}>
-              <h3 id="ledger-form-title" style={styles.modalTitle}>New Ledger Transaction</h3>
-              <button type="button" style={styles.modalClose} onClick={() => setShowForm(false)} aria-label="Close">
+              <h3 id="ledger-form-title" style={styles.modalTitle}>{t('ledger.form.title')}</h3>
+              <button type="button" style={styles.modalClose} onClick={() => setShowForm(false)} aria-label={t('common.close')}>
                 ✕
               </button>
             </div>
@@ -191,18 +193,18 @@ export function LedgerManager({ formatMoney }: Props) {
 
             <form onSubmit={handleCreate} style={styles.form}>
               <label style={styles.label}>
-                Description
+                {t('ledger.form.description')}
                 <input
                   style={styles.input}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. Groceries at Supermarket X"
+                  placeholder={t('ledger.form.descriptionPlaceholder')}
                   required
                 />
               </label>
 
               <label style={styles.label}>
-                Date
+                {t('common.date')}
                 <input
                   type="date"
                   style={styles.input}
@@ -213,13 +215,13 @@ export function LedgerManager({ formatMoney }: Props) {
 
               <div style={styles.formRow}>
                 <label style={styles.label}>
-                  Debit account
+                  {t('ledger.form.debit')}
                   <select
                     style={styles.select}
                     value={entry.debitAccountId}
                     onChange={(e) => setEntry((f) => ({ ...f, debitAccountId: e.target.value }))}
                   >
-                    <option value="">Select…</option>
+                    <option value="">{t('ledger.form.select')}</option>
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} ({a.type})
@@ -229,13 +231,13 @@ export function LedgerManager({ formatMoney }: Props) {
                 </label>
 
                 <label style={styles.label}>
-                  Credit account
+                  {t('ledger.form.credit')}
                   <select
                     style={styles.select}
                     value={entry.creditAccountId}
                     onChange={(e) => setEntry((f) => ({ ...f, creditAccountId: e.target.value }))}
                   >
-                    <option value="">Select…</option>
+                    <option value="">{t('ledger.form.select')}</option>
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} ({a.type})
@@ -246,7 +248,7 @@ export function LedgerManager({ formatMoney }: Props) {
               </div>
 
               <label style={styles.label}>
-                Amount (R$)
+                {t('ledger.form.amount')}
                 <input
                   type="number"
                   step="0.01"
@@ -261,10 +263,10 @@ export function LedgerManager({ formatMoney }: Props) {
 
               <div style={styles.modalActions}>
                 <button type="button" style={styles.cancelButton} onClick={() => setShowForm(false)} disabled={saving}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" style={styles.submitButton} disabled={saving}>
-                  {saving ? 'Saving…' : 'Create entry'}
+                  {saving ? t('common.saving') : t('ledger.form.createEntry')}
                 </button>
               </div>
             </form>

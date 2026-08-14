@@ -17,9 +17,11 @@ import {
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useSnackbar } from '../components/Snackbar';
+import { useI18n } from '../i18n';
 
 export function ServerScreen() {
   const { show: showSnackbar } = useSnackbar();
+  const { t } = useI18n();
   const [current, setCurrent] = useState('');
   const [input, setInput] = useState('');
   const [testing, setTesting] = useState(false);
@@ -38,11 +40,11 @@ export function ServerScreen() {
     try {
       const ok = await testServerConnection(input);
       if (ok) {
-        showSnackbar('✅ Connection OK — backend is reachable');
+        showSnackbar(t('server.connectionOk'));
       } else {
         Alert.alert(
-          'Connection failed',
-          'Could not reach the backend at this address. Check the IP/port and that the server is running.',
+          t('server.connectionFailed'),
+          t('server.connectionFailedDesc'),
         );
       }
     } finally {
@@ -56,9 +58,9 @@ export function ServerScreen() {
       const normalized = await setApiBaseUrl(input);
       setCurrent(normalized);
       setInput(normalized);
-      showSnackbar('✅ Server saved — the app is using it now');
+      showSnackbar(t('server.saved'));
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save server');
+      Alert.alert(t('common.error'), err instanceof Error ? (err.message === 'Server address cannot be empty' ? t('server.addressRequired') : err.message) : t('server.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -69,23 +71,22 @@ export function ServerScreen() {
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Server</Text>
+        <Text style={styles.pageTitle}>{t('server.title')}</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Backend address</Text>
+        <Text style={styles.sectionTitle}>{t('server.backendAddress')}</Text>
         <Text style={styles.receiptHint}>
-          Enter the address of your PudimFinance server so the app can talk to
-          it. Use your computer's LAN IP on a phone (e.g. http://192.168.1.100:3000).
+          {t('server.hint')}
         </Text>
 
-        <Text style={styles.label}>Current address</Text>
+        <Text style={styles.label}>{t('server.current')}</Text>
         <Text style={styles.serverCurrent} numberOfLines={1}>
           {current}
-          {isDefault && '  (default)'}
+          {isDefault && t('server.default')}
         </Text>
 
-        <Text style={styles.label}>New address</Text>
+        <Text style={styles.label}>{t('server.new')}</Text>
         <TextInput
           style={styles.input}
           value={input}
@@ -106,7 +107,7 @@ export function ServerScreen() {
             {testing ? (
               <ActivityIndicator color={colors.textMuted} size="small" />
             ) : (
-              <Text style={styles.cancelButtonText}>Test connection</Text>
+              <Text style={styles.cancelButtonText}>{t('server.test')}</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -117,19 +118,16 @@ export function ServerScreen() {
             {saving ? (
               <ActivityIndicator color={colors.primaryText} />
             ) : (
-              <Text style={styles.submitButtonText}>Save</Text>
+              <Text style={styles.submitButtonText}>{t('server.save')}</Text>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Why configure this?</Text>
+        <Text style={styles.sectionTitle}>{t('server.whyTitle')}</Text>
         <Text style={styles.receiptHint}>
-          The backend runs on your server/computer, not on the phone. Since the
-          address can change (new LAN IP, different port, moving to a hosted
-          server), it is configurable here instead of being fixed at build
-          time.
+          {t('server.whyDesc')}
         </Text>
       </View>
     </ScrollView>

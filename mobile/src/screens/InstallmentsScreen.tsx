@@ -25,6 +25,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { EmptyState } from '../components/EmptyState';
 import { useSnackbar } from '../components/Snackbar';
+import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
@@ -33,6 +34,7 @@ interface Props {
 
 export function InstallmentsScreen({ categories, formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
+  const { t } = useI18n();
   const [plans, setPlans] = useState<InstallmentPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,7 +54,7 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
       const data = await fetchInstallmentPlans();
       setPlans(data);
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to load installment plans');
+      showSnackbar(err instanceof Error ? err.message : t('installments.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,7 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
       const d = await fetchInstallmentPlan(id);
       setDetail(d);
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to load plan detail');
+      showSnackbar(err instanceof Error ? err.message : t('installments.failedLoadDetail'));
     }
   };
 
@@ -92,19 +94,19 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
     const total = parseFloat(totalAmount);
     const count = parseInt(installmentCount, 10);
     if (!description.trim()) {
-      Alert.alert('Validation', 'Description is required');
+      Alert.alert(t('common.validation'), t('installments.validation.desc'));
       return;
     }
     if (!total || total <= 0) {
-      Alert.alert('Validation', 'Total amount must be greater than zero');
+      Alert.alert(t('common.validation'), t('installments.validation.total'));
       return;
     }
     if (count < 2 || count > 60) {
-      Alert.alert('Validation', 'Installments must be between 2 and 60');
+      Alert.alert(t('common.validation'), t('installments.validation.count'));
       return;
     }
     if (!startDate) {
-      Alert.alert('Validation', 'Start date is required');
+      Alert.alert(t('common.validation'), t('installments.validation.date'));
       return;
     }
 
@@ -120,9 +122,9 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
       setShowForm(false);
       resetForm();
       await loadPlans();
-      showSnackbar('Installment plan created');
+      showSnackbar(t('installments.created'));
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to create installment plan');
+      showSnackbar(err instanceof Error ? err.message : t('installments.failedCreate'));
     } finally {
       setSaving(false);
     }
@@ -131,39 +133,39 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
   const handleGenerate = async (id: string) => {
     try {
       const res = await generateInstallments(id);
-      showSnackbar(`Generated ${res.generated} installment transaction(s)`);
+      showSnackbar(t('installments.generated', { count: res.generated }));
       await loadPlans();
       if (detail && detail.plan.id === id) setDetail(await fetchInstallmentPlan(id));
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to generate installments');
+      showSnackbar(err instanceof Error ? err.message : t('installments.failedGenerate'));
     }
   };
 
   const handlePay = async (planId: string, number: number) => {
     try {
       await payInstallment(planId, number);
-      showSnackbar(`Installment ${number} marked as paid`);
+      showSnackbar(t('installments.markedPaid', { number }));
       setDetail(await fetchInstallmentPlan(planId));
       await loadPlans();
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to pay installment');
+      showSnackbar(err instanceof Error ? err.message : t('installments.failedPay'));
     }
   };
 
   const handleDelete = (plan: InstallmentPlan) => {
-    Alert.alert('Delete installment plan?', `This will delete "${plan.description}" and unlink generated transactions.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('installments.deleteTitle'), t('installments.deleteMessage', { description: plan.description }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await deleteInstallmentPlan(plan.id);
             setDetail(null);
             await loadPlans();
-            showSnackbar('Installment plan deleted');
+            showSnackbar(t('installments.deleted'));
           } catch (err) {
-            showSnackbar(err instanceof Error ? err.message : 'Failed to delete installment plan');
+            showSnackbar(err instanceof Error ? err.message : t('installments.failedDelete'));
           }
         },
       },
@@ -175,7 +177,7 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
   return (
     <ScrollView style={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Installments</Text>
+        <Text style={styles.pageTitle}>{t('installments.titleShort')}</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
@@ -183,15 +185,15 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
             setShowForm(true);
           }}
         >
-          <Text style={styles.addButtonText}>+ New Plan</Text>
+          <Text style={styles.addButtonText}>{t('installments.newPlan')}</Text>
         </TouchableOpacity>
       </View>
 
       {!loading && plans.length === 0 && (
         <EmptyState
           icon="📅"
-          title="No installment plans"
-          description="Split a purchase into N monthly payments."
+          title={t('installments.noTitle')}
+          description={t('installments.noDesc')}
         />
       )}
 
@@ -208,13 +210,13 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
                 <View style={styles.planTitleBlock}>
                   <Text style={styles.planTitle}>{plan.description}</Text>
                   <Text style={styles.planSubtitle}>
-                    {plan.category_name || 'Uncategorized'} · {plan.progress.paid_count}/{plan.installments} paid
+                    {plan.category_name || t('installments.uncategorised')} · {t('installments.paidCount', { paid: plan.progress.paid_count, total: plan.installments })}
                   </Text>
                 </View>
               </View>
               <View style={styles.planAmounts}>
                 <Text style={styles.planTotal}>{formatMoney(plan.total_amount)}</Text>
-                <Text style={styles.planRemaining}>{formatMoney(plan.installment_amount)}/mo</Text>
+                <Text style={styles.planRemaining}>{t('installments.perMonth', { amount: formatMoney(plan.installment_amount) })}</Text>
               </View>
             </View>
             <View style={styles.progressTrack}>
@@ -231,14 +233,14 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
             <View style={styles.planActions}>
               {overDue && plan.progress.pending_count > 0 && (
                 <TouchableOpacity style={styles.planActionButton} onPress={() => handleGenerate(plan.id)}>
-                  <Text style={styles.planActionButtonText}>Generate</Text>
+                  <Text style={styles.planActionButtonText}>{t('installments.generate')}</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.planActionButton} onPress={() => openDetail(plan.id)}>
-                <Text style={styles.planActionButtonText}>View</Text>
+                <Text style={styles.planActionButtonText}>{t('installments.view')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.planActionButton, styles.planDeleteButton]} onPress={() => handleDelete(plan)}>
-                <Text style={styles.planDeleteText}>Delete</Text>
+                <Text style={styles.planDeleteText}>{t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -257,21 +259,21 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
                 </TouchableOpacity>
               </View>
               <Text style={styles.planDetailMeta}>
-                {formatMoney(detail.plan.installment_amount)} × {detail.plan.installments} · Total {formatMoney(detail.plan.total_amount)} · {detail.plan.progress.paid_count} paid
+                {formatMoney(detail.plan.installment_amount)} × {detail.plan.installments} · {t('installments.detailTotal', { amount: formatMoney(detail.plan.total_amount) })} · {detail.plan.progress.paid_count} {t('common.paid')}
               </Text>
               {detail.installments.map((inst) => (
                 <View key={inst.id} style={styles.installmentRow}>
                   <Text style={styles.installmentNumber}>#{inst.installment_number}</Text>
                   <Text style={styles.installmentDue}>{inst.due_date}</Text>
                   <Text style={styles.installmentStatus}>
-                    {inst.status === 'paid' ? '✅ Paid' : inst.status === 'generated' ? '🟡 Gen' : '⚪ Pending'}
+                    {inst.status === 'paid' ? t('installments.statusPaid') : inst.status === 'generated' ? t('installments.statusGenerated') : t('installments.statusPending')}
                   </Text>
                   {inst.status !== 'paid' && (
                     <TouchableOpacity
                       style={styles.payButton}
                       onPress={() => handlePay(detail.plan.id, inst.installment_number)}
                     >
-                      <Text style={styles.payButtonText}>Pay</Text>
+                      <Text style={styles.payButtonText}>{t('creditCards.pay')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -287,18 +289,18 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
         <Modal visible transparent animationType="slide" onRequestClose={() => setShowForm(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>New Installment Plan</Text>
+              <Text style={styles.modalTitle}>{t('installments.form.title')}</Text>
 
-              <Text style={styles.label}>Description</Text>
+              <Text style={styles.label}>{t('installments.form.description')}</Text>
               <TextInput
                 style={styles.input}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="TV 55&quot; Samsung"
+                placeholder={t('installments.form.descriptionPlaceholder')}
                 placeholderTextColor={colors.textDim}
               />
 
-              <Text style={styles.label}>Total amount (R$)</Text>
+              <Text style={styles.label}>{t('installments.form.total')}</Text>
               <TextInput
                 style={styles.input}
                 value={totalAmount}
@@ -308,7 +310,7 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
                 keyboardType="decimal-pad"
               />
 
-              <Text style={styles.label}>Installments (2-60)</Text>
+              <Text style={styles.label}>{t('installments.form.count')}</Text>
               <TextInput
                 style={styles.input}
                 value={installmentCount}
@@ -320,17 +322,17 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
 
               {totalAmount && installmentCount && parseInt(installmentCount, 10) > 0 && (
                 <Text style={styles.monthPreview}>
-                  ≈ {formatMoney((parseFloat(totalAmount) / parseInt(installmentCount, 10)).toFixed(2))} per month
+                  {t('installments.form.perMonth', { amount: formatMoney((parseFloat(totalAmount) / parseInt(installmentCount, 10)).toFixed(2)) })}
                 </Text>
               )}
 
-              <Text style={styles.label}>Category (optional)</Text>
+              <Text style={styles.label}>{t('installments.form.categoryOptional')}</Text>
               <View style={styles.categoryGrid}>
                 <TouchableOpacity
                   style={[styles.categoryChip, categoryId === '' && styles.categoryChipActive]}
                   onPress={() => setCategoryId('')}
                 >
-                  <Text style={[styles.categoryChipText, categoryId === '' && styles.categoryChipTextActive]}>None</Text>
+                  <Text style={[styles.categoryChipText, categoryId === '' && styles.categoryChipTextActive]}>{t('common.none')}</Text>
                 </TouchableOpacity>
                 {expenseCategories.map((c) => (
                   <TouchableOpacity
@@ -345,7 +347,7 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
                 ))}
               </View>
 
-              <Text style={styles.label}>First installment date (YYYY-MM-DD)</Text>
+              <Text style={styles.label}>{t('installments.form.firstDate')} (YYYY-MM-DD)</Text>
               <TextInput
                 style={styles.input}
                 value={startDate}
@@ -357,7 +359,7 @@ export function InstallmentsScreen({ categories, formatMoney }: Props) {
 
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelButton} onPress={() => setShowForm(false)} disabled={saving}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.submitButton, saving && styles.submitButtonDisabled]}

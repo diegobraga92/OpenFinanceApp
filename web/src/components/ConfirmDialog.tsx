@@ -1,4 +1,5 @@
 import { useEffect, type CSSProperties } from 'react';
+import { useI18n } from '../i18n';
 
 interface Props {
   open: boolean;
@@ -14,11 +15,14 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Delete',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useI18n();
+  const resolvedConfirm = confirmLabel ?? t('confirm.delete');
+  const resolvedCancel = cancelLabel ?? t('confirm.cancel');
   // Close on Escape for keyboard users.
   useEffect(() => {
     if (!open) return;
@@ -55,14 +59,14 @@ export function ConfirmDialog({
             onClick={onCancel}
             autoFocus
           >
-            {cancelLabel}
+            {resolvedCancel}
           </button>
           <button
             type="button"
             style={styles.confirmButton}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {resolvedConfirm}
           </button>
         </div>
       </div>

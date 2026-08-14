@@ -15,6 +15,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useSnackbar } from '../components/Snackbar';
 import { EmptyState } from '../components/EmptyState';
+import { useI18n } from '../i18n';
 
 interface Props {
   formatMoney: (value: string | number) => string;
@@ -48,6 +49,7 @@ interface EditableItem {
 
 export function ReceiptsScreen({ formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
+  const { t } = useI18n();
   const [qrData, setQrData] = useState('');
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
   const [reviewItems, setReviewItems] = useState<EditableItem[]>([]);
@@ -75,7 +77,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
     if (receipt.items && receipt.items.length > 0) {
       setReviewItems(
         receipt.items.map((i) => ({
-          description: i.description ?? 'Item',
+          description: i.description ?? t('receipts.item'),
           quantity: i.quantity ?? '1',
           unit_price: i.unit_price ?? '',
           total_price: i.total_price ?? '',
@@ -83,7 +85,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
       );
     } else {
       setReviewItems([
-        { description: 'Receipt', quantity: '1', unit_price: '', total_price: receipt.total ?? '' },
+        { description: t('receipts.receipt'), quantity: '1', unit_price: '', total_price: receipt.total ?? '' },
       ]);
     }
   };
@@ -96,7 +98,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
       const res = await scanReceipt(qrData);
       applyParsedReceipt(res as ParsedReceipt);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to parse QR');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('receipts.failedParseQr'));
     } finally {
       setLoading(false);
     }
@@ -118,13 +120,13 @@ export function ReceiptsScreen({ formatMoney }: Props) {
       const result = await TextRecognition.recognize(uri, TextRecognitionScript.LATIN);
       const rawText = result.text;
       if (!rawText.trim()) {
-        Alert.alert('OCR', 'No text recognized. Try a clearer, better-lit photo.');
+        Alert.alert(t('receipts.ocrFailed'), t('receipts.ocrNoText'));
         return;
       }
       const res = await scanReceiptOcr(rawText);
       applyParsedReceipt(res as ParsedReceipt);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'OCR failed');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('receipts.ocrFailed'));
     } finally {
       setOcrLoading(false);
     }
@@ -146,20 +148,20 @@ export function ReceiptsScreen({ formatMoney }: Props) {
           unit_price: i.unit_price || undefined,
           total_price: i.total_price || undefined,
         }));
-      const res = await saveReceipt({
-        store_name: parsed.store_name || 'Unknown Store',
+      await saveReceipt({
+        store_name: parsed.store_name || t('receipts.unknownStore'),
         cnpj: parsed.cnpj ?? null,
         date: (parsed.date as string)?.split('T')[0] || new Date().toISOString().slice(0, 10),
         total: parsed.total,
-        items: items.length > 0 ? items : [{ description: 'Receipt', quantity: '1', total_price: parsed.total }],
+        items: items.length > 0 ? items : [{ description: t('receipts.receipt'), quantity: '1', total_price: parsed.total }],
       });
-      showSnackbar(`✅ Receipt saved with ${items.length} item(s) (${res.id.slice(0, 8)}…)`);
+      showSnackbar(t('receipts.savedWithItems', { count: items.length }));
       await loadGallery();
       setParsed(null);
       setReviewItems([]);
       setQrData('');
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save receipt');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('receipts.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -168,19 +170,19 @@ export function ReceiptsScreen({ formatMoney }: Props) {
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Receipt Scanner</Text>
+        <Text style={styles.pageTitle}>{t('receipts.title')}</Text>
       </View>
       <Text style={styles.receiptHint}>
-        Paste an NFC-e QR code to parse its receipt data (no OCR).
+        {t('receipts.subtitle')}
       </Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Scan NFC-e QR</Text>
+        <Text style={styles.sectionTitle}>{t('receipts.scanQr')}</Text>
         <TextInput
           style={styles.receiptQrInput}
           value={qrData}
           onChangeText={setQrData}
-          placeholder="Paste the NFC-e QR code URL…"
+          placeholder={t('receipts.qrPlaceholder')}
           placeholderTextColor={colors.textDim}
           multiline
           numberOfLines={4}
@@ -196,15 +198,15 @@ export function ReceiptsScreen({ formatMoney }: Props) {
           {loading ? (
             <ActivityIndicator color={colors.primaryText} />
           ) : (
-            <Text style={styles.submitButtonText}>Scan QR</Text>
+            <Text style={styles.submitButtonText}>{t('receipts.scanQrButton')}</Text>
           )}
         </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Scan Receipt Photo (OCR)</Text>
+        <Text style={styles.sectionTitle}>{t('receipts.ocrTitle')}</Text>
         <Text style={styles.receiptHint}>
-          No QR code handy? Take a photo of the receipt and the text will be read on-device.
+          {t('receipts.ocrHint')}
         </Text>
         <TouchableOpacity
           style={[styles.submitButton, ocrLoading && styles.submitButtonDisabled]}
@@ -214,7 +216,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
           {ocrLoading ? (
             <ActivityIndicator color={colors.primaryText} />
           ) : (
-            <Text style={styles.submitButtonText}>📷 Read Receipt</Text>
+            <Text style={styles.submitButtonText}>{t('receipts.readReceipt')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -250,14 +252,14 @@ export function ReceiptsScreen({ formatMoney }: Props) {
                     style={[styles.receiptItemInput, styles.receiptItemDesc]}
                     value={item.description}
                     onChangeText={(v) => updateReviewItem(idx, { description: v })}
-                    placeholder="Description"
+                    placeholder={t('common.description')}
                     placeholderTextColor={colors.textDim}
                   />
                   <TextInput
                     style={[styles.receiptItemInput, styles.receiptItemSmall]}
                     value={item.quantity}
                     onChangeText={(v) => updateReviewItem(idx, { quantity: v })}
-                    placeholder="Qty"
+                    placeholder={t('receipts.quantity')}
                     placeholderTextColor={colors.textDim}
                     keyboardType="decimal-pad"
                   />
@@ -265,7 +267,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
                     style={[styles.receiptItemInput, styles.receiptItemSmall]}
                     value={item.unit_price}
                     onChangeText={(v) => updateReviewItem(idx, { unit_price: v })}
-                    placeholder="Unit"
+                    placeholder={t('receipts.unit')}
                     placeholderTextColor={colors.textDim}
                     keyboardType="decimal-pad"
                   />
@@ -273,7 +275,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
                     style={[styles.receiptItemInput, styles.receiptItemSmall]}
                     value={item.total_price}
                     onChangeText={(v) => updateReviewItem(idx, { total_price: v })}
-                    placeholder="Total"
+                    placeholder={t('common.total')}
                     placeholderTextColor={colors.textDim}
                     keyboardType="decimal-pad"
                   />
@@ -294,7 +296,7 @@ export function ReceiptsScreen({ formatMoney }: Props) {
                   ])
                 }
               >
-                <Text style={styles.receiptItemAddText}>+ Add item</Text>
+                <Text style={styles.receiptItemAddText}>{t('receipts.addItem')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -307,29 +309,29 @@ export function ReceiptsScreen({ formatMoney }: Props) {
             {saving ? (
               <ActivityIndicator color={colors.primaryText} />
             ) : (
-              <Text style={styles.submitButtonText}>Save Receipt</Text>
+              <Text style={styles.submitButtonText}>{t('receipts.saveReceipt')}</Text>
             )}
           </TouchableOpacity>
         </View>
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Gallery</Text>
+        <Text style={styles.sectionTitle}>{t('receipts.gallery')}</Text>
         {gallery.length === 0 ? (
           <EmptyState
             compact
             icon="🧾"
-            title="No receipts yet"
-            description="Scan your first NFC-e QR code to start building a receipt history."
+            title={t('receipts.noReceiptsTitle')}
+            description={t('receipts.noReceiptsDesc')}
           />
         ) : (
           <View style={styles.receiptList}>
             {gallery.map((r) => (
               <View key={r.id} style={styles.receiptRow}>
                 <View style={styles.receiptRowInfo}>
-                  <Text style={styles.receiptRowStore}>{r.store_name || 'Unknown store'}</Text>
+                  <Text style={styles.receiptRowStore}>{r.store_name || t('receipts.unknownStore')}</Text>
                   <Text style={styles.receiptRowDate}>
-                    {r.receipt_date || '—'} · {r.item_count ?? 0} items
+                    {r.receipt_date || '—'} · {r.item_count ?? 0} {t('common.items')}
                   </Text>
                 </View>
                 <Text style={styles.receiptRowTotal}>

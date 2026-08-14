@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { AuditEvent, fetchAuditEvents } from '../api';
+import { useI18n } from '../i18n';
 
 interface Props {
   token: string | null;
 }
 
 export function AuditDashboard({ token }: Props) {
+  const { t, formatDateTime } = useI18n();
   const [items, setItems] = useState<AuditEvent[]>([]);
   const [eventType, setEventType] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export function AuditDashboard({ token }: Props) {
         const res = await fetchAuditEvents(token, { event_type: eventType || undefined, page, page_size: 50 });
         setItems(res.items);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load audit events');
+        setError(err instanceof Error ? err.message : t('audit.failedLoad'));
       } finally {
         setLoading(false);
       }
@@ -33,8 +35,8 @@ export function AuditDashboard({ token }: Props) {
     <div>
       <div style={styles.pageHeader}>
         <div>
-          <h2 style={styles.pageTitle}>Audit Log</h2>
-          <p style={styles.pageSubtitle}>Admin-only view of the immutable event trail.</p>
+          <h2 style={styles.pageTitle}>{t('audit.title')}</h2>
+          <p style={styles.pageSubtitle}>{t('audit.subtitle')}</p>
         </div>
       </div>
 
@@ -45,30 +47,30 @@ export function AuditDashboard({ token }: Props) {
           style={styles.input}
           value={eventType}
           onChange={(e) => setEventType(e.target.value)}
-          placeholder="Filter by event type (e.g. TransactionRecorded)"
+          placeholder={t('audit.filterPlaceholder')}
         />
         <button type="button" style={styles.button} onClick={() => load()} disabled={loading}>
-          {loading ? 'Loading…' : 'Apply'}
+          {loading ? t('common.loading') : t('common.apply')}
         </button>
       </div>
 
       {items.length === 0 ? (
-        <p style={styles.empty}>No audit events found.</p>
+        <p style={styles.empty}>{t('audit.noEvents')}</p>
       ) : (
         <div style={styles.tableWrapper}>
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Time</th>
-                <th style={styles.th}>Event Type</th>
-                <th style={styles.th}>Aggregate</th>
-                <th style={styles.th}>Aggregate ID</th>
+                <th style={styles.th}>{t('audit.time')}</th>
+                <th style={styles.th}>{t('audit.eventType')}</th>
+                <th style={styles.th}>{t('audit.aggregate')}</th>
+                <th style={styles.th}>{t('audit.aggregateId')}</th>
               </tr>
             </thead>
             <tbody>
               {items.map((e) => (
                 <tr key={e.id} style={styles.tr}>
-                  <td style={styles.td}>{new Date(e.occurred_at).toLocaleString()}</td>
+                  <td style={styles.td}>{formatDateTime(e.occurred_at)}</td>
                   <td style={styles.td}>{e.event_type}</td>
                   <td style={styles.td}>{e.aggregate_type}</td>
                   <td style={styles.td} title={JSON.stringify(e.payload)}>{e.aggregate_id}</td>

@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { useI18n } from '../i18n';
 
 interface ToastItem {
   id: number;
@@ -24,6 +25,7 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
+  const { t } = useI18n();
 
   const dismiss = useCallback((id: number) => {
     setToasts((ts) => ts.filter((t) => t.id !== id));
@@ -42,27 +44,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ push }}>
       {children}
-      <div style={styles.container} role="region" aria-label="Notifications">
-        {toasts.map((t) => (
-          <div key={t.id} style={styles.toast} role="status">
-            <span style={styles.message}>{t.message}</span>
-            {t.actionLabel && t.onAction && (
+      <div style={styles.container} role="region" aria-label={t('toast.notifications')}>
+        {toasts.map((toast) => (
+          <div key={toast.id} style={styles.toast} role="status">
+            <span style={styles.message}>{toast.message}</span>
+            {toast.actionLabel && toast.onAction && (
               <button
                 type="button"
                 style={styles.action}
                 onClick={() => {
-                  t.onAction?.();
-                  dismiss(t.id);
+                  toast.onAction?.();
+                  dismiss(toast.id);
                 }}
               >
-                {t.actionLabel}
+                {toast.actionLabel}
               </button>
             )}
             <button
               type="button"
               style={styles.close}
-              onClick={() => dismiss(t.id)}
-              aria-label="Dismiss notification"
+              onClick={() => dismiss(toast.id)}
+              aria-label={t('toast.dismissNotification')}
             >
               ✕
             </button>

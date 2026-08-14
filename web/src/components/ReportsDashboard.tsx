@@ -20,17 +20,13 @@ import {
   MonthlyReportResponse,
   TrendsResponse,
 } from '../api';
+import { useI18n } from '../i18n';
 
 type ReportTab = 'overview' | 'breakdown' | 'trends';
 
 interface Props {
   formatMoney: (value: string | number) => string;
 }
-
-const MONTH_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
 
 const CHART_COLORS = [
   '#22c55e', '#ef4444', '#3b82f6', '#eab308', '#8b5cf6',
@@ -39,12 +35,13 @@ const CHART_COLORS = [
 ];
 
 export function ReportsDashboard({ formatMoney }: Props) {
+  const { t, shortMonthNames } = useI18n();
   const [tab, setTab] = useState<ReportTab>('overview');
   const [monthly, setMonthly] = useState<MonthlyReportResponse | null>(null);
   const [breakdown, setBreakdown] = useState<CategoryBreakdownResponse | null>(null);
   const [trends, setTrends] = useState<TrendsResponse | null>(null);
   const [trendMonths, setTrendMonths] = useState(6);
-  const [rangeLabel, setRangeLabel] = useState('Current month');
+  const [rangeLabel, setRangeLabel] = useState(t('reports.currentMonth'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,11 +59,11 @@ export function ReportsDashboard({ formatMoney }: Props) {
       }
       const data = await fetchMonthlyReport(startYear, startMonth, endYear, endMonth);
       setMonthly(data);
-      const startLabel = `${MONTH_NAMES[startMonth - 1]}/${String(startYear).slice(2)}`;
-      const endLabel = `${MONTH_NAMES[endMonth - 1]}/${String(endYear).slice(2)}`;
+      const startLabel = `${shortMonthNames[startMonth - 1]}/${String(startYear).slice(2)}`;
+      const endLabel = `${shortMonthNames[endMonth - 1]}/${String(endYear).slice(2)}`;
       setRangeLabel(`${startLabel} – ${endLabel}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load monthly report');
+      setError(err instanceof Error ? err.message : t('reports.failedMonthly'));
     }
   }, []);
 
@@ -79,7 +76,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
       const data = await fetchCategoryBreakdown(firstDay, today);
       setBreakdown(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load category breakdown');
+      setError(err instanceof Error ? err.message : t('reports.failedBreakdown'));
     }
   }, []);
 
@@ -88,7 +85,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
       const data = await fetchTrends(months);
       setTrends(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load trends');
+      setError(err instanceof Error ? err.message : t('reports.failedTrends'));
     }
   }, []);
 
@@ -107,17 +104,17 @@ export function ReportsDashboard({ formatMoney }: Props) {
 
   const trendData = (trends?.trends ?? []).map((t) => ({
     ...t,
-    displayLabel: `${MONTH_NAMES[t.month - 1]} '${String(t.year).slice(2)}`,
+    displayLabel: `${shortMonthNames[t.month - 1]} '${String(t.year).slice(2)}`,
   }));
 
   const breakdownPieData = (breakdown?.categories ?? []).map((c, i) => ({
-    name: c.category_name || 'Uncategorised',
+    name: c.category_name || t('common.uncategorised'),
     value: parseFloat(c.total),
     color: c.color || CHART_COLORS[i % CHART_COLORS.length],
   }));
 
   const breakdownBarData = (breakdown?.categories ?? []).slice(0, 10).map((c, i) => ({
-    name: c.category_name || 'Uncategorised',
+    name: c.category_name || t('common.uncategorised'),
     total: parseFloat(c.total),
     percentage: parseFloat(c.percentage),
     color: c.color || CHART_COLORS[i % CHART_COLORS.length],
@@ -127,7 +124,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
     <div>
       <div style={styles.pageHeader}>
         <div>
-          <h2 style={styles.pageTitle}>Reports & Insights</h2>
+          <h2 style={styles.pageTitle}>{t('reports.title')}</h2>
           <p style={styles.pageSubtitle}>{rangeLabel}</p>
         </div>
       </div>
@@ -145,26 +142,26 @@ export function ReportsDashboard({ formatMoney }: Props) {
             }}
             style={styles.retryButton}
           >
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       )}
 
       <div style={styles.subNav}>
-        {(['overview', 'breakdown', 'trends'] as ReportTab[]).map((t) => (
+        {(['overview', 'breakdown', 'trends'] as ReportTab[]).map((reportTab) => (
           <button
-            key={t}
-            style={{ ...styles.subNavButton, ...(tab === t ? styles.subNavButtonActive : {}) }}
-            onClick={() => setTab(t)}
+            key={reportTab}
+            style={{ ...styles.subNavButton, ...(tab === reportTab ? styles.subNavButtonActive : {}) }}
+            onClick={() => setTab(reportTab)}
           >
-            {t === 'overview' ? 'Monthly Overview' : t === 'breakdown' ? 'Category Breakdown' : 'Trends'}
+            {tab === 'overview' ? t('reports.overview') : tab === 'breakdown' ? t('reports.breakdown') : t('reports.trends')}
           </button>
         ))}
       </div>
 
       {loading ? (
         <div style={styles.loading}>
-          <p>Loading reports…</p>
+          <p>{t('reports.loading')}</p>
         </div>
       ) : (
         <>
@@ -172,19 +169,19 @@ export function ReportsDashboard({ formatMoney }: Props) {
             <div>
               <div style={styles.overviewCards}>
                 <div style={styles.overviewCard}>
-                  <p style={styles.overviewLabel}>Total Income</p>
+                  <p style={styles.overviewLabel}>{t('reports.totalIncome')}</p>
                   <p style={{ ...styles.overviewValue, color: 'var(--color-income)' }}>
                     {formatMoney(monthly.months.reduce((sum, m) => sum + parseFloat(m.income_total), 0))}
                   </p>
                 </div>
                 <div style={styles.overviewCard}>
-                  <p style={styles.overviewLabel}>Total Expenses</p>
+                  <p style={styles.overviewLabel}>{t('reports.totalExpenses')}</p>
                   <p style={{ ...styles.overviewValue, color: 'var(--color-expense)' }}>
                     {formatMoney(monthly.months.reduce((sum, m) => sum + parseFloat(m.expense_total), 0))}
                   </p>
                 </div>
                 <div style={styles.overviewCard}>
-                  <p style={styles.overviewLabel}>Net</p>
+                  <p style={styles.overviewLabel}>{t('reports.net')}</p>
                   <p style={{
                     ...styles.overviewValue,
                     color: monthly.months.reduce((sum, m) => sum + parseFloat(m.balance), 0) >= 0  ? 'var(--color-income)' : 'var(--color-expense)',
@@ -195,12 +192,12 @@ export function ReportsDashboard({ formatMoney }: Props) {
               </div>
 
               <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>Income vs Expenses by Month</h3>
+                <h3 style={styles.sectionTitle}>{t('reports.incomeVsExpenses')}</h3>
                 <div style={styles.chartContainer}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={monthly.months.map((m) => ({
                       ...m,
-                      label: `${MONTH_NAMES[m.month - 1]} '${String(m.year).slice(2)}`,
+                      label: `${shortMonthNames[m.month - 1]} '${String(m.year).slice(2)}`,
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                       <XAxis dataKey="label" stroke="var(--color-text-muted)" fontSize={12} />
@@ -213,7 +210,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       <Line
                         type="monotone"
                         dataKey="income_total"
-                        name="Income"
+                        name={t('reports.income')}
                         stroke="var(--color-income)"
                         strokeWidth={2}
                         dot={false}
@@ -221,7 +218,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       <Line
                         type="monotone"
                         dataKey="expense_total"
-                        name="Expenses"
+                        name={t('reports.expenses')}
                         stroke="var(--color-expense)"
                         strokeWidth={2}
                         dot={false}
@@ -229,7 +226,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       <Line
                         type="monotone"
                         dataKey="balance"
-                        name="Balance"
+                        name={t('reports.balance')}
                         stroke="var(--color-chart-neutral)"
                         strokeWidth={2}
                         dot={false}
@@ -241,22 +238,22 @@ export function ReportsDashboard({ formatMoney }: Props) {
               </div>
 
               <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>Monthly Table</h3>
+                <h3 style={styles.sectionTitle}>{t('reports.monthlyTable')}</h3>
                 <div style={styles.tableWrapper}>
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={styles.th}>Month</th>
-                        <th style={styles.th} align="right">Income</th>
-                        <th style={styles.th} align="right">Expenses</th>
-                        <th style={styles.th} align="right">Balance</th>
+                        <th style={styles.th}>{t('reports.month')}</th>
+                        <th style={styles.th} align="right">{t('reports.income')}</th>
+                        <th style={styles.th} align="right">{t('reports.expenses')}</th>
+                        <th style={styles.th} align="right">{t('reports.balance')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {monthly.months.map((m) => (
                         <tr key={`${m.year}-${m.month}`} style={styles.tr}>
                           <td style={styles.td}>
-                            {MONTH_NAMES[m.month - 1]} {m.year}
+                            {shortMonthNames[m.month - 1]} {m.year}
                           </td>
                           <td style={{ ...styles.td, ...styles.numCell, color: 'var(--color-income)' }}>
                             {formatMoney(m.income_total)}
@@ -280,13 +277,13 @@ export function ReportsDashboard({ formatMoney }: Props) {
             <div>
               {breakdown && breakdown.categories.length === 0 ? (
                 <div style={styles.emptyCard}>
-                  <p style={styles.emptyText}>No expenses in this period yet.</p>
+                  <p style={styles.emptyText}>{t('reports.noExpenses')}</p>
                 </div>
               ) : (
                 <>
                   <div style={styles.breakdownGrid}>
                     <div style={styles.section}>
-                      <h3 style={styles.sectionTitle}>Spending by Category</h3>
+                      <h3 style={styles.sectionTitle}>{t('reports.spendingByCategory')}</h3>
                       <div style={styles.pieContainer}>
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -315,7 +312,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                     </div>
 
                     <div style={styles.section}>
-                      <h3 style={styles.sectionTitle}>Top Categories (Bar)</h3>
+                      <h3 style={styles.sectionTitle}>{t('reports.topCategories')}</h3>
                       <div style={styles.barList}>
                         {breakdownBarData.map((item) => (
                           <div key={item.name} style={styles.barRow}>
@@ -336,15 +333,15 @@ export function ReportsDashboard({ formatMoney }: Props) {
                   </div>
 
                   <div style={styles.section}>
-                    <h3 style={styles.sectionTitle}>Detailed Breakdown</h3>
+                    <h3 style={styles.sectionTitle}>{t('reports.detailedBreakdown')}</h3>
                     <div style={styles.tableWrapper}>
                       <table style={styles.table}>
                         <thead>
                           <tr>
-                            <th style={styles.th}>Category</th>
-                            <th style={styles.th} align="right">Transactions</th>
-                            <th style={styles.th} align="right">Total</th>
-                            <th style={styles.th} align="right">%</th>
+                            <th style={styles.th}>{t('common.category')}</th>
+                            <th style={styles.th} align="right">{t('reports.transactions')}</th>
+                            <th style={styles.th} align="right">{t('common.total')}</th>
+                            <th style={styles.th} align="right">{t('reports.percentage')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -352,7 +349,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                             <tr key={c.category_id || 'none'} style={styles.tr}>
                               <td style={styles.td}>
                                 {c.icon && <span style={styles.icon}>{c.icon} </span>}
-                                {c.category_name || 'Uncategorised'}
+                                {c.category_name || t('common.uncategorised')}
                               </td>
                               <td style={{ ...styles.td, ...styles.numCell }}>{c.transaction_count}</td>
                               <td style={{ ...styles.td, ...styles.numCell }}>{formatMoney(c.total)}</td>
@@ -377,13 +374,13 @@ export function ReportsDashboard({ formatMoney }: Props) {
                     style={{ ...styles.trendButton, ...(trendMonths === m ? styles.trendButtonActive : {}) }}
                     onClick={() => setTrendMonths(m)}
                   >
-                    Last {m} months
+                    {t('reports.lastMonths', { count: m })}
                   </button>
                 ))}
               </div>
 
               <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>Monthly Trends</h3>
+                <h3 style={styles.sectionTitle}>{t('reports.monthlyTrends')}</h3>
                 <div style={styles.chartContainer}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData}>
@@ -398,7 +395,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       <Line
                         type="monotone"
                         dataKey="income_total"
-                        name="Income"
+                        name={t('reports.income')}
                         stroke="var(--color-income)"
                         strokeWidth={2}
                         dot={false}
@@ -406,7 +403,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       <Line
                         type="monotone"
                         dataKey="expense_total"
-                        name="Expenses"
+                        name={t('reports.expenses')}
                         stroke="var(--color-expense)"
                         strokeWidth={2}
                         dot={false}
@@ -414,7 +411,7 @@ export function ReportsDashboard({ formatMoney }: Props) {
                       <Line
                         type="monotone"
                         dataKey="net"
-                        name="Net"
+                        name={t('reports.netShort')}
                         stroke="var(--color-chart-neutral)"
                         strokeWidth={2}
                         dot={false}
@@ -426,21 +423,21 @@ export function ReportsDashboard({ formatMoney }: Props) {
               </div>
 
               <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>Trend Data</h3>
+                <h3 style={styles.sectionTitle}>{t('reports.trendData')}</h3>
                 <div style={styles.tableWrapper}>
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={styles.th}>Month</th>
-                        <th style={styles.th} align="right">Income</th>
-                        <th style={styles.th} align="right">Expenses</th>
-                        <th style={styles.th} align="right">Net</th>
+                        <th style={styles.th}>{t('reports.month')}</th>
+                        <th style={styles.th} align="right">{t('reports.income')}</th>
+                        <th style={styles.th} align="right">{t('reports.expenses')}</th>
+                        <th style={styles.th} align="right">{t('reports.netShort')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(trends?.trends ?? []).map((t) => (
                         <tr key={`${t.year}-${t.month}`} style={styles.tr}>
-                          <td style={styles.td}>{MONTH_NAMES[t.month - 1]} {t.year}</td>
+                          <td style={styles.td}>{shortMonthNames[t.month - 1]} {t.year}</td>
                           <td style={{ ...styles.td, ...styles.numCell, color: 'var(--color-income)' }}>
                             {formatMoney(t.income_total)}
                           </td>

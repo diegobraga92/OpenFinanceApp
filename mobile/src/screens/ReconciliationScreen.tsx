@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { ReconciliationUploadResponse, uploadReconciliation } from '../api';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import { styles } from '../theme/styles';
 
 interface Props {
@@ -16,7 +17,8 @@ interface Props {
 }
 
 export function ReconciliationScreen({ formatMoney }: Props) {
-  const [reconStatementName, setReconStatementName] = useState('Bank Statement');
+  const { t } = useI18n();
+  const [reconStatementName, setReconStatementName] = useState('');
   const [reconCsv, setReconCsv] = useState('');
   const [reconResult, setReconResult] = useState<ReconciliationUploadResponse | null>(null);
   const [reconLoading, setReconLoading] = useState(false);
@@ -26,7 +28,7 @@ export function ReconciliationScreen({ formatMoney }: Props) {
     setReconError(null);
     setReconResult(null);
     if (!reconCsv.trim()) {
-      setReconError('CSV data is required');
+      setReconError(t('recon.validation.csvRequired'));
       return;
     }
     setReconLoading(true);
@@ -47,17 +49,17 @@ export function ReconciliationScreen({ formatMoney }: Props) {
         .filter((r) => r.date && r.description && r.amount);
 
       if (rows.length === 0) {
-        setReconError('CSV is empty or malformed. Expected date,description,amount');
+        setReconError(t('recon.validation.mobileEmpty'));
         return;
       }
 
       const res = await uploadReconciliation({
-        statement_name: reconStatementName.trim() || 'Bank Statement',
+        statement_name: reconStatementName.trim() || t('recon.bankStatement'),
         lines: rows,
       });
       setReconResult(res);
     } catch (err) {
-      setReconError(err instanceof Error ? err.message : 'Failed to upload reconciliation');
+      setReconError(err instanceof Error ? err.message : t('recon.failedUpload'));
     } finally {
       setReconLoading(false);
     }
@@ -66,27 +68,27 @@ export function ReconciliationScreen({ formatMoney }: Props) {
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Reconciliation</Text>
+        <Text style={styles.pageTitle}>{t('recon.title')}</Text>
       </View>
 
       <View style={styles.formCard}>
-        <Text style={styles.formTitle}>Upload Statement</Text>
+        <Text style={styles.formTitle}>{t('recon.uploadReconcile')}</Text>
 
-        <Text style={styles.label}>Statement Name</Text>
+        <Text style={styles.label}>{t('recon.statementName')}</Text>
         <TextInput
           style={styles.input}
           value={reconStatementName}
           onChangeText={setReconStatementName}
-          placeholder="Bank Statement"
+          placeholder={t('recon.bankStatement')}
           placeholderTextColor={colors.textDim}
         />
 
-        <Text style={styles.label}>CSV Data (date,description,amount)</Text>
+        <Text style={styles.label}>{t('recon.csvData')} (date,description,amount)</Text>
         <TextInput
           style={styles.reconCsvInput}
           value={reconCsv}
           onChangeText={setReconCsv}
-          placeholder={"2026-08-01,Supermarket,150.00\n2026-08-02,Salary,2500.00"}
+          placeholder={t('recon.csvPlaceholderMobile')}
           placeholderTextColor={colors.textDim}
           multiline
           numberOfLines={6}
@@ -107,25 +109,25 @@ export function ReconciliationScreen({ formatMoney }: Props) {
           {reconLoading ? (
             <ActivityIndicator color={colors.primaryText} />
           ) : (
-            <Text style={styles.submitButtonText}>Upload & Reconcile</Text>
+            <Text style={styles.submitButtonText}>{t('recon.uploadReconcile')}</Text>
           )}
         </TouchableOpacity>
       </View>
 
       {reconResult && (
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Results</Text>
+          <Text style={styles.formTitle}>{t('recon.results')}</Text>
           <View style={styles.reconSummaryRow}>
             <View style={styles.reconSummaryItem}>
-              <Text style={styles.reconSummaryLabel}>Total</Text>
+              <Text style={styles.reconSummaryLabel}>{t('common.total')}</Text>
               <Text style={styles.reconSummaryValue}>{reconResult.total_rows}</Text>
             </View>
             <View style={styles.reconSummaryItem}>
-              <Text style={[styles.reconSummaryLabel, { color: colors.income }]}>Matched</Text>
+              <Text style={[styles.reconSummaryLabel, { color: colors.income }]}>{t('recon.matched')}</Text>
               <Text style={[styles.reconSummaryValue, { color: colors.income }]}>{reconResult.matched_rows}</Text>
             </View>
             <View style={styles.reconSummaryItem}>
-              <Text style={[styles.reconSummaryLabel, { color: colors.expense }]}>Unmatched</Text>
+              <Text style={[styles.reconSummaryLabel, { color: colors.expense }]}>{t('recon.unmatched')}</Text>
               <Text style={[styles.reconSummaryValue, { color: colors.expense }]}>{reconResult.unmatched_rows}</Text>
             </View>
           </View>

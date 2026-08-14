@@ -631,6 +631,18 @@ export const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
   },
+  drawerLangRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  drawerLangLabel: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
   monthNav: {
     flexDirection: 'row',
     alignItems: 'center',

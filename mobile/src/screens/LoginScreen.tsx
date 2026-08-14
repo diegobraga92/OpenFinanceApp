@@ -13,6 +13,8 @@ import { loginUser, registerUser } from '../api';
 import { setAuthSession, type AuthUser } from '../auth';
 import { getApiBaseUrl, setApiBaseUrl } from '../config/server';
 import { colors, radius, spacing, typography } from '../theme/tokens';
+import { useI18n } from '../i18n';
+import { LanguageToggle } from '../components/LanguageToggle';
 
 type Mode = 'login' | 'register';
 
@@ -22,6 +24,7 @@ interface Props {
 
 /** Full-screen login / registration form shown when no valid session exists. */
 export function LoginScreen({ onAuthenticated }: Props) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,7 +67,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
         onAuthenticated(res.user);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(err instanceof Error ? err.message : t('login.authFailed'));
     } finally {
       setBusy(false);
     }
@@ -76,12 +79,15 @@ export function LoginScreen({ onAuthenticated }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.card}>
+        <View style={styles.langRow}>
+          <LanguageToggle />
+        </View>
         <Text style={styles.logo}>🏦</Text>
         <Text style={styles.title}>PudimFinance</Text>
         <Text style={styles.subtitle}>
           {mode === 'login'
-            ? 'Sign in to your personal finance dashboard'
-            : 'Create an account to start tracking your money'}
+            ? t('login.subtitle')
+            : t('login.registerSubtitle')}
         </Text>
 
         {error && (
@@ -94,7 +100,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           style={styles.serverInput}
           value={serverUrl}
           onChangeText={setServerUrl}
-          placeholder="Server (e.g. http://192.168.1.100:3000)"
+          placeholder={t('login.serverPlaceholder')}
           placeholderTextColor={colors.textDim}
           autoCapitalize="none"
           autoCorrect={false}
@@ -106,7 +112,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
             style={styles.input}
             value={displayName}
             onChangeText={setDisplayName}
-            placeholder="Display name (optional)"
+            placeholder={t('login.displayName')}
             placeholderTextColor={colors.textDim}
             autoCapitalize="words"
           />
@@ -116,7 +122,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           style={styles.input}
           value={email}
           onChangeText={setEmail}
-          placeholder="Email"
+          placeholder={t('login.email')}
           placeholderTextColor={colors.textDim}
           keyboardType="email-address"
           autoCapitalize="none"
@@ -127,7 +133,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           style={styles.input}
           value={password}
           onChangeText={setPassword}
-          placeholder={mode === 'register' ? 'Password (at least 8 characters)' : 'Password'}
+          placeholder={mode === 'register' ? t('login.minChars') : t('login.password')}
           placeholderTextColor={colors.textDim}
           secureTextEntry
           autoCapitalize="none"
@@ -143,7 +149,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
             <ActivityIndicator color={colors.primaryText} />
           ) : (
             <Text style={styles.submitText}>
-              {mode === 'login' ? 'Sign in' : 'Create account'}
+              {mode === 'login' ? t('login.signIn') : t('login.createAccount')}
             </Text>
           )}
         </TouchableOpacity>
@@ -155,8 +161,8 @@ export function LoginScreen({ onAuthenticated }: Props) {
         >
           <Text style={styles.switchText}>
             {mode === 'login'
-              ? "Don't have an account? Create one"
-              : 'Already registered? Sign in'}
+              ? t('login.switchToRegister')
+              : t('login.switchToLogin')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -181,6 +187,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.xl,
     alignItems: 'center',
+  },
+  langRow: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.md,
   },
   logo: {
     fontSize: 48,

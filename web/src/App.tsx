@@ -30,6 +30,9 @@ import { CreditCardManager } from './components/CreditCardManager';
 import { EmptyState } from './components/EmptyState';
 import { useToast } from './components/Toast';
 import { useTheme } from './theme/ThemeContext';
+import { useI18n } from './i18n';
+import { LanguageToggle } from './components/LanguageToggle';
+import type { TranslationKey } from '../../shared/i18n';
 
 type Tab = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'receipts' | 'audit' | 'installments' | 'credit-cards';
 
@@ -48,24 +51,19 @@ const TABS: Tab[] = [
   'categories',
 ];
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-const NAV_ITEMS: [Tab, string][] = [
-  ['dashboard', 'Dashboard'],
-  ['transactions', 'Transactions'],
-  ['accounts', 'Accounts'],
-  ['credit-cards', 'Credit Cards'],
-  ['ledger', 'Ledger'],
-  ['budgets', 'Budgets'],
-  ['installments', 'Installments'],
-  ['reports', 'Reports'],
-  ['reconciliation', 'Reconciliation'],
-  ['receipts', 'Receipts'],
-  ['audit', 'Audit'],
-  ['categories', 'Categories'],
+const NAV_ITEMS: [Tab, TranslationKey][] = [
+  ['dashboard', 'nav.dashboard'],
+  ['transactions', 'nav.transactions'],
+  ['accounts', 'nav.accounts'],
+  ['credit-cards', 'nav.creditCards'],
+  ['ledger', 'nav.ledger'],
+  ['budgets', 'nav.budgets'],
+  ['installments', 'nav.installments'],
+  ['reports', 'nav.reports'],
+  ['reconciliation', 'nav.reconciliation'],
+  ['receipts', 'nav.receipts'],
+  ['audit', 'nav.audit'],
+  ['categories', 'nav.categories'],
 ];
 
 export default function App() {
@@ -84,6 +82,7 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false);
   const { toggle: toggleTheme, mode: themeMode } = useTheme();
   const { push: pushToast } = useToast();
+  const { t, formatMoney, monthNames } = useI18n();
 
   // Allow child views (e.g. CreditCardManager) to request navigating to the
   // Accounts tab.
@@ -99,10 +98,10 @@ export default function App() {
       setCategories(data);
       return data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load categories');
+      setError(err instanceof Error ? err.message : t('errors.loadCategories'));
       return [];
     }
-  }, []);
+  }, [t]);
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -110,10 +109,10 @@ export default function App() {
       setAccounts(data);
       return data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load accounts');
+      setError(err instanceof Error ? err.message : t('errors.loadAccounts'));
       return [];
     }
-  }, []);
+  }, [t]);
 
   const loadTransactions = useCallback(async () => {
     try {
@@ -121,10 +120,10 @@ export default function App() {
       setTransactions(data.items);
       return data.items;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load transactions');
+      setError(err instanceof Error ? err.message : t('errors.loadTransactions'));
       return [];
     }
-  }, []);
+  }, [t]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -143,7 +142,7 @@ export default function App() {
       setTrends(trnds);
       setAccounts(accnts);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setError(err instanceof Error ? err.message : t('errors.loadData'));
     } finally {
       setLoading(false);
     }
@@ -161,9 +160,14 @@ export default function App() {
         )[0];
         const pct = Math.round(parseFloat(worst.percentage));
         const extras = over.length - 1;
-        const prefix = extras > 0 ? `${extras} more budget${extras > 1 ? 's' : ''} at/over 80% · ` : '';
+        const prefix =
+          extras > 0
+            ? t(extras === 1 ? 'dashboard.budgetAlertMore_one' : 'dashboard.budgetAlertMore_other', {
+                count: extras,
+              })
+            : '';
         setBudgetAlert(
-          `⚠️ ${prefix}You've spent ${pct}% of your ${worst.budget.category_name} budget this month`
+          t('dashboard.budgetAlert', { prefix, pct, category: worst.budget.category_name }),
         );
       } else {
         setBudgetAlert(null);
@@ -171,7 +175,7 @@ export default function App() {
     } catch {
       // Budget alerts are non-critical; ignore errors
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadData();
@@ -194,15 +198,15 @@ export default function App() {
     const categoryById = new Map(categories.map((c) => [c.id, c]));
     const rows = [
       ['Date', 'Type', 'Description', 'Category', 'Amount', 'Notes'],
-      ...transactions.map((t) => [
-        t.date,
-        t.type,
-        `"${t.description.replace(/"/g, '""')}"`,
-        t.category_id && categoryById.get(t.category_id)
-          ? `"${categoryById.get(t.category_id)!.name.replace(/"/g, '""')}"`
-          : 'Uncategorised',
-        t.amount,
-        t.notes ? `"${t.notes.replace(/"/g, '""')}"` : '',
+      ...transactions.map((tx) => [
+        tx.date,
+        tx.type,
+        `"${tx.description.replace(/"/g, '""')}"`,
+        tx.category_id && categoryById.get(tx.category_id)
+          ? `"${categoryById.get(tx.category_id)!.name.replace(/"/g, '""')}"`
+          : t('common.uncategorised'),
+        tx.amount,
+        tx.notes ? `"${tx.notes.replace(/"/g, '""')}"` : '',
       ]),
     ];
     const csv = rows.map((r) => r.join(',')).join('\n');
@@ -215,21 +219,21 @@ export default function App() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    pushToast({ message: `Exported ${transactions.length} transactions` });
+    pushToast({ message: t('transactions.exported', { count: transactions.length }) });
   };
 
   const handleTransactionCreated = async () => {
     setShowForm(false);
     setEditingTransaction(null);
     await loadData();
-    pushToast({ message: 'Transaction saved' });
+    pushToast({ message: t('transactions.saved') });
   };
 
   const handleTransactionDeleted = async (deleted: Transaction) => {
     await loadData();
     pushToast({
-      message: `Transaction "${deleted.description}" deleted`,
-      actionLabel: 'Undo',
+      message: t('transactions.deleted', { description: deleted.description }),
+      actionLabel: t('transactions.undo'),
       onAction: async () => {
         try {
           await createTransaction({
@@ -240,10 +244,10 @@ export default function App() {
             date: deleted.date,
             notes: deleted.notes || null,
           });
-          pushToast({ message: 'Transaction restored' });
+          pushToast({ message: t('transactions.restored') });
           await loadData();
         } catch (err) {
-          pushToast({ message: err instanceof Error ? err.message : 'Could not restore transaction' });
+          pushToast({ message: err instanceof Error ? err.message : t('transactions.couldNotRestore') });
         }
       },
     });
@@ -305,11 +309,6 @@ export default function App() {
     );
   };
 
-  const formatMoney = (value: string | number) => {
-    const n = typeof value === 'string' ? parseFloat(value) : value;
-    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
   // Auth session: user + token come from AuthContext; the API layer attaches
   // the Bearer token automatically and refreshes it on expiry.
   const { user, token: authToken, isLoading, logout } = useAuth();
@@ -317,7 +316,7 @@ export default function App() {
   if (isLoading) {
     return (
       <div style={styles.container}>
-        <div aria-label="Loading" aria-busy="true" style={styles.loadingScreen}>
+        <div aria-label={t('header.loadingAria')} aria-busy="true" style={styles.loadingScreen}>
           <div className="skeleton" style={{ height: 180, marginBottom: '2rem' }} />
           <div className="skeleton" style={{ height: 220 }} />
         </div>
@@ -349,7 +348,7 @@ export default function App() {
           <button
             type="button"
             className="nav-toggle"
-            aria-label="Toggle navigation"
+            aria-label={t('nav.toggle')}
             aria-expanded={navOpen}
             onClick={() => setNavOpen((v) => !v)}
           >
@@ -369,7 +368,7 @@ export default function App() {
           <nav
             style={styles.nav}
             className={navOpen ? 'app-nav app-nav-open' : 'app-nav'}
-            aria-label="Main navigation"
+            aria-label={t('nav.main')}
           >
             {NAV_ITEMS.map(([key, label], i) => (
               <span key={key} style={styles.navItem}>
@@ -379,7 +378,7 @@ export default function App() {
                   aria-current={tab === key ? 'page' : undefined}
                   onClick={() => { setTab(key); setNavOpen(false); }}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               </span>
             ))}
@@ -390,18 +389,19 @@ export default function App() {
                 type="button"
                 style={styles.logoutButton}
                 onClick={logout}
-                title={`Signed in as ${user.email} — click to sign out`}
+                title={t('header.signedInAs', { email: user.email })}
               >
                 <span style={styles.logoutEmail}>{user.email}</span>
                 <span aria-hidden="true">⏻</span>
               </button>
             )}
+            <LanguageToggle />
             <button
               type="button"
               style={styles.themeToggle}
               onClick={toggleTheme}
-              aria-label={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-              title={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              aria-label={themeMode === 'light' ? t('header.darkMode') : t('header.lightMode')}
+              title={themeMode === 'light' ? t('header.darkMode') : t('header.lightMode')}
             >
               {themeMode === 'light' ? '🌙' : '☀️'}
             </button>
@@ -413,7 +413,7 @@ export default function App() {
         {error && (
           <div style={styles.errorBanner}>
             <p>{error}</p>
-            <button onClick={loadData} style={styles.retryButton}>Retry</button>
+            <button onClick={loadData} style={styles.retryButton}>{t('common.retry')}</button>
           </div>
         )}
 
@@ -425,7 +425,7 @@ export default function App() {
         )}
 
         {loading && !error ? (
-          <div aria-label="Loading" aria-busy="true">
+          <div aria-label={t('header.loadingAria')} aria-busy="true">
             <div className="skeleton" style={{ height: 180, marginBottom: '2rem' }} />
             <div className="skeleton" style={{ height: 220, marginBottom: '2rem' }} />
             <div className="skeleton" style={{ height: 120 }} />
@@ -435,9 +435,9 @@ export default function App() {
             <div className="section" style={styles.balanceCard}>
               <div style={styles.balanceHeader}>
                 <div>
-                  <p style={styles.balanceLabel}>Current Balance</p>
+                  <p style={styles.balanceLabel}>{t('dashboard.currentBalance')}</p>
                   <p style={styles.balanceMonth}>
-                    {MONTH_NAMES[new Date().getMonth()]} {new Date().getFullYear()}
+                    {monthNames[new Date().getMonth()]} {new Date().getFullYear()}
                   </p>
                 </div>
                 {sparkPoints && sparkPoints.length > 1 && (
@@ -446,7 +446,7 @@ export default function App() {
                     height="44"
                     viewBox="0 0 110 44"
                     role="img"
-                    aria-label="Balance trend over the last 6 months"
+                    aria-label={t('dashboard.sparklineAria')}
                     style={styles.sparkline}
                   >
                     <polyline
@@ -480,7 +480,7 @@ export default function App() {
               <div style={styles.balanceRow}>
                 <div style={styles.balanceItem}>
                   <p style={styles.balanceItemLabel}>
-                    Income {monthDeltas && renderDelta(monthDeltas.income)}
+                    {t('common.income')} {monthDeltas && renderDelta(monthDeltas.income)}
                   </p>
                   <p style={{ ...styles.balanceItemValue, color: 'var(--color-income)' }}>
                     {formatMoney(summary?.income_total ?? '0')}
@@ -488,7 +488,7 @@ export default function App() {
                 </div>
                 <div style={styles.balanceItem}>
                   <p style={styles.balanceItemLabel}>
-                    Expenses {monthDeltas && renderDelta(monthDeltas.expense, true)}
+                    {t('common.expenses')} {monthDeltas && renderDelta(monthDeltas.expense, true)}
                   </p>
                   <p style={{ ...styles.balanceItemValue, color: 'var(--color-expense)' }}>
                     {formatMoney(summary?.expense_total ?? '0')}
@@ -499,14 +499,14 @@ export default function App() {
 
             {summary && summary.by_category.length > 0 && (
               <div className="section" style={styles.section}>
-                <h3 style={styles.sectionTitle}>Category Breakdown</h3>
+                <h3 style={styles.sectionTitle}>{t('dashboard.categoryBreakdown')}</h3>
                 <div style={styles.categoryBars}>
                   {summary.by_category.slice(0, 8).map((cat) => (
                     <div key={cat.category_id || 'none'} style={styles.categoryBar}>
                       <div style={styles.categoryBarHeader}>
                         <span style={styles.categoryBarName}>
                           {cat.icon && <span style={styles.categoryIcon}>{cat.icon}</span>}
-                          {cat.category_name || 'Uncategorised'}
+                          {cat.category_name || t('common.uncategorised')}
                         </span>
                         <span style={styles.categoryBarTotal}>
                           {formatMoney(cat.total)}
@@ -533,18 +533,18 @@ export default function App() {
 
             <div className="section" style={styles.section}>
               <div style={styles.sectionHeader}>
-                <h3 style={styles.sectionTitle}>Recent Transactions</h3>
+                <h3 style={styles.sectionTitle}>{t('dashboard.recentTransactions')}</h3>
                 <button style={styles.viewAllButton} onClick={() => setTab('transactions')}>
-                  View all →
+                  {t('dashboard.viewAll')}
                 </button>
               </div>
               {transactions.length === 0 ? (
                 <EmptyState
                   compact
                   icon="💸"
-                  title="No transactions yet"
-                  description="Add your first income or expense to start tracking your money."
-                  actionLabel="+ Add Transaction"
+                  title={t('dashboard.noTransactionsTitle')}
+                  description={t('dashboard.noTransactionsDesc')}
+                  actionLabel={t('dashboard.addTransaction')}
                   onAction={() => {
                     setEditingTransaction(null);
                     setShowForm(true);
@@ -588,23 +588,23 @@ export default function App() {
         ) : tab === 'transactions' ? (
           <div>
             <div style={styles.pageHeader}>
-              <h2 style={styles.pageTitle}>Transactions</h2>
+              <h2 style={styles.pageTitle}>{t('transactions.title')}</h2>
               <div style={styles.pageActions}>
                 <div style={styles.searchWrap}>
                   <input
                     type="search"
                     style={styles.searchInput}
-                    placeholder="Search transactions…"
+                    placeholder={t('transactions.search')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    aria-label="Search transactions"
+                    aria-label={t('transactions.searchAria')}
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       style={styles.searchClear}
                       onClick={() => setSearchQuery('')}
-                      aria-label="Clear search"
+                      aria-label={t('common.clearSearch')}
                     >
                       ✕
                     </button>
@@ -615,9 +615,8 @@ export default function App() {
                   style={styles.secondaryButton}
                   onClick={exportTransactionsCsv}
                   disabled={transactions.length === 0}
-                  title={transactions.length === 0 ? 'No transactions to export' : 'Download CSV'}
                 >
-                  ⬇ Export CSV
+                  {t('transactions.export')}
                 </button>
                 <button
                   style={styles.primaryButton}
@@ -626,7 +625,7 @@ export default function App() {
                     setShowForm(true);
                 }}
               >
-                + Add Transaction
+                {t('transactions.add')}
               </button>
             </div>
             </div>
@@ -644,9 +643,9 @@ export default function App() {
               <div className="section" style={styles.section}>
                 <EmptyState
                   icon="💸"
-                  title="No transactions yet"
-                  description="Every expense and income starts here — add your first one to see your balance come to life."
-                  actionLabel="+ Add Transaction"
+                  title={t('transactions.noTitle')}
+                  description={t('transactions.noDesc')}
+                  actionLabel={t('transactions.add')}
                   onAction={() => {
                     setEditingTransaction(null);
                     setShowForm(true);
@@ -657,9 +656,9 @@ export default function App() {
               <div className="section" style={styles.section}>
                 <EmptyState
                   icon="🔍"
-                  title="No matches"
-                  description={`No transactions match "${searchQuery}". Try a different search.`}
-                  actionLabel="Clear search"
+                  title={t('transactions.noMatches')}
+                  description={t('transactions.noMatchesDesc', { query: searchQuery })}
+                  actionLabel={t('common.clearSearch')}
                   onAction={() => setSearchQuery('')}
                 />
               </div>
@@ -685,7 +684,7 @@ export default function App() {
       </main>
 
       <footer style={styles.footer}>
-        <p>PudimFinance • Personal finance tracking</p>
+        <p>{t('app.footer')}</p>
       </footer>
     </div>
   );

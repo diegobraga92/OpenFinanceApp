@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import { countPendingOperations, isOnline, syncAll } from '../offline/sync-engine';
 
 type Status = 'online' | 'syncing' | 'offline';
@@ -14,6 +15,7 @@ type Status = 'online' | 'syncing' | 'offline';
  * - offline → red bar with the number of pending local changes
  */
 export function OfflineBanner() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<Status>('online');
   const [pending, setPending] = useState(0);
 
@@ -68,12 +70,12 @@ export function OfflineBanner() {
     >
       <Text style={styles.text}>
         {status === 'offline' ? (
-          pending > 0 ? `🔴 Offline — ${pending} change(s) pending` : '🔴 Offline'
+          pending > 0 ? t(pending === 1 ? 'offline.pending_one' : 'offline.pending_other', { count: pending }) : t('offline.offline')
         ) : status === 'syncing' ? (
-          '🟡 Syncing…'
+          t('offline.syncing')
         ) : (
           <Text style={styles.text} onPress={handleSync}>
-            🟢 {pending} change(s) pending — tap to sync
+            {t(pending === 1 ? 'offline.syncPending_one' : 'offline.syncPending_other', { count: pending })}
           </Text>
         )}
       </Text>

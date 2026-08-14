@@ -1,5 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n';
+import { LanguageToggle } from './LanguageToggle';
 
 type Mode = 'login' | 'register';
 
@@ -10,6 +12,7 @@ type Mode = 'login' | 'register';
  */
 export function LoginScreen() {
   const { login, register } = useAuth();
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +33,7 @@ export function LoginScreen() {
       // On success the AuthContext updates `user`, and App re-renders into the
       // main dashboard — nothing else to do here.
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(err instanceof Error ? err.message : t('login.authFailed'));
     } finally {
       setBusy(false);
     }
@@ -44,12 +47,15 @@ export function LoginScreen() {
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
+        <div style={styles.langWrap}>
+          <LanguageToggle />
+        </div>
         <div style={styles.logo} aria-hidden="true">🏦</div>
         <h1 style={styles.title}>PudimFinance</h1>
         <p style={styles.subtitle}>
           {mode === 'login'
-            ? 'Sign in to your personal finance dashboard'
-            : 'Create an account to start tracking your money'}
+            ? t('login.subtitle')
+            : t('login.registerSubtitle')}
         </p>
 
         {error && (
@@ -61,7 +67,7 @@ export function LoginScreen() {
         <form onSubmit={handleSubmit} noValidate>
           {mode === 'register' && (
             <div style={styles.field}>
-              <label htmlFor="pudim-display-name" style={styles.label}>Display name (optional)</label>
+              <label htmlFor="pudim-display-name" style={styles.label}>{t('login.displayName')}</label>
               <input
                 id="pudim-display-name"
                 type="text"
@@ -75,7 +81,7 @@ export function LoginScreen() {
           )}
 
           <div style={styles.field}>
-            <label htmlFor="pudim-email" style={styles.label}>Email</label>
+            <label htmlFor="pudim-email" style={styles.label}>{t('login.email')}</label>
             <input
               id="pudim-email"
               type="email"
@@ -90,7 +96,7 @@ export function LoginScreen() {
           </div>
 
           <div style={styles.field}>
-            <label htmlFor="pudim-password" style={styles.label}>Password</label>
+            <label htmlFor="pudim-password" style={styles.label}>{t('login.password')}</label>
             <input
               id="pudim-password"
               type="password"
@@ -100,28 +106,28 @@ export function LoginScreen() {
               style={styles.input}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={mode === 'register' ? 'At least 8 characters' : '••••••••'}
+              placeholder={mode === 'register' ? t('login.minChars') : '••••••••'}
             />
           </div>
 
           <button type="submit" style={styles.submit} disabled={busy}>
-            {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+            {busy ? t('login.pleaseWait') : mode === 'login' ? t('login.signIn') : t('login.createAccount')}
           </button>
         </form>
 
         <p style={styles.switchText}>
           {mode === 'login' ? (
             <>
-              No account yet?{' '}
+              {t('login.noAccount')}{' '}
               <button type="button" style={styles.switchLink} onClick={() => switchMode('register')}>
-                Create one
+                {t('login.createOne')}
               </button>
             </>
           ) : (
             <>
-              Already registered?{' '}
+              {t('login.hasAccount')}{' '}
               <button type="button" style={styles.switchLink} onClick={() => switchMode('login')}>
-                Sign in
+                {t('login.signIn')}
               </button>
             </>
           )}
@@ -139,6 +145,11 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: '2rem',
+  },
+  langWrap: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '0.5rem',
   },
   card: {
     width: '100%',

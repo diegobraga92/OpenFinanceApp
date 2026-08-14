@@ -2,6 +2,7 @@ import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Category, Transaction } from '../api';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
 import { styles } from '../theme/styles';
 import { TransactionRow } from '../components/TransactionRow';
 
@@ -24,6 +25,7 @@ export function TransactionsScreen({
   onEdit,
   onDelete,
 }: Props) {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
@@ -40,9 +42,9 @@ export function TransactionsScreen({
   return (
     <View style={styles.content}>
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Transactions</Text>
+        <Text style={styles.pageTitle}>{t('transactions.title')}</Text>
         <TouchableOpacity style={styles.addButton} onPress={onAdd}>
-          <Text style={styles.addButtonText}>+ Add</Text>
+          <Text style={styles.addButtonText}>{t('transactions.addShort')}</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.searchBox}>
@@ -51,24 +53,24 @@ export function TransactionsScreen({
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search transactions…"
+          placeholder={t('transactions.search')}
           placeholderTextColor={colors.textDim}
           clearButtonMode="while-editing"
-          accessibilityLabel="Search transactions"
+          accessibilityLabel={t('transactions.searchAria')}
         />
       </View>
       {transactions.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No transactions yet.</Text>
+          <Text style={styles.emptyText}>{t('transactions.noTitle')}</Text>
           <TouchableOpacity style={styles.addButton} onPress={onAdd}>
-            <Text style={styles.addButtonText}>Add your first one</Text>
+            <Text style={styles.addButtonText}>{t('transactions.firstOne')}</Text>
           </TouchableOpacity>
         </View>
       ) : filteredTransactions.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No matches for "{searchQuery}".</Text>
+          <Text style={styles.emptyText}>{t('transactions.noMatchesMobile', { query: searchQuery })}</Text>
           <TouchableOpacity style={styles.addButton} onPress={() => setSearchQuery('')}>
-            <Text style={styles.addButtonText}>Clear search</Text>
+            <Text style={styles.addButtonText}>{t('common.clearSearch')}</Text>
           </TouchableOpacity>
         </View>
       ) : (

@@ -8,28 +8,15 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme/tokens';
+import { useI18n } from '../i18n';
+import type { TranslationKey } from '../../../shared/i18n';
 
 const ONBOARDING_KEY = 'pudim_onboarded_v1';
 
-const STEPS = [
-  {
-    icon: '🏦',
-    title: 'Welcome to PudimFinance',
-    description:
-      'Track your income and expenses in minutes. Add a transaction, pick a category, and watch your balance update.',
-  },
-  {
-    icon: '🎯',
-    title: 'Set budgets, stay on track',
-    description:
-      'Give every category a monthly limit. Color-coded progress bars and warnings help you spot overspending early.',
-  },
-  {
-    icon: '🔒',
-    title: 'Your data, protected',
-    description:
-      'Unlock the app with Face ID or fingerprint. Search, export to CSV, and reconcile bank statements whenever you need.',
-  },
+const STEPS: { icon: string; titleKey: TranslationKey; descKey: TranslationKey }[] = [
+  { icon: '🏦', titleKey: 'onboarding.step1Title', descKey: 'onboarding.step1Desc' },
+  { icon: '🎯', titleKey: 'onboarding.step2Title', descKey: 'onboarding.step2Desc' },
+  { icon: '🔒', titleKey: 'onboarding.step3Title', descKey: 'onboarding.step3Desc' },
 ];
 
 /** Shows the onboarding wizard on first launch, then renders children. */
@@ -69,6 +56,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
 }
 
 function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
+  const { t } = useI18n();
   const [step, setStep] = useState(0);
   const current = STEPS[step];
 
@@ -76,7 +64,7 @@ function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
     <View style={styles.container}>
       <View style={styles.skipRow}>
         <TouchableOpacity onPress={onComplete} style={styles.skipButton}>
-          <Text style={styles.skipText}>Skip</Text>
+          <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -88,18 +76,18 @@ function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
         </View>
 
         <Text style={styles.icon}>{current.icon}</Text>
-        <Text style={styles.title}>{current.title}</Text>
-        <Text style={styles.description}>{current.description}</Text>
+        <Text style={styles.title}>{t(current.titleKey)}</Text>
+        <Text style={styles.description}>{t(current.descKey)}</Text>
       </ScrollView>
 
       <View style={styles.footer}>
         {step < STEPS.length - 1 ? (
           <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(step + 1)}>
-            <Text style={styles.primaryButtonText}>Next</Text>
+            <Text style={styles.primaryButtonText}>{t('onboarding.next')}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.primaryButton} onPress={onComplete}>
-            <Text style={styles.primaryButtonText}>Get Started</Text>
+            <Text style={styles.primaryButtonText}>{t('onboarding.getStarted')}</Text>
           </TouchableOpacity>
         )}
       </View>

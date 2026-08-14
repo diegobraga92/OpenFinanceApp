@@ -5,6 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    fs: {
+      // Allow importing the shared/i18n dictionary from the repo root.
+      allow: ['..'],
+    },
     proxy: {
       // Backend routes are served under /api/... — pass the URI through unchanged.
       '/api': {

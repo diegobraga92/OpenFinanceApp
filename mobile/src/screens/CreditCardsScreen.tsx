@@ -26,6 +26,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { EmptyState } from '../components/EmptyState';
 import { useSnackbar } from '../components/Snackbar';
+import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
@@ -43,6 +44,7 @@ interface AnticipatableItem {
 
 export function CreditCardsScreen({ categories, formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
+  const { t } = useI18n();
   const [cards, setCards] = useState<CardOverview[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bills, setBills] = useState<CardBill[]>([]);
@@ -74,7 +76,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       setCards(data);
       setSelectedId((prev) => prev ?? data[0]?.id ?? null);
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to load credit cards');
+      showSnackbar(err instanceof Error ? err.message : t('creditCards.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -130,7 +132,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       setAnticipatable(items);
       setShowAnticipate(true);
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to load installments');
+      showSnackbar(err instanceof Error ? err.message : t('creditCards.failedLoadInstallments'));
     }
   };
 
@@ -138,11 +140,11 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
     if (!selected) return;
     const amount = parseFloat(purchaseAmount);
     if (!purchaseDesc.trim()) {
-      Alert.alert('Validation', 'Description is required');
+      Alert.alert(t('common.validation'), t('creditCards.validation.desc'));
       return;
     }
     if (!amount || amount <= 0) {
-      Alert.alert('Validation', 'Amount must be greater than zero');
+      Alert.alert(t('common.validation'), t('creditCards.validation.amount'));
       return;
     }
     setSaving(true);
@@ -159,9 +161,9 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       setPurchaseCategory('');
       await loadCards();
       if (selectedId) await loadBills(selectedId);
-      showSnackbar('Purchase recorded on card');
+      showSnackbar(t('creditCards.recorded'));
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to record purchase');
+      showSnackbar(err instanceof Error ? err.message : t('creditCards.failedRecord'));
     } finally {
       setSaving(false);
     }
@@ -174,7 +176,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       const billId =
         payBillId || selected.current_bill?.id || bills.find((b) => b.status === 'open')?.id;
       if (!billId) {
-        showSnackbar('No open bill to pay');
+        showSnackbar(t('creditCards.noOpenBill'));
         setSaving(false);
         return;
       }
@@ -186,10 +188,10 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       await loadCards();
       if (selectedId) await loadBills(selectedId);
       showSnackbar(
-        `${formatMoney(res.amount_paid)} applied — ${formatMoney(res.remaining)} remaining`,
+        t('creditCards.billPaid', { amount: formatMoney(res.amount_paid), remaining: formatMoney(res.remaining) }),
       );
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to pay bill');
+      showSnackbar(err instanceof Error ? err.message : t('creditCards.failedPay'));
     } finally {
       setSaving(false);
     }
@@ -201,7 +203,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       .filter(([, on]) => on)
       .map(([id]) => id);
     if (ids.length === 0) {
-      Alert.alert('Validation', 'Select at least one installment');
+      Alert.alert(t('common.validation'), t('creditCards.validation.installment'));
       return;
     }
     setSaving(true);
@@ -216,10 +218,10 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       await loadCards();
       if (selectedId) await loadBills(selectedId);
       showSnackbar(
-        `${res.installments_anticipated} installment(s) anticipated — discount ${formatMoney(res.discount_amount)}`,
+        t('creditCards.anticipated', { count: res.installments_anticipated, amount: formatMoney(res.discount_amount) }),
       );
     } catch (err) {
-      showSnackbar(err instanceof Error ? err.message : 'Failed to anticipate installments');
+      showSnackbar(err instanceof Error ? err.message : t('creditCards.failedAnticipate'));
     } finally {
       setSaving(false);
     }
@@ -239,15 +241,15 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Credit Cards</Text>
+        <Text style={styles.pageTitle}>{t('creditCards.title')}</Text>
       </View>
 
       {cards.length === 0 ? (
         <EmptyState
           compact
           icon="💳"
-          title="No credit cards yet"
-          description="Create a liability account with a closing day and due day (Accounts tab). Card purchases, bills and installment anticipation will appear here."
+          title={t('creditCards.noTitle')}
+          description={t('creditCards.noDesc')}
         />
       ) : (
         <>
@@ -262,7 +264,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
                 <View style={styles.creditCardTop}>
                   <Text style={styles.creditCardName}>{c.name}</Text>
                   <Text style={c.current_bill?.status === 'paid' ? styles.creditCardBadgePaid : styles.creditCardBadgeOpen}>
-                    {c.current_bill ? c.current_bill.status : 'no bill'}
+                    {c.current_bill ? c.current_bill.status : t('creditCards.noBill')}
                   </Text>
                 </View>
                 <Text style={styles.creditCardBalance}>
@@ -270,9 +272,9 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
                 </Text>
                 <Text style={styles.creditCardMeta}>
                   {c.current_bill
-                    ? `Due ${c.current_bill.due_date} · bill ${formatMoney(c.current_bill.remaining_amount)}`
-                    : 'No purchases yet'}
-                  {c.credit_limit ? ` · limit ${formatMoney(c.credit_limit)}` : ''}
+                    ? `${t('common.due', { date: c.current_bill.due_date })} · ${t('common.bill', { amount: formatMoney(c.current_bill.remaining_amount) })}`
+                    : t('common.noPurchasesYet')}
+                  {c.credit_limit ? ` · ${t('common.limit', { amount: formatMoney(c.credit_limit) })}` : ''}
                 </Text>
               </TouchableOpacity>
             );
@@ -282,45 +284,44 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
             <View style={styles.sectionCard}>
               <View style={styles.creditCardActions}>
                 <TouchableOpacity style={styles.secondaryButton} onPress={openAnticipate}>
-                  <Text style={styles.secondaryButtonText}>⏩ Antecipar</Text>
+                  <Text style={styles.secondaryButtonText}>{t('creditCards.anticipateShort')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowPay(true)}>
-                  <Text style={styles.secondaryButtonText}>💸 Pay bill</Text>
+                  <Text style={styles.secondaryButtonText}>{t('creditCards.payBill')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.primaryButton} onPress={() => setShowPurchase(true)}>
-                  <Text style={styles.primaryButtonText}>+ Purchase</Text>
+                  <Text style={styles.primaryButtonText}>{t('creditCards.purchase')}</Text>
                 </TouchableOpacity>
               </View>
 
               {selected.current_bill && (
                 <View style={styles.creditCardCurrentBill}>
-                  <Text style={styles.creditCardCurrentBillLabel}>Current bill</Text>
+                  <Text style={styles.creditCardCurrentBillLabel}>{t('creditCards.currentBill')}</Text>
                   <Text style={styles.creditCardCurrentBillValue}>
                     {formatMoney(selected.current_bill.remaining_amount)}
                   </Text>
                   <Text style={styles.creditCardCurrentBillMeta}>
-                    Total {formatMoney(selected.current_bill.total_amount)} · paid{' '}
-                    {formatMoney(selected.current_bill.paid_amount)} · due{' '}
-                    {selected.current_bill.due_date}
+                    {t('common.total')} {formatMoney(selected.current_bill.total_amount)} · {t('common.paid')}{' '}
+                    {formatMoney(selected.current_bill.paid_amount)} · {t('common.due', { date: selected.current_bill.due_date })}
                   </Text>
                 </View>
               )}
 
-              <Text style={styles.sectionTitle}>Billing cycles</Text>
+              <Text style={styles.sectionTitle}>{t('creditCards.billingCycles')}</Text>
               {bills.length === 0 ? (
-                <Text style={styles.emptyText}>No billing cycles yet.</Text>
+                <Text style={styles.emptyText}>{t('creditCards.noCycles')}</Text>
               ) : (
                 bills.map((b) => (
                   <View key={b.id} style={styles.creditCardBillRow}>
                     <Text style={styles.creditCardBillRowText}>
-                      {b.period_start} → {b.period_end}
+                      {t('creditCards.periodRange', { start: b.period_start, end: b.period_end })}
                     </Text>
-                    <Text style={styles.creditCardBillRowText}>Due {b.due_date}</Text>
+                    <Text style={styles.creditCardBillRowText}>{t('common.due', { date: b.due_date })}</Text>
                     <Text style={styles.creditCardBillRowText}>{formatMoney(b.total_amount)}</Text>
                     <Text
                       style={b.status === 'paid' ? styles.creditCardBillPaid : styles.creditCardBillOpen}
                     >
-                      {b.status === 'paid' ? 'Paid' : formatMoney(b.remaining_amount)}
+                      {b.status === 'paid' ? t('common.paid') : formatMoney(b.remaining_amount)}
                     </Text>
                   </View>
                 ))
@@ -333,17 +334,17 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       <Modal visible={showPurchase} transparent animationType="fade" onRequestClose={() => setShowPurchase(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Record card purchase</Text>
-            <Text style={styles.label}>Description</Text>
+            <Text style={styles.modalTitle}>{t('creditCards.purchaseModalTitle')}</Text>
+            <Text style={styles.label}>{t('common.description')}</Text>
             <TextInput
               style={styles.input}
               value={purchaseDesc}
               onChangeText={setPurchaseDesc}
-              placeholder="e.g. Dinner at Churrascaria"
+              placeholder={t('creditCards.descPlaceholder')}
               placeholderTextColor={colors.textDim}
               autoFocus
             />
-            <Text style={styles.label}>Amount (R$)</Text>
+            <Text style={styles.label}>{t('transactions.form.amount')}</Text>
             <TextInput
               style={styles.input}
               value={purchaseAmount}
@@ -352,7 +353,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
               placeholderTextColor={colors.textDim}
               keyboardType="decimal-pad"
             />
-            <Text style={styles.label}>Category</Text>
+            <Text style={styles.label}>{t('common.category')}</Text>
             <View style={styles.pickerWrap}>
               {expenseCategories.map((c) => (
                 <TouchableOpacity
@@ -370,11 +371,11 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
                 onPress={() => setPurchaseCategory('')}
               >
                 <Text style={[styles.pillText, !purchaseCategory && styles.pillTextActive]}>
-                  Miscellaneous
+                  {t('common.miscellaneous')}
                 </Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.label}>Date</Text>
+            <Text style={styles.label}>{t('common.date')}</Text>
             <TextInput
               style={styles.input}
               value={purchaseDate}
@@ -385,10 +386,10 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowPurchase(false)} disabled={saving}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.submitButton, saving && styles.submitButtonDisabled]} onPress={handlePurchase} disabled={saving}>
-                {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.submitButtonText}>Record</Text>}
+                {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.submitButtonText}>{t('creditCards.record')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -398,8 +399,8 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       <Modal visible={showPay} transparent animationType="fade" onRequestClose={() => setShowPay(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Pay card bill</Text>
-            <Text style={styles.label}>Bill</Text>
+            <Text style={styles.modalTitle}>{t('creditCards.payModalTitle')}</Text>
+            <Text style={styles.label}>{t('creditCards.bill')}</Text>
             <View style={styles.pickerWrap}>
               {bills
                 .filter((b) => b.status === 'open')
@@ -410,7 +411,7 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
                     onPress={() => setPayBillId(b.id)}
                   >
                     <Text style={[styles.pillText, payBillId === b.id && styles.pillTextActive]}>
-                      Due {b.due_date} — {formatMoney(b.remaining_amount)}
+                      {t('common.due', { date: b.due_date })} — {formatMoney(b.remaining_amount)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -420,12 +421,12 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
                   onPress={() => setPayBillId('')}
                 >
                   <Text style={[styles.pillText, !payBillId && styles.pillTextActive]}>
-                    Current bill — {formatMoney(selected.current_bill.remaining_amount)}
+                    {t('creditCards.currentBill')} — {formatMoney(selected.current_bill.remaining_amount)}
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
-            <Text style={styles.label}>Amount (R$) — leave empty to pay the full remaining amount</Text>
+            <Text style={styles.label}>{t('creditCards.payAmountHint')}</Text>
             <TextInput
               style={styles.input}
               value={payAmount}
@@ -436,10 +437,10 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowPay(false)} disabled={saving}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.submitButton, saving && styles.submitButtonDisabled]} onPress={handlePay} disabled={saving}>
-                {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.submitButtonText}>Pay</Text>}
+                {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.submitButtonText}>{t('creditCards.pay')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -450,13 +451,12 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
       <Modal visible={showAnticipate} transparent animationType="fade" onRequestClose={() => setShowAnticipate(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Antecipar parcelas</Text>
+            <Text style={styles.modalTitle}>{t('creditCards.anticipateTitle')}</Text>
             <Text style={styles.label}>
-              Pay future installments early on the current bill. Many providers offer a
-              discount — enter the one you received.
+              {t('creditCards.anticipateDesc')}
             </Text>
             {anticipatable.length === 0 ? (
-              <Text style={styles.emptyText}>No future installments linked to this card.</Text>
+              <Text style={styles.emptyText}>{t('creditCards.noFutureInstallments')}</Text>
             ) : (
               <>
                 {anticipatable.map((it) => (
@@ -471,12 +471,11 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
                     }
                   >
                     <Text style={[styles.pillText, checked[it.installmentId] && styles.pillTextActive]}>
-                      {checked[it.installmentId] ? '☑ ' : '☐ '}Parcela {it.number}/{it.total} —{' '}
-                      {it.planDescription} · {formatMoney(it.amount)} · due {it.dueDate}
+                      {checked[it.installmentId] ? '☑ ' : '☐ '}{t('creditCards.installmentItem', { number: it.number, total: it.total, description: it.planDescription })} · {formatMoney(it.amount)} · {t('common.due', { date: it.dueDate })}
                     </Text>
                   </TouchableOpacity>
                 ))}
-                <Text style={styles.label}>Discount % (provider early-payment incentive, e.g. 5)</Text>
+                <Text style={styles.label}>{t('creditCards.discountLabel')}</Text>
                 <TextInput
                   style={styles.input}
                   value={discountPercent}
@@ -489,14 +488,14 @@ export function CreditCardsScreen({ categories, formatMoney }: Props) {
             )}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowAnticipate(false)} disabled={saving}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitButton, saving && styles.submitButtonDisabled]}
                 onPress={handleAnticipate}
                 disabled={saving}
               >
-                {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.submitButtonText}>Antecipar</Text>}
+                {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.submitButtonText}>{t('creditCards.anticipateShort')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

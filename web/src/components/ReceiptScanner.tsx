@@ -8,6 +8,7 @@ import {
   mergeProducts,
 } from '../api';
 import { useToast } from './Toast';
+import { useI18n } from '../i18n';
 
 interface Props {
   formatMoney: (value: string | number) => string;
@@ -72,6 +73,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
   const [mergeSource, setMergeSource] = useState('');
   const [merging, setMerging] = useState(false);
   const { push: pushToast } = useToast();
+  const { t } = useI18n();
 
   const loadGallery = async () => {
     try {
@@ -96,26 +98,26 @@ export function ReceiptScanner({ formatMoney }: Props) {
       const res = await fetchPriceHistory(productId);
       setPriceHistory(res.points as PricePoint[]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load price history');
+      setError(err instanceof Error ? err.message : t('receipts.failedPriceHistory'));
     }
   };
 
   const handleMerge = async () => {
     if (!mergeTarget || !mergeSource || mergeTarget === mergeSource) {
-      setError('Pick two different products to merge');
+      setError(t('receipts.pickTwo'));
       return;
     }
     setMerging(true);
     setError(null);
     try {
       const res = await mergeProducts({ target_id: mergeTarget, source_id: mergeSource });
-      pushToast({ message: `Products merged (${res.status})` });
+      pushToast({ message: t('receipts.merged', { status: res.status }) });
       setMergeTarget('');
       setMergeSource('');
       setPriceHistory(null);
       await loadGallery();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to merge products');
+      setError(err instanceof Error ? err.message : t('receipts.failedMerge'));
     } finally {
       setMerging(false);
     }
@@ -129,7 +131,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
       const res = await scanReceipt(qrData);
       applyParsedReceipt(res as ParsedReceipt);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse QR');
+      setError(err instanceof Error ? err.message : t('receipts.failedParseQr'));
     } finally {
       setLoading(false);
     }
@@ -145,7 +147,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
     if (receipt.items && receipt.items.length > 0) {
       setReviewItems(
         receipt.items.map((i) => ({
-          description: i.description ?? 'Item',
+          description: i.description ?? t('receipts.item'),
           quantity: i.quantity ?? '1',
           unit_price: i.unit_price ?? '',
           total_price: i.total_price ?? '',
@@ -154,7 +156,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
     } else {
       setReviewItems([
         {
-          description: 'Receipt',
+          description: t('receipts.receipt'),
           quantity: '1',
           unit_price: '',
           total_price: receipt.total ?? '',
@@ -176,13 +178,13 @@ export function ReceiptScanner({ formatMoney }: Props) {
       });
       const rawText = result.data.text;
       if (!rawText.trim()) {
-        setError('OCR found no text in this image. Try a clearer photo.');
+        setError(t('receipts.ocrNoText'));
         return;
       }
       const res = await scanReceiptOcr(rawText);
       applyParsedReceipt(res as ParsedReceipt);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'OCR failed');
+      setError(err instanceof Error ? err.message : t('receipts.ocrFailed'));
     } finally {
       setOcrLoading(false);
     }
@@ -213,17 +215,17 @@ export function ReceiptScanner({ formatMoney }: Props) {
           total_price: i.total_price || undefined,
         }));
       const res = await saveReceipt({
-        store_name: parsed.store_name || 'Unknown Store',
+        store_name: parsed.store_name || t('receipts.unknownStore'),
         cnpj: parsed.cnpj || null,
         date: (parsed.date as string)?.split('T')[0] || new Date().toISOString().slice(0, 10),
         total: parsed.total,
-        items: items.length > 0 ? items : [{ description: 'Receipt', quantity: '1', total_price: parsed.total }],
+        items: items.length > 0 ? items : [{ description: t('receipts.receipt'), quantity: '1', total_price: parsed.total }],
       });
       setSavedId(res.id);
       await loadGallery();
-      pushToast({ message: `Receipt saved with ${items.length} item(s)` });
+      pushToast({ message: t('receipts.savedWithItems', { count: items.length }) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save receipt');
+      setError(err instanceof Error ? err.message : t('receipts.failedSave'));
     } finally {
       setLoading(false);
     }
@@ -233,33 +235,33 @@ export function ReceiptScanner({ formatMoney }: Props) {
     <div>
       <div style={styles.pageHeader}>
         <div>
-          <h2 style={styles.pageTitle}>Receipt Scanner</h2>
-          <p style={styles.pageSubtitle}>Paste an NFC-e QR code to parse its receipt data (no OCR).</p>
+          <h2 style={styles.pageTitle}>{t('receipts.title')}</h2>
+          <p style={styles.pageSubtitle}>{t('receipts.subtitle')}</p>
         </div>
       </div>
 
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Scan NFC-e QR</h3>
+        <h3 style={styles.sectionTitle}>{t('receipts.scanQr')}</h3>
         {error && <div style={styles.errorBox}><p>{error}</p></div>}
         <label style={styles.label}>
-          QR Code Data
+          {t('receipts.qrData')}
           <textarea
             style={styles.input}
             value={qrData}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setQrData(e.target.value)}
-            placeholder="Paste the NFC-e QR code URL (e.g. http://www.fazenda.gov.br/nfce/qrcode?v=2&p=...)"
+            placeholder={t('receipts.qrPlaceholder')}
             spellCheck={false}
           />
         </label>
         <button type="button" style={styles.button} onClick={parseQr} disabled={loading || !qrData.trim()}>
-          {loading ? 'Parsing…' : 'Scan QR'}
+          {loading ? t('receipts.parsing') : t('receipts.scanQrButton')}
         </button>
       </div>
 
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Scan Receipt Photo (OCR)</h3>
+        <h3 style={styles.sectionTitle}>{t('receipts.ocrTitle')}</h3>
         <p style={styles.sectionHint}>
-          No QR code handy? Upload a photo of the receipt and the text will be read automatically.
+          {t('receipts.ocrHint')}
         </p>
         <input
           type="file"
@@ -269,7 +271,7 @@ export function ReceiptScanner({ formatMoney }: Props) {
         />
         {selectedImage && (
           <div style={styles.imagePreviewWrap}>
-            <img src={selectedImage} alt="Receipt preview" style={styles.imagePreview} />
+            <img src={selectedImage} alt={t('receipts.receiptPreview')} style={styles.imagePreview} />
           </div>
         )}
         <button
@@ -278,25 +280,25 @@ export function ReceiptScanner({ formatMoney }: Props) {
           onClick={handleOcr}
           disabled={ocrLoading || !selectedImage}
         >
-          {ocrLoading ? 'Reading receipt…' : 'Read Receipt'}
+          {ocrLoading ? t('receipts.reading') : t('receipts.readReceipt')}
         </button>
-        {ocrLoading && <p style={styles.sectionHint}>Running OCR in your browser…</p>}
+        {ocrLoading && <p style={styles.sectionHint}>{t('receipts.ocrRunning')}</p>}
       </div>
 
       {parsed && (
         <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>Parsed Receipt</h3>
+          <h3 style={styles.sectionTitle}>{t('receipts.parsedTitle')}</h3>
           <div style={styles.fieldGrid}>
-            <div><p style={styles.fieldLabel}>Store</p><p style={styles.fieldValue}>{parsed.store_name || '—'}</p></div>
-            <div><p style={styles.fieldLabel}>Total</p><p style={styles.fieldValue}>{formatMoney(parsed.total || '0')}</p></div>
-            <div><p style={styles.fieldLabel}>Date</p><p style={styles.fieldValue}>{parsed.date || '—'}</p></div>
-            <div><p style={styles.fieldLabel}>CNPJ</p><p style={styles.fieldValue}>{parsed.cnpj || '—'}</p></div>
+            <div><p style={styles.fieldLabel}>{t('receipts.store')}</p><p style={styles.fieldValue}>{parsed.store_name || '—'}</p></div>
+            <div><p style={styles.fieldLabel}>{t('receipts.total')}</p><p style={styles.fieldValue}>{formatMoney(parsed.total || '0')}</p></div>
+            <div><p style={styles.fieldLabel}>{t('common.date')}</p><p style={styles.fieldValue}>{parsed.date || '—'}</p></div>
+            <div><p style={styles.fieldLabel}>{t('receipts.cnpj')}</p><p style={styles.fieldValue}>{parsed.cnpj || '—'}</p></div>
           </div>
 
           {reviewItems.length > 0 && (
             <div style={styles.itemReview}>
               <p style={styles.itemReviewTitle}>
-                Items ({reviewItems.length}) — edit before saving
+                {t('receipts.itemsTitle', { count: reviewItems.length })}
               </p>
               {reviewItems.map((item, idx) => (
                 <div key={idx} style={styles.itemRow}>
@@ -304,31 +306,31 @@ export function ReceiptScanner({ formatMoney }: Props) {
                     style={styles.itemInputDesc}
                     value={item.description}
                     onChange={(e) => updateReviewItem(idx, { description: e.target.value })}
-                    placeholder="Description"
+                    placeholder={t('common.description')}
                   />
                   <input
                     style={styles.itemInputSmall}
                     value={item.quantity}
                     onChange={(e) => updateReviewItem(idx, { quantity: e.target.value })}
-                    placeholder="Qty"
+                    placeholder={t('receipts.quantity')}
                   />
                   <input
                     style={styles.itemInputSmall}
                     value={item.unit_price}
                     onChange={(e) => updateReviewItem(idx, { unit_price: e.target.value })}
-                    placeholder="Unit"
+                    placeholder={t('receipts.unit')}
                   />
                   <input
                     style={styles.itemInputSmall}
                     value={item.total_price}
                     onChange={(e) => updateReviewItem(idx, { total_price: e.target.value })}
-                    placeholder="Total"
+                    placeholder={t('common.total')}
                   />
                   <button
                     type="button"
                     style={styles.itemRemove}
                     onClick={() => setReviewItems((items) => items.filter((_, i) => i !== idx))}
-                    title="Remove item"
+                    title={t('receipts.removeItem')}
                   >
                     ✕
                   </button>
@@ -344,31 +346,31 @@ export function ReceiptScanner({ formatMoney }: Props) {
                   ])
                 }
               >
-                + Add item
+                {t('receipts.addItem')}
               </button>
             </div>
           )}
 
           <button type="button" style={styles.button} onClick={save} disabled={loading}>
-            {loading ? 'Saving…' : 'Save Receipt'}
+            {loading ? t('common.saving') : t('receipts.saveReceipt')}
           </button>
-          {savedId && <p style={styles.success}>Saved ✓ (id: {savedId})</p>}
+          {savedId && <p style={styles.success}>{t('receipts.saved', { id: savedId ?? '' })}</p>}
         </div>
       )}
 
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Gallery</h3>
+        <h3 style={styles.sectionTitle}>{t('receipts.gallery')}</h3>
         {gallery.length === 0 ? (
-          <p style={styles.empty}>No receipts yet.</p>
+          <p style={styles.empty}>{t('receipts.noReceipts')}</p>
         ) : (
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Date</th>
-                  <th style={styles.th}>Store</th>
-                  <th style={styles.th} align="right">Total</th>
-                  <th style={styles.th} align="right">Items</th>
+                  <th style={styles.th}>{t('transactions.table.date')}</th>
+                  <th style={styles.th}>{t('receipts.store')}</th>
+                  <th style={styles.th} align="right">{t('common.total')}</th>
+                  <th style={styles.th} align="right">{t('common.items')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -388,8 +390,8 @@ export function ReceiptScanner({ formatMoney }: Props) {
 
       {products.length > 0 && (
         <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>Products</h3>
-          <p style={styles.productHint}>Click a product to see its price history.</p>
+          <h3 style={styles.sectionTitle}>{t('receipts.products')}</h3>
+          <p style={styles.productHint}>{t('receipts.productHint')}</p>
           <div style={styles.productGrid}>
             {products.map((p) => (
               <button
@@ -405,17 +407,17 @@ export function ReceiptScanner({ formatMoney }: Props) {
 
           {priceHistory && (
             <div style={styles.priceHistory}>
-              <h4 style={styles.priceHistoryTitle}>Price history — {selectedProduct}</h4>
+              <h4 style={styles.priceHistoryTitle}>{t('receipts.priceHistory', { product: selectedProduct ?? '' })}</h4>
               {priceHistory.length === 0 ? (
-                <p style={styles.empty}>No price history available yet.</p>
+                <p style={styles.empty}>{t('receipts.noPriceHistory')}</p>
               ) : (
                 <div style={styles.tableWrapper}>
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={styles.th}>Date</th>
-                        <th style={styles.th}>Store</th>
-                        <th style={styles.th} align="right">Unit price</th>
+                        <th style={styles.th}>{t('transactions.table.date')}</th>
+                        <th style={styles.th}>{t('receipts.store')}</th>
+                        <th style={styles.th} align="right">{t('receipts.unitPrice')}</th>
                       </tr>
                     </thead>
                     <tbody>

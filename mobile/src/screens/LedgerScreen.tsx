@@ -21,6 +21,7 @@ import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useSnackbar } from '../components/Snackbar';
 import { EmptyState } from '../components/EmptyState';
+import { useI18n } from '../i18n';
 
 interface Props {
   formatMoney: (value: string | number) => string;
@@ -28,6 +29,7 @@ interface Props {
 
 export function LedgerScreen({ formatMoney }: Props) {
   const { show: showSnackbar } = useSnackbar();
+  const { t } = useI18n();
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
   const [accounts, setAccounts] = useState<AccountWithBalance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,7 @@ export function LedgerScreen({ formatMoney }: Props) {
       setTransactions(txns);
       setAccounts(accts);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to load ledger data');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('ledger.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -61,11 +63,11 @@ export function LedgerScreen({ formatMoney }: Props) {
   const handleCreate = async () => {
     const amt = parseFloat(amount);
     if (!description.trim() || !debitAccountId || !creditAccountId || !(amt > 0)) {
-      Alert.alert('Validation', 'Fill in description, both accounts and a positive amount');
+      Alert.alert(t('common.validation'), t('ledger.validation.fill'));
       return;
     }
     if (debitAccountId === creditAccountId) {
-      Alert.alert('Validation', 'Debit and credit accounts must be different');
+      Alert.alert(t('common.validation'), t('ledger.validation.different'));
       return;
     }
     setSaving(true);
@@ -74,11 +76,11 @@ export function LedgerScreen({ formatMoney }: Props) {
         description: description.trim(),
         date: new Date().toISOString().slice(0, 10),
         entries: [
-          { account_id: debitAccountId, debit_amount: String(amt), credit_amount: '0', description: 'Debit' },
-          { account_id: creditAccountId, debit_amount: '0', credit_amount: String(amt), description: 'Credit' },
+          { account_id: debitAccountId, debit_amount: String(amt), credit_amount: '0', description: t('ledger.debit') },
+          { account_id: creditAccountId, debit_amount: '0', credit_amount: String(amt), description: t('ledger.credit') },
         ],
       });
-      showSnackbar('✅ Ledger transaction created');
+      showSnackbar(t('ledger.created'));
       setShowForm(false);
       setDescription('');
       setDebitAccountId('');
@@ -86,7 +88,7 @@ export function LedgerScreen({ formatMoney }: Props) {
       setAmount('');
       await load();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create transaction');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('ledger.failedCreate'));
     } finally {
       setSaving(false);
     }
@@ -95,23 +97,23 @@ export function LedgerScreen({ formatMoney }: Props) {
   const handleMigrate = async () => {
     try {
       const res = await migrateSingleToDouble();
-      showSnackbar(`✅ Migrated ${res.migrated} of ${res.total_processed}`);
+      showSnackbar(t('ledger.migrated', { migrated: res.migrated, total: res.total_processed }));
       await load();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Migration failed');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('ledger.migrationFailed'));
     }
   };
 
   return (
     <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Ledger</Text>
+        <Text style={styles.pageTitle}>{t('ledger.title')}</Text>
         <View style={styles.ledgerHeaderActions}>
           <TouchableOpacity style={styles.secondaryButton} onPress={handleMigrate}>
-            <Text style={styles.secondaryButtonText}>Migrate</Text>
+            <Text style={styles.secondaryButtonText}>{t('ledger.migrate')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={() => setShowForm(true)}>
-            <Text style={styles.addButtonText}>+ New</Text>
+            <Text style={styles.addButtonText}>{t('ledger.newEntry')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -124,9 +126,9 @@ export function LedgerScreen({ formatMoney }: Props) {
         <EmptyState
           compact
           icon="📒"
-          title="No ledger transactions yet"
-          description="Double-entry transactions keep a balanced, immutable record of every movement."
-          actionLabel="+ New Ledger Entry"
+          title={t('ledger.noTitle')}
+          description={t('ledger.noDesc')}
+          actionLabel={t('ledger.newEntry')}
           onAction={() => setShowForm(true)}
         />
       ) : (
@@ -162,18 +164,18 @@ export function LedgerScreen({ formatMoney }: Props) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>New Ledger Transaction</Text>
+            <Text style={styles.modalTitle}>{t('ledger.form.title')}</Text>
 
-            <Text style={styles.label}>Description</Text>
+            <Text style={styles.label}>{t('ledger.form.description')}</Text>
             <TextInput
               style={styles.input}
               value={description}
               onChangeText={setDescription}
-              placeholder="e.g. Groceries at Supermarket X"
+              placeholder={t('ledger.form.descriptionPlaceholder')}
               placeholderTextColor={colors.textDim}
             />
 
-            <Text style={styles.label}>Debit account</Text>
+            <Text style={styles.label}>{t('ledger.form.debit')}</Text>
             <View style={styles.ledgerAccountPicker}>
               {accounts.map((a) => (
                 <TouchableOpacity
@@ -197,7 +199,7 @@ export function LedgerScreen({ formatMoney }: Props) {
               ))}
             </View>
 
-            <Text style={styles.label}>Credit account</Text>
+            <Text style={styles.label}>{t('ledger.form.credit')}</Text>
             <View style={styles.ledgerAccountPicker}>
               {accounts.map((a) => (
                 <TouchableOpacity
@@ -221,7 +223,7 @@ export function LedgerScreen({ formatMoney }: Props) {
               ))}
             </View>
 
-            <Text style={styles.label}>Amount (R$)</Text>
+            <Text style={styles.label}>{t('ledger.form.amount')}</Text>
             <TextInput
               style={styles.input}
               value={amount}
@@ -237,7 +239,7 @@ export function LedgerScreen({ formatMoney }: Props) {
                 onPress={() => setShowForm(false)}
                 disabled={saving}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitButton, saving && styles.submitButtonDisabled]}
@@ -247,7 +249,7 @@ export function LedgerScreen({ formatMoney }: Props) {
                 {saving ? (
                   <ActivityIndicator color={colors.primaryText} />
                 ) : (
-                  <Text style={styles.submitButtonText}>Create</Text>
+                  <Text style={styles.submitButtonText}>{t('ledger.form.createEntry')}</Text>
                 )}
               </TouchableOpacity>
             </View>

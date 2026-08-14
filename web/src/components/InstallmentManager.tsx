@@ -13,6 +13,7 @@ import {
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 import { useToast } from './Toast';
+import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
@@ -43,6 +44,7 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
   const [pendingDelete, setPendingDelete] = useState<InstallmentPlan | null>(null);
   const [detail, setDetail] = useState<InstallmentPlanDetail | null>(null);
   const { push: pushToast } = useToast();
+  const { t } = useI18n();
 
   const expenseCategories = categories.filter((c) => c.type === 'expense');
 
@@ -53,7 +55,7 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
       const data = await fetchInstallmentPlans();
       setPlans(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load installment plans');
+      setError(err instanceof Error ? err.message : t('installments.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
       const d = await fetchInstallmentPlan(id);
       setDetail(d);
     } catch (err) {
-      pushToast({ message: err instanceof Error ? err.message : 'Failed to load plan detail' });
+      pushToast({ message: err instanceof Error ? err.message : t('installments.failedLoadDetail') });
     }
   };
 
@@ -79,10 +81,10 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
     try {
       const total = parseFloat(form.total_amount);
       const count = parseInt(form.installments, 10);
-      if (form.description.trim().length === 0) throw new Error('Description is required');
-      if (!total || total <= 0) throw new Error('Total amount must be greater than zero');
-      if (count < 2 || count > 60) throw new Error('Installments must be between 2 and 60');
-      if (!form.start_date) throw new Error('Start date is required');
+      if (form.description.trim().length === 0) throw new Error(t('installments.validation.desc'));
+      if (!total || total <= 0) throw new Error(t('installments.validation.total'));
+      if (count < 2 || count > 60) throw new Error(t('installments.validation.count'));
+      if (!form.start_date) throw new Error(t('installments.validation.date'));
 
       await createInstallmentPlan({
         description: form.description.trim(),
@@ -100,9 +102,9 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
         start_date: new Date().toISOString().slice(0, 10),
       });
       await loadPlans();
-      pushToast({ message: 'Installment plan created' });
+      pushToast({ message: t('installments.created') });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create installment plan');
+      setError(err instanceof Error ? err.message : t('installments.failedCreate'));
     } finally {
       setSaving(false);
     }
@@ -112,25 +114,25 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
     try {
       const res = await generateInstallments(id);
       pushToast({
-        message: `Generated ${res.generated} installment transaction(s)`,
+        message: t('installments.generated', { count: res.generated }),
       });
       await loadPlans();
       if (detail && detail.plan.id === id) {
         setDetail(await fetchInstallmentPlan(id));
       }
     } catch (err) {
-      pushToast({ message: err instanceof Error ? err.message : 'Failed to generate installments' });
+      pushToast({ message: err instanceof Error ? err.message : t('installments.failedGenerate') });
     }
   };
 
   const handlePay = async (planId: string, number: number) => {
     try {
       await payInstallment(planId, number);
-      pushToast({ message: `Installment ${number} marked as paid` });
+      pushToast({ message: t('installments.markedPaid', { number }) });
       setDetail(await fetchInstallmentPlan(planId));
       await loadPlans();
     } catch (err) {
-      pushToast({ message: err instanceof Error ? err.message : 'Failed to pay installment' });
+      pushToast({ message: err instanceof Error ? err.message : t('installments.failedPay') });
     }
   };
 
@@ -140,9 +142,9 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
       setPendingDelete(null);
       setDetail(null);
       await loadPlans();
-      pushToast({ message: 'Installment plan deleted' });
+      pushToast({ message: t('installments.deleted') });
     } catch (err) {
-      pushToast({ message: err instanceof Error ? err.message : 'Failed to delete installment plan' });
+      pushToast({ message: err instanceof Error ? err.message : t('installments.failedDelete') });
     }
   };
 
@@ -151,22 +153,22 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
   return (
     <div>
       <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>Installments (Parcelas)</h2>
-        <button style={styles.primaryButton} onClick={() => setShowForm(true)}>+ New Plan</button>
+        <h2 style={styles.pageTitle}>{t('installments.title')}</h2>
+        <button style={styles.primaryButton} onClick={() => setShowForm(true)}>{t('installments.newPlan')}</button>
       </div>
 
       {error && (
         <div style={styles.errorBanner}>
           <p>{error}</p>
-          <button onClick={loadPlans} style={styles.retryButton}>Retry</button>
+          <button onClick={loadPlans} style={styles.retryButton}>{t('common.retry')}</button>
         </div>
       )}
 
       {!loading && plans.length === 0 && !showForm && (
         <EmptyState
           icon="📅"
-          title="No installment plans"
-          description="Split a purchase into N monthly payments. Create your first plan to get started."
+          title={t('installments.noTitle')}
+          description={t('installments.noDesc')}
         />
       )}
 
@@ -183,15 +185,15 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
                 <div>
                   <div style={styles.planTitle}>{plan.description}</div>
                   <div style={styles.planSubtitle}>
-                    {plan.category_name || 'Uncategorized'} · {plan.progress.paid_count}/{plan.installments} paid ·{' '}
-                    {formatMoney(plan.installment_amount)}/month
+                    {plan.category_name || t('installments.uncategorised')} · {t('installments.paidCount', { paid: plan.progress.paid_count, total: plan.installments })} ·{' '}
+                    {t('installments.perMonth', { amount: formatMoney(plan.installment_amount) })}
                   </div>
                 </div>
               </div>
               <div style={styles.planAmounts}>
                 <div style={styles.planTotal}>{formatMoney(plan.total_amount)}</div>
                 <div style={styles.planRemaining}>
-                  {formatMoney(plan.progress.remaining_amount)} left
+                  {t('installments.left', { amount: formatMoney(plan.progress.remaining_amount) })}
                 </div>
               </div>
             </div>
@@ -207,13 +209,13 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
             <div style={styles.planActions}>
               {overDue && plan.progress.pending_count > 0 && (
                 <button style={styles.generateButton} onClick={() => handleGenerate(plan.id)}>
-                  Generate transactions
+                  {t('installments.generate')}
                 </button>
               )}
               <button style={styles.secondaryButton} onClick={() => openDetail(plan.id)}>
-                View installments
+                {t('installments.view')}
               </button>
-              <button style={styles.deleteButton} onClick={() => setPendingDelete(plan)}>Delete</button>
+              <button style={styles.deleteButton} onClick={() => setPendingDelete(plan)}>{t('common.delete')}</button>
             </div>
           </div>
         );
@@ -229,8 +231,8 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
             </div>
             <div style={styles.detailMeta}>
               <span>{formatMoney(detail.plan.installment_amount)} × {detail.plan.installments}</span>
-              <span>Total: {formatMoney(detail.plan.total_amount)}</span>
-              <span>{detail.plan.progress.paid_count} paid · {detail.plan.progress.pending_count} remaining</span>
+              <span>{t('installments.detailTotal', { amount: formatMoney(detail.plan.total_amount) })}</span>
+              <span>{t('installments.detailRemaining', { paid: detail.plan.progress.paid_count, pending: detail.plan.progress.pending_count })}</span>
             </div>
             <div style={styles.installmentList}>
               {detail.installments.map((inst) => (
@@ -238,14 +240,14 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
                   <span style={styles.installmentNumber}>#{inst.installment_number}</span>
                   <span style={styles.installmentDue}>{inst.due_date}</span>
                   <span style={styles.installmentStatus}>
-                    {inst.status === 'paid' ? '✅ Paid' : inst.status === 'generated' ? '🟡 Generated' : '⚪ Pending'}
+                    {inst.status === 'paid' ? t('installments.statusPaid') : inst.status === 'generated' ? t('installments.statusGenerated') : t('installments.statusPending')}
                   </span>
                   {inst.status !== 'paid' && (
                     <button
                       style={styles.payButton}
                       onClick={() => handlePay(detail.plan.id, inst.installment_number)}
                     >
-                      Mark paid
+                      {t('installments.markPaid')}
                     </button>
                   )}
                 </div>
@@ -259,21 +261,21 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
       {showForm && (
         <div style={styles.overlay} onClick={() => setShowForm(false)}>
           <form style={styles.form} onClick={(e) => e.stopPropagation()} onSubmit={handleCreate}>
-            <h3 style={styles.formTitle}>New Installment Plan</h3>
+            <h3 style={styles.formTitle}>{t('installments.form.title')}</h3>
 
             <label style={styles.label}>
-              Description
+              {t('installments.form.description')}
               <input
                 style={styles.input}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="TV 55&quot; Samsung"
+                placeholder={t('installments.form.descriptionPlaceholder')}
               />
             </label>
 
             <div style={styles.formRow}>
               <label style={styles.label}>
-                Total amount (R$)
+                {t('installments.form.total')}
                 <input
                   style={styles.input}
                   type="number"
@@ -285,7 +287,7 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
                 />
               </label>
               <label style={styles.label}>
-                Installments (2-60)
+                {t('installments.form.count')}
                 <input
                   style={styles.input}
                   type="number"
@@ -299,18 +301,18 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
 
             {form.total_amount && form.installments && parseInt(form.installments, 10) > 0 && (
               <div style={styles.monthPreview}>
-                ≈ {formatMoney((parseFloat(form.total_amount) / parseInt(form.installments, 10)).toFixed(2))} per month
+                {t('installments.form.perMonth', { amount: formatMoney((parseFloat(form.total_amount) / parseInt(form.installments, 10)).toFixed(2)) })}
               </div>
             )}
 
             <label style={styles.label}>
-              Category (optional)
+              {t('installments.form.categoryOptional')}
               <select
                 style={styles.input}
                 value={form.category_id}
                 onChange={(e) => setForm({ ...form, category_id: e.target.value })}
               >
-                <option value="">None</option>
+                <option value="">{t('common.none')}</option>
                 {expenseCategories.map((c) => (
                   <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ''}{c.name}</option>
                 ))}
@@ -318,7 +320,7 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
             </label>
 
             <label style={styles.label}>
-              First installment date
+              {t('installments.form.firstDate')}
               <input
                 style={styles.input}
                 type="date"
@@ -329,10 +331,10 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
 
             <div style={styles.actions}>
               <button type="button" style={styles.cancelButton} onClick={() => setShowForm(false)}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="submit" style={styles.submitButton} disabled={saving}>
-                {saving ? 'Creating…' : 'Create Plan'}
+                {saving ? t('common.creating') : t('installments.form.create')}
               </button>
             </div>
           </form>
@@ -342,9 +344,9 @@ export function InstallmentManager({ categories, formatMoney }: Props) {
       {pendingDelete && (
         <ConfirmDialog
           open={!!pendingDelete}
-          title="Delete installment plan?"
-          message={`This will delete "${pendingDelete.description}" and unlink any generated transactions.`}
-          confirmLabel="Delete"
+          title={t('installments.deleteTitle')}
+          message={t('installments.deleteMessage', { description: pendingDelete.description })}
+          confirmLabel={t('common.delete')}
           onConfirm={() => handleDelete(pendingDelete)}
           onCancel={() => setPendingDelete(null)}
         />

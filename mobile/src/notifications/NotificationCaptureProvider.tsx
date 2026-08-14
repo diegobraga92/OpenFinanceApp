@@ -20,6 +20,7 @@ import { Category, createTransaction, fetchCategories } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useSnackbar } from '../components/Snackbar';
+import { useI18n } from '../i18n';
 import {
   NotificationSettings,
   ParsedTransaction,
@@ -42,6 +43,7 @@ export function useNotificationCapture(): NotificationCaptureContextValue {
 
 export function NotificationCaptureProvider({ children }: { children: ReactNode }) {
   const { show: showSnackbar } = useSnackbar();
+  const { t } = useI18n();
   const [pending, setPending] = useState<ParsedTransaction | null>(null);
   const [saving, setSaving] = useState(false);
   const [description, setDescription] = useState('');
@@ -62,7 +64,7 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
         type: parsed.type,
         category_id: overrideCategoryId ?? parsed.categoryId,
         date: parsed.date,
-        notes: 'Captured from push notification',
+        notes: t('notifications.notes'),
       });
     },
     [],
@@ -76,12 +78,12 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
         void persistTransaction(parsed)
           .then(() => {
             showSnackbar(
-              `✅ ${parsed.type === 'income' ? 'Income' : 'Expense'} R$ ${parsed.amount} — ${parsed.description}`,
+              t('notifications.captured', { type: t(parsed.type === 'income' ? 'notifications.income' : 'notifications.expense'), amount: parsed.amount, description: parsed.description }),
             );
           })
           .catch((err: unknown) => {
             showSnackbar(
-              err instanceof Error ? `Capture failed: ${err.message}` : 'Capture failed',
+              err instanceof Error ? `Capture failed: ${err.message}` : t('notifications.captureFailed'),
             );
           });
       } else {
@@ -114,10 +116,10 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
     setSaving(true);
     try {
       await persistTransaction(pending, description.trim() || undefined, pendingCategoryId);
-      showSnackbar(`✅ Transaction R$ ${pending.amount} created`);
+      showSnackbar(t('notifications.created', { amount: pending.amount }));
       setPending(null);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create transaction');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('notifications.failedCreate'));
     } finally {
       setSaving(false);
     }
@@ -134,23 +136,22 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Capture transaction?</Text>
+            <Text style={styles.modalTitle}>{t('notifications.captureTitle')}</Text>
             <Text style={styles.monthPreview}>
-              A notification was detected: {pending?.type === 'income' ? 'income' : 'expense'} of
-              R$ {pending?.amount} from "{pending?.description}".
+              {t('notifications.captureDesc', { type: t(pending?.type === 'income' ? 'notifications.income' : 'notifications.expense'), amount: pending?.amount ?? '', description: pending?.description ?? '' })}
             </Text>
 
-            <Text style={styles.label}>Description</Text>
+            <Text style={styles.label}>{t('notifications.description')}</Text>
             <TextInput
               style={styles.input}
               value={description}
               onChangeText={setDescription}
-              placeholder="Merchant / description"
+              placeholder={t('notifications.descriptionPlaceholder')}
               placeholderTextColor={colors.textDim}
               autoFocus
             />
 
-            <Text style={styles.label}>Category</Text>
+            <Text style={styles.label}>{t('common.category')}</Text>
             <View style={styles.categoryGrid}>
               <TouchableOpacity
                 style={[styles.categoryChip, pendingCategoryId === null && styles.categoryChipActive]}
@@ -162,7 +163,7 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
                     pendingCategoryId === null && styles.categoryChipTextActive,
                   ]}
                 >
-                  None
+                  {t('common.none')}
                 </Text>
               </TouchableOpacity>
               {categories
@@ -194,7 +195,7 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
                 onPress={() => setPending(null)}
                 disabled={saving}
               >
-                <Text style={styles.cancelButtonText}>Skip</Text>
+                <Text style={styles.cancelButtonText}>{t('notifications.skip')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitButton, saving && styles.submitButtonDisabled]}
@@ -204,7 +205,7 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
                 {saving ? (
                   <ActivityIndicator color={colors.primaryText} />
                 ) : (
-                  <Text style={styles.submitButtonText}>Create</Text>
+                  <Text style={styles.submitButtonText}>{t('notifications.create')}</Text>
                 )}
               </TouchableOpacity>
             </View>

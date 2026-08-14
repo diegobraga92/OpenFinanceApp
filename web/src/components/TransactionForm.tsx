@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import type { Category, Transaction } from '../api';
 import { createTransaction, updateTransaction } from '../api';
+import { useI18n } from '../i18n';
 
 interface Props {
   categories: Category[];
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function TransactionForm({ categories, editing, onCancel, onSaved }: Props) {
+  const { t } = useI18n();
   const [description, setDescription] = useState(editing?.description ?? '');
   const [amount, setAmount] = useState(editing?.amount ?? '');
   const [type, setType] = useState<'income' | 'expense'>(
@@ -52,7 +54,7 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save transaction');
+      setError(err instanceof Error ? err.message : t('transactions.form.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -68,7 +70,7 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
     >
       <form style={styles.form} onSubmit={handleSubmit} role="dialog" aria-modal="true" aria-labelledby="tx-form-title">
         <h3 id="tx-form-title" style={styles.title}>
-          {editing ? 'Edit Transaction' : 'Add Transaction'}
+          {editing ? t('transactions.form.edit') : t('transactions.form.add')}
         </h3>
 
         {error && (
@@ -78,19 +80,19 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
         )}
 
         <label style={styles.label}>
-          Description
+          {t('common.description')}
           <input
             style={styles.input}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g. Lunch at Restaurante X"
+            placeholder={t('transactions.form.descriptionPlaceholder')}
             required
           />
         </label>
 
         <div style={styles.row}>
           <label style={styles.label}>
-            Amount (R$)
+            {t('transactions.form.amount')}
             <input
               style={styles.input}
               type="number"
@@ -98,13 +100,13 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
               min="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
+              placeholder={t('transactions.form.amountPlaceholder')}
               required
             />
           </label>
 
           <label style={styles.label}>
-            Date
+            {t('common.date')}
             <input
               style={styles.input}
               type="date"
@@ -116,7 +118,7 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
         </div>
 
         <label style={styles.label}>
-          Type
+          {t('common.type')}
           <div style={styles.typeToggle}>
             <button
               type="button"
@@ -128,7 +130,7 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
                 if (cat && cat.type !== 'expense') setCategoryId('');
               }}
             >
-              Expense
+              {t('common.expense')}
             </button>
             <button
               type="button"
@@ -139,19 +141,19 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
                 if (cat && cat.type !== 'income') setCategoryId('');
               }}
             >
-              Income
+              {t('common.income')}
             </button>
           </div>
         </label>
 
         <label style={styles.label}>
-          Category
+          {t('common.category')}
           <select
             style={styles.input}
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
           >
-            <option value="">— No category —</option>
+            <option value="">— {t('common.none')} —</option>
             {filteredCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.icon ? `${c.icon} ` : ''}{c.name}
@@ -161,12 +163,12 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
         </label>
 
         <label style={styles.label}>
-          Notes
+          {t('common.notes')}
           <textarea
             style={{ ...styles.input, minHeight: '4rem', resize: 'vertical' }}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional notes…"
+            placeholder={t('transactions.form.notesPlaceholder')}
           />
         </label>
 
@@ -177,14 +179,14 @@ export function TransactionForm({ categories, editing, onCancel, onSaved }: Prop
             onClick={onCancel}
             disabled={saving}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
             style={styles.submitButton}
             disabled={saving}
           >
-            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Transaction'}
+            {saving ? t('common.saving') : editing ? t('transactions.form.saveChanges') : t('transactions.form.add')}
           </button>
         </div>
       </form>
