@@ -1,0 +1,3 @@
+# Host build artifacts are NOT used by the Docker build (everything is compiled
+# inside the container) — excluding target/ avoids uploading ~14 GB per build.
+target/

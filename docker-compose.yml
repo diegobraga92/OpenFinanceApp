@@ -55,8 +55,10 @@ services:
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      # Context is the repo root (not ./web) because web/src imports the
+      # shared i18n dictionary from ../shared/i18n — it must be in the build.
+      context: .
+      dockerfile: web/Dockerfile
       # VITE_API_BASE_URL is baked into the JS bundle at build time.
       #   empty/unset   → web app uses same-origin URLs; nginx proxies
       #                   /api, /health, /swagger-ui to the backend.
