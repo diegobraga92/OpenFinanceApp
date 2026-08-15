@@ -1,9 +1,7 @@
 package expo.modules.notificationlistener
 
-import android.app.Notification
 import android.content.Intent
 import android.provider.Settings
-import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -35,6 +33,10 @@ class NotificationListenerModule : Module() {
     AsyncFunction("openSettings") {
       openNotificationAccessSettings()
     }
+
+    Function("drainPendingNotifications") {
+      drainPendingNotifications()
+    }
   }
 
   private fun isNotificationAccessGranted(): Boolean {
@@ -51,17 +53,17 @@ class NotificationListenerModule : Module() {
     context.startActivity(intent)
   }
 
+  /** True while the React context is still able to deliver JS events. */
+  fun isReactContextReady(): Boolean = appContext.reactContext != null
+
   /** Called by [NotificationListenerService] for every posted notification. */
-  fun handlePosted(sbn: StatusBarNotification) {
-    val notification = sbn.notification ?: return
-    val extras = notification.extras ?: return
-    val payload = mapOf(
-      "packageName" to sbn.packageName,
-      "title" to (extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""),
-      "text" to (extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""),
-      "bigText" to (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""),
-      "postTime" to sbn.postTime,
-    )
+  fun handlePosted(payload: Map<String, Any?>) {
     sendEvent("onNotificationPosted", payload)
+  }
+
+  /** Returns (and clears) notifications persisted while the app was killed. */
+  private fun drainPendingNotifications(): List<Map<String, Any?>> {
+    val context = appContext.reactContext
+    return if (context == null) emptyList() else NotificationCaptureQueue.drain(context)
   }
 }

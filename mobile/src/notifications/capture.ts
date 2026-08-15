@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchCategories } from '../api';
 import {
   addNotificationListener,
+  drainPendingNotifications as drainNativePendingNotifications,
   isNotificationAccessEnabled,
   isSupported as nativeCaptureSupported,
   openNotificationAccessSettings as openSystemNotificationAccessSettings,
@@ -290,6 +291,42 @@ export function parseNotification(
 export type NotificationListener = (parsed: ParsedTransaction) => void;
 
 /**
+ * Applies settings, monitored-app filtering and parsing to a single raw
+ * notification payload, calling `listener` when it results in a valid
+ * transaction. Shared by the live subscription and the drain-on-launch path so
+ * both behave identically.
+ */
+export async function handleNotificationPayload(
+  payload: NotificationPayload,
+  listener: NotificationListener,
+): Promise<void> {
+  const settings = await getNotificationSettings();
+  if (!settings.enabled) return;
+
+  // Filter by monitored apps (package names). Empty = watch all apps.
+  if (
+    settings.monitoredApps.length > 0 &&
+    !settings.monitoredApps.includes(payload.packageName)
+  ) {
+    return;
+  }
+
+  const text = [payload.title, payload.text, payload.bigText, payload.textLines, payload.subText]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  if (!text) return;
+
+  const categories = await fetchCategories().catch(() => []);
+  const parsed = parseNotification(
+    text,
+    categories,
+    settings.defaultCategoryId,
+  );
+  if (parsed) listener(parsed);
+}
+
+/**
  * Subscribes to notifications posted by OTHER apps via the native Android
  * `NotificationListenerService`. Returns an unsubscribe function.
  *
@@ -304,32 +341,24 @@ export function subscribeToNotifications(
 
   return addNotificationListener((payload: NotificationPayload) => {
     // Fire-and-forget async work: reading settings + parsing.
-    void (async () => {
-      const settings = await getNotificationSettings();
-      if (!settings.enabled) return;
-
-      // Filter by monitored apps (package names). Empty = watch all apps.
-      if (
-        settings.monitoredApps.length > 0 &&
-        !settings.monitoredApps.includes(payload.packageName)
-      ) {
-        return;
-      }
-
-      const text = [payload.title, payload.text, payload.bigText]
-        .filter(Boolean)
-        .join(' ')
-        .trim();
-      if (!text) return;
-
-      const categories = await fetchCategories().catch(() => []);
-      const parsed = parseNotification(
-        text,
-        categories,
-        settings.defaultCategoryId,
-      );
-      if (parsed) listener(parsed);
-    })();
+    void handleNotificationPayload(payload, listener);
   }).remove;
+}
+
+/**
+ * Processes notifications that were captured by the native
+ * `NotificationListenerService` while the app was killed (persisted to a
+ * durable queue because no JS runtime was alive to receive them). Returns the
+ * number of raw payloads drained. No-op on platforms without the native module.
+ */
+export async function drainPendingNotifications(
+  listener: NotificationListener,
+): Promise<number> {
+  if (!nativeCaptureSupported) return 0;
+  const pending = drainNativePendingNotifications();
+  for (const payload of pending) {
+    void handleNotificationPayload(payload, listener);
+  }
+  return pending.length;
 }
 

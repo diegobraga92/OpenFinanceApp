@@ -102,7 +102,12 @@ async function request<T>(path: string, options?: {
   let response = await doFetch();
 
   // Access token expired — try to refresh once, then retry the request.
-  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+  // Only skip refresh for the auth endpoints that don't use an access token
+  // (login/register/refresh). `/api/auth/me` validates the stored session, so it
+  // must go through the refresh path or returning users get logged out whenever
+  // the short-lived access token has expired.
+  const NO_REFRESH_AUTH_PATHS = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
+  if (response.status === 401 && !NO_REFRESH_AUTH_PATHS.includes(path)) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       response = await doFetch();

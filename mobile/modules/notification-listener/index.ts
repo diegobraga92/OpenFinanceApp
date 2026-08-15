@@ -18,6 +18,10 @@ export type NotificationPayload = {
   text: string;
   /** Expanded/rich body (often contains the parsed transaction line). */
   bigText: string;
+  /** Small additional line (rarely used; may hold the amount). */
+  subText?: string;
+  /** Multi-line body (some apps only populate `EXTRA_TEXT_LINES`). */
+  textLines?: string;
   /** Posting timestamp (epoch millis). */
   postTime: number;
 };
@@ -56,4 +60,15 @@ export function addNotificationListener(
   listener: (payload: NotificationPayload) => void,
 ): NotificationListenerSubscription {
   return native().addListener('onNotificationPosted', listener);
+}
+
+/**
+ * Returns (and clears) notifications that were captured by the native
+ * `NotificationListenerService` while the app process was killed. Because no JS
+ * runtime was alive at capture time, the service persisted them to a durable
+ * queue; the app drains it on launch.
+ */
+export function drainPendingNotifications(): NotificationPayload[] {
+  if (!isSupported) return [];
+  return native().drainPendingNotifications();
 }

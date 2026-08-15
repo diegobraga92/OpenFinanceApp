@@ -25,6 +25,7 @@ import { useI18n } from '../i18n';
 import {
   NotificationSettings,
   ParsedTransaction,
+  drainPendingNotifications,
   getNotificationSettings,
   subscribeToNotifications,
 } from './capture';
@@ -101,11 +102,21 @@ export function NotificationCaptureProvider({ children }: { children: ReactNode 
   );
 
   useEffect(() => {
+    let mounted = true;
     void (async () => {
-      settingsRef.current = await getNotificationSettings();
+      // Load settings before anything so the synchronous settingsRef check in
+      // handleParsed never sees null for notifications processed on startup.
+      const settings = await getNotificationSettings();
+      if (mounted) settingsRef.current = settings;
+      // Process notifications the native service captured while the app was
+      // killed (persisted in a durable queue because no JS runtime was alive).
+      await drainPendingNotifications(handleParsed);
     })();
     const unsubscribe = subscribeToNotifications(handleParsed);
-    return unsubscribe;
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, [handleParsed]);
 
   const refresh = useCallback(async () => {
