@@ -722,18 +722,19 @@ async fn apply_category_delete(
     Ok(Some(server_id))
 }
 
+/// Extracted account fields from a sync payload.
+struct AccountPayload {
+    name: String,
+    acct_type: String,
+    account_kind: Option<String>,
+    parent_id: Option<Uuid>,
+    closing_day: Option<i16>,
+    due_day: Option<i16>,
+    credit_limit: Option<rust_decimal::Decimal>,
+}
+
 /// Extracts the common account fields from a sync payload.
-fn account_fields_from_payload(
-    op: &SyncOperation,
-) -> (
-    String,
-    String,
-    Option<String>,
-    Option<Uuid>,
-    Option<i16>,
-    Option<i16>,
-    Option<rust_decimal::Decimal>,
-) {
+fn account_fields_from_payload(op: &SyncOperation) -> AccountPayload {
     let name = op
         .payload
         .get("name")
@@ -779,7 +780,7 @@ fn account_fields_from_payload(
         .and_then(|v| v.as_str())
         .and_then(|s| s.parse::<rust_decimal::Decimal>().ok());
 
-    (
+    AccountPayload {
         name,
         acct_type,
         account_kind,
@@ -787,15 +788,22 @@ fn account_fields_from_payload(
         closing_day,
         due_day,
         credit_limit,
-    )
+    }
 }
 
 async fn apply_account_create(
     state: &AppState,
     op: &SyncOperation,
 ) -> Result<Option<Uuid>, (StatusCode, String)> {
-    let (name, acct_type, account_kind, parent_id, closing_day, due_day, credit_limit) =
-        account_fields_from_payload(op);
+    let AccountPayload {
+        name,
+        acct_type,
+        account_kind,
+        parent_id,
+        closing_day,
+        due_day,
+        credit_limit,
+    } = account_fields_from_payload(op);
 
     // Idempotency: the client UUID is the account id, so a retried push simply
     // updates the same row.
@@ -844,8 +852,15 @@ async fn apply_account_update(
         )
     })?;
 
-    let (name, acct_type, account_kind, parent_id, closing_day, due_day, credit_limit) =
-        account_fields_from_payload(op);
+    let AccountPayload {
+        name,
+        acct_type,
+        account_kind,
+        parent_id,
+        closing_day,
+        due_day,
+        credit_limit,
+    } = account_fields_from_payload(op);
 
     let result = sqlx::query(
         "UPDATE accounts
