@@ -56,12 +56,32 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
 
+      # Sign the release APK with the private release keystore (from GitHub
+      # secrets) instead of the public debug keystore. Google Play Protect
+      # blocks sideloaded APKs signed with the debug/test key, so release
+      # builds must use a real keystore. When the secrets are not configured
+      # the build falls back to the debug keystore (with a warning).
+      - name: Configure release signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            printf '\n# Private release signing (injected by CI - never hard-code).\nPUDIM_RELEASE_STORE_FILE=release.keystore\nPUDIM_RELEASE_STORE_PASSWORD=%s\nPUDIM_RELEASE_KEY_ALIAS=%s\nPUDIM_RELEASE_KEY_PASSWORD=%s\n' "$RELEASE_KEYSTORE_PASSWORD" "$RELEASE_KEY_ALIAS" "$RELEASE_KEY_PASSWORD" >> android/gradle.properties
+            echo "Release signing configured with keystore."
+          else
+            echo "::warning::No RELEASE_KEYSTORE_BASE64 secret set — release APK will be debug-signed (Play Protect may block it)."
+          fi
+
       # Build a RELEASE APK: debug builds deliberately skip JS bundling (they
       # expect Metro to be running) and crash on launch with "Unable to load
       # script ... index.android.bundle". Release builds embed the Hermes JS
-      # bundle via Expo's `export:embed` step and are signed with the debug
-      # keystore that prebuild generates — so they sideload like a debug APK
-      # but work fully offline.
+      # bundle via Expo's `export:embed` step and are signed with the private
+      # release keystore when the secrets above are configured (otherwise they
+      # fall back to the debug keystore so the workflow still works).
       - name: Build release APK
         run: |
           cd android

@@ -104,8 +104,7 @@ rebuilding:
 
 Every push to `main` touching `mobile/**` triggers the **Mobile APK Build**
 workflow (`.github/workflows/mobile-apk.yml`), which produces an installable
-**release** APK (embedded JS bundle, signed with the debug keystore so it
-sideloads without a Play Store):
+**release** APK (embedded JS bundle, sideloadable without a Play Store):
 
 1. Open the **Actions** tab on GitHub → select **Mobile APK Build**.
 2. Pick the latest run (green check) → **Artifacts** → download
@@ -115,8 +114,34 @@ sideloads without a Play Store):
 
 You can also trigger a build anytime by opening the workflow and clicking
 **Run workflow** (the `workflow_dispatch` trigger) — no push required.
-Debug-signed release APKs support sideloading; enable *"Install unknown apps"*
-for the source app if your phone prompts you.
+
+**Google Play Protect**: because the app is sideloaded (not from the Play
+Store), Play Protect may show a warning or block the install. If it does,
+tap **"More details"** → **"Install anyway"**. If it hard-blocks, temporarily
+disable Play Protect scanning (Play Store → profile → *Play Protect* → Settings
+→ *Scan apps with Play Protect* → off), install, then re-enable it.
+
+To avoid the stricter *"signed with a test key"* block, sign the APK with a
+private release keystore instead of the debug keystore:
+
+1. Generate a keystore once and keep it safe (never commit it):
+   ```bash
+   keytool -genkeypair -v -storetype PKCS12 \
+     -keystore pudim-release.keystore -alias pudim \
+     -keyalg RSA -keysize 2048 -validity 10000 \
+     -dname "CN=PudimFinance, OU=Mobile, O=PudimFinance, L=Sao Paulo, ST=SP, C=BR" \
+     -storepass "STRONG-PASSWORD" -keypass "STRONG-PASSWORD" -noprompt
+   ```
+2. Add these **GitHub secrets** (repo → Settings → Secrets and variables →
+   Actions):
+   - `RELEASE_KEYSTORE_BASE64` — `base64 -w0 pudim-release.keystore`
+   - `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS` (`pudim`),
+     `RELEASE_KEY_PASSWORD`
+3. The next CI build signs the APK with that keystore. If the secrets aren't
+   set, the workflow still builds but falls back to the debug keystore (a
+   `::warning::` appears in the run log).
+
+Enable *"Install unknown apps"* for the source app if your phone prompts you.
 
 
 ### Mobile: Push Notification Capture
