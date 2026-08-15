@@ -143,10 +143,12 @@ Cartão final 1234 R$ 100,00 às 14:30     → expense 100.00
 Boleto pago R$ 85,75                     → expense 85.75
 ```
 
-> **Note:** iOS only allows foreground notifications to be observed. For
-> reliable capture while the app is backgrounded on Android, a native
-> `NotificationListenerService` module is required (out of scope for the
-> managed Expo workflow).
+> **Android only.** Capture works by reading other apps' notifications through a
+> native `NotificationListenerService` (the local `expo-notification-listener`
+> module). The user must grant **Notification access** (Settings → Special app
+> access → Notification access). It works while the app is backgrounded or
+> killed. On iOS, reading other apps' notifications is blocked by the sandbox,
+> so the feature is disabled there.
 
 
 ### Credit Cards, Faturas & Antecipação

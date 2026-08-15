@@ -571,6 +571,12 @@ export const en = {
     'Parse incoming bank and payment notifications and save them as transactions.',
   'notifications.permissionNeeded': 'Permission needed',
   'notifications.permissionNeededDesc': 'Allow notifications to enable auto-capture.',
+  'notifications.accessNeeded': 'Notification access required',
+  'notifications.accessNeededDesc':
+    'To capture transactions from other apps, PudimFinance needs Android "Notification access". Open Settings to enable it.',
+  'notifications.openSettings': 'Open Settings',
+  'notifications.unavailable':
+    'Capturing notifications from other apps is only available on Android.',
   'notifications.monitoredApps': 'Monitored Apps',
   'notifications.watchingAll': '✓ Watching all apps (no filter)',
   'notifications.clearSelection': 'Clear selection — watch all apps',

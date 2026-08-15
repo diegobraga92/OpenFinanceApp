@@ -1,17 +1,30 @@
 /**
  * Push notification → transaction capture for PudimFinance.
  *
- * Watches incoming notifications (foreground via expo-notifications) and parses
- * them with pattern-matched regexes tuned for common Brazilian bank/payment app
- * alerts (Nubank, Itaú, Banco do Brasil, PicPay, Mercado Pago, ...).
+ * Android: a native `NotificationListenerService` (see the local
+ * `expo-notification-listener` module) observes notifications posted by OTHER
+ * apps once the user grants "Notification access". Each notification is parsed
+ * with pattern-matched regexes tuned for common Brazilian bank/payment app
+ * alerts (Nubank, Itaú, Banco do Brasil, PicPay, Mercado Pago, ...) and turned
+ * into a transaction.
+ *
+ * This works while the app is backgrounded or killed (Android only). iOS cannot
+ * observe other apps' notifications due to sandboxing, so capture is disabled
+ * there.
  *
  * Settings (enabled, monitored apps, capture mode, default category) are
  * persisted in AsyncStorage.
  */
 
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchCategories } from '../api';
+import {
+  addNotificationListener,
+  isNotificationAccessEnabled,
+  isSupported as nativeCaptureSupported,
+  openNotificationAccessSettings as openSystemNotificationAccessSettings,
+  type NotificationPayload,
+} from '../../modules/notification-listener';
 
 // ---------------------------------------------------------------------------
 // Settings
@@ -22,7 +35,7 @@ export type CaptureMode = 'auto' | 'ask';
 export interface NotificationSettings {
   /** Master switch — false means notifications are ignored. */
   enabled: boolean;
-  /** App package/titles we watch for (empty = all apps). */
+  /** Android package names we watch for (empty = all apps). */
   monitoredApps: string[];
   /** `auto` creates transactions silently; `ask` prompts first. */
   mode: CaptureMode;
@@ -39,31 +52,78 @@ export const DEFAULT_SETTINGS: NotificationSettings = {
   defaultCategoryId: null,
 };
 
-export const KNOWN_APPS: { label: string; keywords: string[] }[] = [
-  { label: 'Nubank', keywords: ['nubank', 'roxinho', 'nuconta'] },
-  { label: 'Itaú', keywords: ['itau', 'itaú'] },
-  { label: 'Banco do Brasil', keywords: ['banco do brasil', 'bb'] },
-  { label: 'Bradesco', keywords: ['bradesco'] },
-  { label: 'Caixa', keywords: ['caixa', 'caixa econ'] },
-  { label: 'PicPay', keywords: ['picpay'] },
-  { label: 'Mercado Pago', keywords: ['mercado pago'] },
-  { label: 'PIX', keywords: ['pix', 'pix copia e cola', 'pix recebido', 'pix enviado'] },
+/**
+ * Known Brazilian banks/payment apps with their Android package names.
+ * The package name is what `NotificationListenerService` reports, so the
+ * "monitored apps" filter matches on it.
+ *
+ * NOTE: package names should be verified on a real device; a wrong value just
+ * means that app won't match when the user selects it (watching all still
+ * works). Add more apps here as needed.
+ */
+export const KNOWN_APPS: { label: string; packageName: string | null }[] = [
+  { label: 'Nubank', packageName: 'com.nu.production' },
+  { label: 'Itaú', packageName: 'com.itau' },
+  { label: 'Banco do Brasil', packageName: 'br.com.bb.android' },
+  { label: 'Bradesco', packageName: 'br.com.bradesco' },
+  { label: 'Caixa', packageName: 'caixa.gov.br.app' },
+  { label: 'PicPay', packageName: 'com.picpay' },
+  { label: 'Mercado Pago', packageName: 'com.mercadopago.wallet' },
+  { label: 'Inter', packageName: 'br.com.intermedium' },
+  { label: 'Santander', packageName: 'br.com.santander' },
 ];
+
+function labelToPackage(label: string): string | null {
+  return KNOWN_APPS.find((app) => app.label === label)?.packageName ?? null;
+}
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   const raw = await AsyncStorage.getItem(SETTINGS_KEY);
   if (!raw) return DEFAULT_SETTINGS;
+  let settings: NotificationSettings;
   try {
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<NotificationSettings>) };
+    settings = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<NotificationSettings>) };
   } catch {
     return DEFAULT_SETTINGS;
   }
+
+  // Migrate legacy settings that stored app *labels* ("Nubank") to the
+  // package names the native listener reports.
+  let changed = false;
+  const monitoredApps = settings.monitoredApps.map((entry) => {
+    const pkg = labelToPackage(entry);
+    if (pkg && pkg !== entry) {
+      changed = true;
+      return pkg;
+    }
+    return entry;
+  });
+  if (changed) {
+    settings = { ...settings, monitoredApps };
+    await saveNotificationSettings(settings);
+  }
+  return settings;
 }
 
 export async function saveNotificationSettings(
   settings: NotificationSettings,
 ): Promise<void> {
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+/** Whether native notification capture is supported on this platform. */
+export function isCaptureSupported(): boolean {
+  return nativeCaptureSupported;
+}
+
+/** Whether the user granted "Notification access" (Android only). */
+export function isNotificationAccessGranted(): boolean {
+  return isNotificationAccessEnabled();
+}
+
+/** Opens the system "Notification access" settings screen (Android only). */
+export function openNotificationAccessSettings(): void {
+  openSystemNotificationAccessSettings();
 }
 
 // ---------------------------------------------------------------------------
@@ -224,52 +284,47 @@ export function parseNotification(
 
 
 // ---------------------------------------------------------------------------
-// Permissions + listening
+// Notification access + listening
 // ---------------------------------------------------------------------------
-
-let configured = false;
-
-export async function configureNotifications(): Promise<boolean> {
-  if (configured) return true;
-  configured = true;
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
-  });
-  const settings = await Notifications.getPermissionsAsync();
-  if (settings.status !== 'granted') {
-    const req = await Notifications.requestPermissionsAsync();
-    return req.status === 'granted';
-  }
-  return true;
-}
 
 export type NotificationListener = (parsed: ParsedTransaction) => void;
 
 /**
- * Subscribes to foreground notifications. Returns an unsubscribe function.
+ * Subscribes to notifications posted by OTHER apps via the native Android
+ * `NotificationListenerService`. Returns an unsubscribe function.
+ *
  * The provided listener is only called when capture is enabled AND the
- * notification body parses to a valid transaction.
+ * notification matches the monitored apps (if any) AND parses to a valid
+ * transaction. On platforms without the native module this is a no-op.
  */
 export function subscribeToNotifications(
   listener: NotificationListener,
 ): () => void {
-  return Notifications.addNotificationReceivedListener((notification) => {
+  if (!nativeCaptureSupported) return () => {};
+
+  return addNotificationListener((payload: NotificationPayload) => {
     // Fire-and-forget async work: reading settings + parsing.
     void (async () => {
       const settings = await getNotificationSettings();
       if (!settings.enabled) return;
 
-      const body = notification.request.content.body ?? '';
-      const title = notification.request.content.title ?? '';
-      if (!body && !title) return;
+      // Filter by monitored apps (package names). Empty = watch all apps.
+      if (
+        settings.monitoredApps.length > 0 &&
+        !settings.monitoredApps.includes(payload.packageName)
+      ) {
+        return;
+      }
+
+      const text = [payload.title, payload.text, payload.bigText]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (!text) return;
 
       const categories = await fetchCategories().catch(() => []);
       const parsed = parseNotification(
-        `${title} ${body}`,
+        text,
         categories,
         settings.defaultCategoryId,
       );
@@ -277,6 +332,4 @@ export function subscribeToNotifications(
     })();
   }).remove;
 }
-
-export { Notifications };
 

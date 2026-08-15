@@ -6,6 +6,7 @@ import {
   Animated,
   AppState,
   RefreshControl,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -379,47 +380,53 @@ function AppContent() {
               </TouchableOpacity>
             </View>
 
-            {PRIMARY_ITEMS.map((item) => {
-              const active = screen === item.key;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[styles.drawerItem, active && styles.drawerItemActive]}
-                  onPress={() => navigate(item.key)}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={18}
-                    color={active ? colors.primary : colors.textMuted}
-                  />
-                  <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
-                    {t(item.labelKey)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            <ScrollView
+              style={styles.drawerScroll}
+              contentContainerStyle={styles.drawerScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {PRIMARY_ITEMS.map((item) => {
+                const active = screen === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[styles.drawerItem, active && styles.drawerItemActive]}
+                    onPress={() => navigate(item.key)}
+                  >
+                    <Ionicons
+                      name={item.icon}
+                      size={18}
+                      color={active ? colors.primary : colors.textMuted}
+                    />
+                    <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
+                      {t(item.labelKey)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
 
-            <View style={styles.drawerDivider} />
-            <Text style={styles.drawerSectionLabel}>{t('nav.tools')}</Text>
-            {TOOLS_ITEMS.map((item) => {
-              const active = screen === item.key;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[styles.drawerItem, active && styles.drawerItemActive]}
-                  onPress={() => navigate(item.key)}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={18}
-                    color={active ? colors.primary : colors.textMuted}
-                  />
-                  <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
-                    {t(item.labelKey)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+              <View style={styles.drawerDivider} />
+              <Text style={styles.drawerSectionLabel}>{t('nav.tools')}</Text>
+              {TOOLS_ITEMS.map((item) => {
+                const active = screen === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[styles.drawerItem, active && styles.drawerItemActive]}
+                    onPress={() => navigate(item.key)}
+                  >
+                    <Ionicons
+                      name={item.icon}
+                      size={18}
+                      color={active ? colors.primary : colors.textMuted}
+                    />
+                    <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
+                      {t(item.labelKey)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
             <View style={styles.drawerFooter}>
               <View style={styles.drawerUser}>

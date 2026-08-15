@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  AppState,
+  Platform,
   ScrollView,
   Switch,
   Text,
@@ -11,13 +13,13 @@ import { Category } from '../api';
 import { colors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { categoryIcon } from '../../../shared/category-icons';
-import {
-  useI18n } from '../i18n';
+import { useI18n } from '../i18n';
 import {
   KNOWN_APPS,
   NotificationSettings,
-  configureNotifications,
   getNotificationSettings,
+  isNotificationAccessGranted,
+  openNotificationAccessSettings,
   saveNotificationSettings,
 } from '../notifications/capture';
 
@@ -28,16 +30,29 @@ interface Props {
 export function NotificationSettingsScreen({ categories }: Props) {
   const { t } = useI18n();
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
+  const [accessGranted, setAccessGranted] = useState<boolean | null>(null);
+
+  const supported = Platform.OS === 'android';
 
   useEffect(() => {
     void (async () => {
       const s = await getNotificationSettings();
       setSettings(s);
-      const granted = await configureNotifications();
-      setPermissionGranted(granted);
+      setAccessGranted(supported ? isNotificationAccessGranted() : false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresh the access flag whenever the app returns to the foreground — the
+  // user may have just toggled it in the system settings screen.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && supported) {
+        setAccessGranted(isNotificationAccessGranted());
+      }
+    });
+    return () => sub.remove();
+  }, [supported]);
 
   const update = useCallback((patch: Partial<NotificationSettings>) => {
     setSettings((cur) => {
@@ -48,13 +63,28 @@ export function NotificationSettingsScreen({ categories }: Props) {
     });
   }, []);
 
+  const requestAccess = () => {
+    if (!supported) return;
+    if (isNotificationAccessGranted()) {
+      setAccessGranted(true);
+      return;
+    }
+    Alert.alert(t('notifications.accessNeeded'), t('notifications.accessNeededDesc'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('notifications.openSettings'),
+        onPress: () => openNotificationAccessSettings(),
+      },
+    ]);
+  };
+
   if (!settings) return null;
 
-  const toggleApp = (label: string) => {
-    const isSelected = settings.monitoredApps.includes(label);
+  const toggleApp = (packageName: string) => {
+    const isSelected = settings.monitoredApps.includes(packageName);
     const next = isSelected
-      ? settings.monitoredApps.filter((a) => a !== label)
-      : [...settings.monitoredApps, label];
+      ? settings.monitoredApps.filter((p) => p !== packageName)
+      : [...settings.monitoredApps, packageName];
     update({ monitoredApps: next });
   };
 
@@ -64,11 +94,20 @@ export function NotificationSettingsScreen({ categories }: Props) {
         <Text style={styles.pageTitle}>{t('notifications.title')}</Text>
       </View>
 
-      {permissionGranted === false && (
+      {!supported && (
         <View style={styles.reconErrorBox}>
-          <Text style={styles.reconErrorText}>
-            {t('notifications.permissionDenied')}
-          </Text>
+          <Text style={styles.reconErrorText}>{t('notifications.unavailable')}</Text>
+        </View>
+      )}
+
+      {supported && accessGranted === false && (
+        <View style={styles.reconErrorBox}>
+          <Text style={styles.reconErrorText}>{t('notifications.permissionDenied')}</Text>
+          <TouchableOpacity style={styles.settingRow} onPress={requestAccess}>
+            <Text style={[styles.settingRowTitle, { color: colors.primary }]}>
+              {t('notifications.openSettings')}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -82,20 +121,19 @@ export function NotificationSettingsScreen({ categories }: Props) {
           </View>
           <Switch
             value={settings.enabled}
+            disabled={!supported}
             onValueChange={(v) => {
-              if (v && permissionGranted !== true) {
-                void configureNotifications().then((g) => {
-                  setPermissionGranted(g);
-                  if (g) update({ enabled: true });
-                  else
-                    Alert.alert(
-                      t('notifications.permissionNeeded'),
-                      t('notifications.permissionNeededDesc'),
-                    );
-                });
-              } else {
-                update({ enabled: v });
+              if (!v) {
+                update({ enabled: false });
+                return;
               }
+              if (!supported) return;
+              if (!isNotificationAccessGranted()) {
+                requestAccess();
+                return;
+              }
+              setAccessGranted(true);
+              update({ enabled: true });
             }}
             trackColor={{ false: colors.surfaceHover, true: colors.primaryHover }}
             thumbColor={settings.enabled ? colors.primary : colors.textMuted}
@@ -103,44 +141,47 @@ export function NotificationSettingsScreen({ categories }: Props) {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t('notifications.monitoredApps')}</Text>
-        <Text style={styles.settingRowDesc}>
-          When a selected app sends a notification, PudimFinance will try to
-          extract the transaction.
-        </Text>
-        {KNOWN_APPS.map((app) => {
-          const selected = settings.monitoredApps.includes(app.label);
-          return (
-            <TouchableOpacity
-              key={app.label}
-              style={styles.settingRow}
-              onPress={() => toggleApp(app.label)}
-            >
-              <Text style={styles.settingRowTitle}>{app.label}</Text>
-              <View
-                style={[
-                  styles.checkbox,
-                  selected && { backgroundColor: colors.primary },
-                ]}
-              >
-                {selected && <Text style={styles.checkboxCheck}>✓</Text>}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-        <TouchableOpacity
-          style={styles.settingRow}
-          onPress={() => update({ monitoredApps: [] })}
-        >
+      {supported && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('notifications.monitoredApps')}</Text>
           <Text style={styles.settingRowDesc}>
-            {settings.monitoredApps.length === 0
-              ? t('notifications.watchingAll')
-              : t('notifications.clearSelection')}
+            When a selected app sends a notification, PudimFinance will try to
+            extract the transaction.
           </Text>
-        </TouchableOpacity>
-      </View>
-
+          {KNOWN_APPS.map((app) => {
+            const pkg = app.packageName;
+            if (!pkg) return null;
+            const selected = settings.monitoredApps.includes(pkg);
+            return (
+              <TouchableOpacity
+                key={pkg}
+                style={styles.settingRow}
+                onPress={() => toggleApp(pkg)}
+              >
+                <Text style={styles.settingRowTitle}>{app.label}</Text>
+                <View
+                  style={[
+                    styles.checkbox,
+                    selected && { backgroundColor: colors.primary },
+                  ]}
+                >
+                  {selected && <Text style={styles.checkboxCheck}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => update({ monitoredApps: [] })}
+          >
+            <Text style={styles.settingRowDesc}>
+              {settings.monitoredApps.length === 0
+                ? t('notifications.watchingAll')
+                : t('notifications.clearSelection')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('notifications.captureMode')}</Text>

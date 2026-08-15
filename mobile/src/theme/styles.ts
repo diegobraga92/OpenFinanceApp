@@ -632,8 +632,13 @@ export const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 2,
   },
+  drawerScroll: {
+    flex: 1,
+  },
+  drawerScrollContent: {
+    paddingBottom: 8,
+  },
   drawerFooter: {
-    marginTop: 'auto',
     borderTopWidth: 1,
     borderTopColor: colors.surfaceHover,
     paddingTop: 8,

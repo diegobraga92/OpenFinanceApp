@@ -571,6 +571,12 @@ export const ptBR = {
     'Analisa as notificações de bancos e apps de pagamento e as salva como transações.',
   'notifications.permissionNeeded': 'Permissão necessária',
   'notifications.permissionNeededDesc': 'Permita notificações para ativar a captura automática.',
+  'notifications.accessNeeded': 'Acesso a notificações necessário',
+  'notifications.accessNeededDesc':
+    'Para capturar transações de outros apps, o PudimFinance precisa do "Acesso a notificações" do Android. Abra as Configurações para ativá-lo.',
+  'notifications.openSettings': 'Abrir Configurações',
+  'notifications.unavailable':
+    'A captura de notificações de outros apps está disponível apenas no Android.',
   'notifications.monitoredApps': 'Apps Monitorados',
   'notifications.watchingAll': '✓ Observando todos os apps (sem filtro)',
   'notifications.clearSelection': 'Limpar seleção — observar todos os apps',
