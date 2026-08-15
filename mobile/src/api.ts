@@ -4,11 +4,17 @@ import { getApiBaseUrl } from './config/server';
 import { isOnline, isServerUnavailable, markServerUnavailable, uuid } from './offline/net';
 import {
   addPendingOperation,
+  deleteLocalAccount,
   deleteLocalTransaction,
+  getLocalAccounts,
   getLocalCategories,
   getLocalTransactionById,
   getLocalTransactions,
+  replaceLocalAccounts,
+  updateLocalAccountFields,
+  upsertLocalAccount,
   upsertLocalTransaction,
+  type LocalAccount,
 } from './offline/database';
 
 // Single-flight refresh: concurrent 401s share one refresh request instead of
@@ -670,6 +676,9 @@ export async function fetchMonthlyReport(
   endMonth?: number,
   accountId?: string,
 ): Promise<MonthlyReportResponse> {
+  const fromLocal = () => computeLocalMonthlyReport(startYear, startMonth, endYear, endMonth, accountId);
+
+  if (!(await isOnline())) return fromLocal();
   const qs = new URLSearchParams();
   if (startYear !== undefined) qs.set('start_year', String(startYear));
   if (startMonth !== undefined) qs.set('start_month', String(startMonth));
@@ -677,59 +686,435 @@ export async function fetchMonthlyReport(
   if (endMonth !== undefined) qs.set('end_month', String(endMonth));
   if (accountId) qs.set('account_id', accountId);
   const query = qs.toString() ? `?${qs.toString()}` : '';
-  return request<MonthlyReportResponse>(`/api/reports/monthly${query}`);
+  try {
+    return await request<MonthlyReportResponse>(`/api/reports/monthly${query}`);
+  } catch (err) {
+    if (isNetworkError(err)) return fromLocal();
+    throw err;
+  }
 }
 
 export async function fetchCategoryBreakdown(
   startDate?: string,
   endDate?: string,
 ): Promise<CategoryBreakdownResponse> {
+  const fromLocal = () => computeLocalCategoryBreakdown(startDate, endDate);
+
+  if (!(await isOnline())) return fromLocal();
   const qs = new URLSearchParams();
   if (startDate) qs.set('start_date', startDate);
   if (endDate) qs.set('end_date', endDate);
   const query = qs.toString() ? `?${qs.toString()}` : '';
-  return request<CategoryBreakdownResponse>(`/api/reports/category-breakdown${query}`);
+  try {
+    return await request<CategoryBreakdownResponse>(`/api/reports/category-breakdown${query}`);
+  } catch (err) {
+    if (isNetworkError(err)) return fromLocal();
+    throw err;
+  }
 }
 
 export async function fetchTrends(months?: number): Promise<TrendsResponse> {
+  const fromLocal = () => computeLocalTrends(months);
+
+  if (!(await isOnline())) return fromLocal();
   const qs = new URLSearchParams();
   if (months !== undefined) qs.set('months', String(months));
   const query = qs.toString() ? `?${qs.toString()}` : '';
-  return request<TrendsResponse>(`/api/reports/trends${query}`);
+  try {
+    return await request<TrendsResponse>(`/api/reports/trends${query}`);
+  } catch (err) {
+    if (isNetworkError(err)) return fromLocal();
+    throw err;
+  }
+}
+
+interface MonthBucket {
+  income: number;
+  expense: number;
+}
+
+/** Sums local transactions by (year, month) within an inclusive month range. */
+function localMonthTotals(
+  startYear: number,
+  startMonth: number,
+  endYear: number,
+  endMonth: number,
+  accountId?: string,
+): Map<string, MonthBucket> {
+  const totals = new Map<string, MonthBucket>();
+  for (const t of getLocalTransactions()) {
+    if (accountId && t.account_id !== accountId) continue;
+    const parts = t.date.slice(0, 10).split('-').map(Number);
+    if (parts.length < 2) continue;
+    const y = parts[0];
+    const m = parts[1];
+    const before = y < startYear || (y === startYear && m < startMonth);
+    const after = y > endYear || (y === endYear && m > endMonth);
+    if (before || after) continue;
+    const key = `${y}-${m}`;
+    const bucket = totals.get(key) ?? { income: 0, expense: 0 };
+    const amount = Number(t.amount) || 0;
+    if (t.type === 'income') bucket.income += amount;
+    else bucket.expense += amount;
+    totals.set(key, bucket);
+  }
+  return totals;
+}
+
+/** Replicates `/api/reports/monthly`, computed from the local mirror. */
+function computeLocalMonthlyReport(
+  startYear?: number,
+  startMonth?: number,
+  endYear?: number,
+  endMonth?: number,
+  accountId?: string,
+): MonthlyReportResponse {
+  const now = new Date();
+  const endY = endYear ?? now.getFullYear();
+  const endM = endMonth ?? now.getMonth() + 1;
+  let startY = startYear ?? endY;
+  let startM = startMonth ?? endM - 5; // default: last 6 months inclusive
+  while (startM <= 0) {
+    startM += 12;
+    startY -= 1;
+  }
+
+  const totals = localMonthTotals(startY, startM, endY, endM, accountId);
+
+  const months: MonthlyReportItem[] = [];
+  let y = startY;
+  let m = startM;
+  while (y < endY || (y === endY && m <= endM)) {
+    const bucket = totals.get(`${y}-${m}`);
+    const income = bucket?.income ?? 0;
+    const expense = bucket?.expense ?? 0;
+    months.push({
+      year: y,
+      month: m,
+      income_total: String(income),
+      expense_total: String(expense),
+      balance: String(income - expense),
+    });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return { months };
+}
+
+/** Replicates `/api/reports/category-breakdown`, computed from the local mirror. */
+function computeLocalCategoryBreakdown(
+  startDate?: string,
+  endDate?: string,
+): CategoryBreakdownResponse {
+  const now = new Date();
+  const start = startDate ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const end = endDate ?? now.toISOString().slice(0, 10);
+
+  const categories = getLocalCategories();
+  const categoryById = new Map(categories.map((c) => [c.server_id ?? c.id, c]));
+  const grouped = new Map<string, CategoryBreakdownItem>();
+
+  let grandTotal = 0;
+  for (const t of getLocalTransactions()) {
+    if (t.type !== 'expense') continue;
+    const date = t.date.slice(0, 10);
+    if (date < start || date > end) continue;
+    const amount = Number(t.amount) || 0;
+    grandTotal += amount;
+
+    const key = t.category_id ?? 'none';
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.total = String((Number(existing.total) || 0) + amount);
+      existing.transaction_count += 1;
+    } else {
+      const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
+      grouped.set(key, {
+        category_id: t.category_id,
+        category_name: cat?.name ?? null,
+        color: cat?.color ?? null,
+        icon: cat?.icon ?? null,
+        total: String(amount),
+        percentage: '0',
+        transaction_count: 1,
+      });
+    }
+  }
+
+  const result = Array.from(grouped.values())
+    .map((c) => ({
+      ...c,
+      percentage: grandTotal > 0 ? String((Number(c.total) / grandTotal) * 100) : '0',
+    }))
+    .sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
+
+  return { categories: result, start_date: start, end_date: end };
+}
+
+/** Replicates `/api/reports/trends`, computed from the local mirror. */
+function computeLocalTrends(months?: number): TrendsResponse {
+  const n = Math.max(1, Math.min(12, months ?? 6));
+  const now = new Date();
+  const endY = now.getFullYear();
+  const endM = now.getMonth() + 1;
+  let startY = endY;
+  let startM = endM - (n - 1);
+  while (startM <= 0) {
+    startM += 12;
+    startY -= 1;
+  }
+
+  const totals = localMonthTotals(startY, startM, endY, endM);
+
+  const trends: TrendPoint[] = [];
+  let y = startY;
+  let m = startM;
+  while (y < endY || (y === endY && m <= endM)) {
+    const bucket = totals.get(`${y}-${m}`);
+    const income = bucket?.income ?? 0;
+    const expense = bucket?.expense ?? 0;
+    trends.push({
+      month_label: `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}`,
+      year: y,
+      month: m,
+      income_total: String(income),
+      expense_total: String(expense),
+      net: String(income - expense),
+    });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return { trends };
+}
+
+/** Converts a server AccountWithBalance into a local mirror row. */
+function accountToLocal(a: AccountWithBalance): LocalAccount {
+  return {
+    id: a.id,
+    server_id: a.id,
+    name: a.name,
+    type: a.type,
+    account_kind: a.account_kind,
+    parent_id: a.parent_id ?? null,
+    closing_day: a.closing_day ?? null,
+    due_day: a.due_day ?? null,
+    credit_limit: a.credit_limit ?? null,
+    balance: a.balance,
+    transaction_count: a.transaction_count ?? 0,
+    created_at: a.created_at,
+    updated_at: a.created_at,
+    synced: 1,
+  };
+}
+
+/** Converts a local mirror row into the AccountWithBalance shape the UI expects. */
+function localAccountToWithBalance(a: LocalAccount): AccountWithBalance {
+  return {
+    id: a.server_id ?? a.id,
+    name: a.name,
+    type: a.type,
+    account_kind: a.account_kind,
+    parent_id: a.parent_id ?? null,
+    closing_day: a.closing_day ?? null,
+    due_day: a.due_day ?? null,
+    credit_limit: a.credit_limit ?? null,
+    balance: a.balance,
+    transaction_count: a.transaction_count,
+    created_at: a.created_at,
+  };
+}
+
+/**
+ * Caches a server account snapshot into the mirror without clobbering
+ * local-only rows that are still awaiting push.
+ */
+function cacheAccountsFromServer(accounts: AccountWithBalance[]): void {
+  const local = getLocalAccounts();
+  const byId = new Map<string, LocalAccount>();
+  for (const acc of local) {
+    if (acc.synced === 0) {
+      byId.set(acc.id, acc); // keep local-only rows
+    } else if (acc.server_id) {
+      byId.set(acc.server_id, acc);
+    } else {
+      byId.set(acc.id, acc);
+    }
+  }
+  for (const a of accounts) {
+    byId.set(a.id, accountToLocal(a));
+  }
+  replaceLocalAccounts(Array.from(byId.values()));
 }
 
 export async function fetchAccountsWithBalance(): Promise<AccountWithBalance[]> {
-  // Accounts are not mirrored locally — fail fast to an empty list offline.
-  if (!(await isOnline())) return [];
-  return request<AccountWithBalance[]>('/api/accounts');
+  const fromLocal = () => getLocalAccounts().map(localAccountToWithBalance);
+
+  if (!(await isOnline())) return fromLocal();
+  try {
+    const accounts = await request<AccountWithBalance[]>('/api/accounts');
+    // Cache the latest snapshot so it's available offline.
+    cacheAccountsFromServer(accounts);
+    return accounts;
+  } catch (err) {
+    // Server became unreachable mid-flight — serve the local mirror.
+    if (isNetworkError(err)) return fromLocal();
+    throw err;
+  }
 }
 
 export async function createAccount(payload: CreateAccountRequest): Promise<Account> {
-  return request<Account>('/api/accounts', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  const localId = uuid();
+  const now = new Date().toISOString();
+  const account: Account = {
+    id: localId,
+    name: payload.name,
+    type: payload.type,
+    account_kind: payload.account_kind ?? payload.type,
+    parent_id: payload.parent_id ?? null,
+    closing_day: payload.closing_day ?? null,
+    due_day: payload.due_day ?? null,
+    credit_limit: payload.credit_limit ?? null,
+    created_at: now,
+  };
+
+  const queueAndStore = (): Account => {
+    upsertLocalAccount({
+      ...account,
+      parent_id: account.parent_id ?? null,
+      closing_day: account.closing_day ?? null,
+      due_day: account.due_day ?? null,
+      credit_limit: account.credit_limit ?? null,
+      server_id: null,
+      balance: '0',
+      transaction_count: 0,
+      updated_at: now,
+      synced: 0,
+    });
+    addPendingOperation({
+      operation_type: 'create',
+      entity_type: 'account',
+      local_id: localId,
+      server_id: null,
+      payload: JSON.stringify(payload),
+    });
+    return account;
+  };
+
+  if (!(await isOnline())) return queueAndStore();
+  try {
+    const created = await request<Account>('/api/accounts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    // Keep the mirror in sync so the new account shows up offline too.
+    upsertLocalAccount(accountToLocal({ ...created, balance: '0', transaction_count: 0 }));
+    return created;
+  } catch (err) {
+    if (isNetworkError(err)) return queueAndStore();
+    throw err;
+  }
 }
 
 export async function updateAccount(
   id: string,
   payload: UpdateAccountRequest,
 ): Promise<Account> {
-  return request<Account>(`/api/accounts/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  const now = new Date().toISOString();
+
+  const queueAndStore = (): Account => {
+    updateLocalAccountFields(id, {
+      name: payload.name,
+      type: payload.type,
+      account_kind: payload.account_kind ?? undefined,
+      parent_id: payload.parent_id ?? null,
+      closing_day: payload.closing_day ?? null,
+      due_day: payload.due_day ?? null,
+      credit_limit: payload.credit_limit ?? null,
+    });
+    addPendingOperation({
+      operation_type: 'update',
+      entity_type: 'account',
+      local_id: null,
+      server_id: id,
+      payload: JSON.stringify(payload),
+    });
+    return {
+      id,
+      name: payload.name,
+      type: payload.type,
+      account_kind: payload.account_kind ?? payload.type,
+      parent_id: payload.parent_id ?? null,
+      closing_day: payload.closing_day ?? null,
+      due_day: payload.due_day ?? null,
+      credit_limit: payload.credit_limit ?? null,
+      created_at: now,
+    };
+  };
+
+  if (!(await isOnline())) return queueAndStore();
+  try {
+    const updated = await request<Account>(`/api/accounts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    // Refresh the local row, keeping the last-known balance until reload.
+    const existing = getLocalAccounts().find((a) => a.server_id === id || a.id === id);
+    upsertLocalAccount(
+      accountToLocal({
+        ...updated,
+        balance: existing?.balance ?? '0',
+        transaction_count: existing?.transaction_count ?? 0,
+      }),
+    );
+    return updated;
+  } catch (err) {
+    if (isNetworkError(err)) return queueAndStore();
+    throw err;
+  }
 }
 
 export async function deleteAccount(id: string): Promise<void> {
-  return request<void>(`/api/accounts/${id}`, {
-    method: 'DELETE',
-  });
+  const queueAndDelete = () => {
+    deleteLocalAccount(id);
+    addPendingOperation({
+      operation_type: 'delete',
+      entity_type: 'account',
+      local_id: null,
+      server_id: id,
+      payload: '{}',
+    });
+  };
+
+  if (!(await isOnline())) {
+    queueAndDelete();
+    return;
+  }
+  try {
+    await request<void>(`/api/accounts/${id}`, {
+      method: 'DELETE',
+    });
+    deleteLocalAccount(id);
+  } catch (err) {
+    if (isNetworkError(err)) {
+      queueAndDelete();
+      return;
+    }
+    throw err;
+  }
 }
 
 // --- Credit cards ---
 
 export async function fetchCreditCards(): Promise<CardOverview[]> {
+  // Card overviews are not mirrored locally — fail fast to an empty list
+  // offline instead of erroring the embedded credit-card panel.
+  if (!(await isOnline())) return [];
   return request<CardOverview[]>('/api/credit-cards');
 }
 
@@ -778,6 +1163,8 @@ export async function createLedgerTransaction(
 }
 
 export async function fetchLedgerTransactions(): Promise<LedgerTransaction[]> {
+  // Ledger rows are not mirrored locally — show an empty list offline.
+  if (!(await isOnline())) return [];
   return request<LedgerTransaction[]>('/api/ledger/transactions');
 }
 
@@ -953,7 +1340,7 @@ export async function fetchInstallmentPlan(id: string): Promise<InstallmentPlanD
 
 export interface SyncPushOperation {
   operation_type: 'create' | 'update' | 'delete';
-  entity_type: 'transaction' | 'category';
+  entity_type: 'transaction' | 'category' | 'account';
   client_id: string;
   server_id?: string;
   payload: Record<string, unknown>;

@@ -4347,9 +4347,17 @@
         "required": [
           "categories",
           "transactions",
+          "accounts",
           "server_time"
         ],
         "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountWithBalance"
+            },
+            "description": "All accounts with their computed balances. Accounts have no\n`updated_at` column, so the whole list is sent on every pull."
+          },
           "categories": {
             "type": "array",
             "items": {

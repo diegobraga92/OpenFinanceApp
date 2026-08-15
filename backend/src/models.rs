@@ -1038,6 +1038,9 @@ pub struct SyncPullResponse {
     pub categories: Vec<Category>,
     /// Transactions changed since last sync.
     pub transactions: Vec<Transaction>,
+    /// All accounts with their computed balances. Accounts have no
+    /// `updated_at` column, so the whole list is sent on every pull.
+    pub accounts: Vec<AccountWithBalance>,
     /// Server time — client stores this as its next `last_synced_at`.
     pub server_time: DateTime<Utc>,
 }

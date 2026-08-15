@@ -2039,6 +2039,11 @@ export interface components {
         };
         /** @description Response: entities changed since the client's last sync. */
         SyncPullResponse: {
+            /**
+             * @description All accounts with their computed balances. Accounts have no
+             *     `updated_at` column, so the whole list is sent on every pull.
+             */
+            accounts: components["schemas"]["AccountWithBalance"][];
             /** @description All categories (or those changed since last sync). */
             categories: components["schemas"]["Category"][];
             /**

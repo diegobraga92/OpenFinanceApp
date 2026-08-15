@@ -13,8 +13,8 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::models::{
-    Category, SyncOpResult, SyncOperation, SyncPullRequest, SyncPullResponse, SyncPushRequest,
-    SyncPushResponse, Transaction,
+    account_type_for_kind, AccountWithBalance, Category, SyncOpResult, SyncOperation,
+    SyncPullRequest, SyncPullResponse, SyncPushRequest, SyncPushResponse, Transaction,
 };
 use crate::state::AppState;
 
@@ -74,9 +74,32 @@ pub async fn pull(
         )
     })?;
 
+    // Accounts have no updated_at column, so return the whole list each time
+    // (the list is small). Balances are computed on the fly from ledger entries.
+    let accounts: Vec<AccountWithBalance> = sqlx::query_as(
+        "SELECT a.id, a.name, a.type, a.account_kind, a.parent_id, a.closing_day, a.due_day,
+                a.credit_limit, a.created_at,
+                COALESCE(SUM(e.debit_amount) - SUM(e.credit_amount), 0) AS balance,
+                COUNT(e.id) AS transaction_count
+         FROM accounts a
+         LEFT JOIN ledger_entries e ON e.account_id = a.id
+         GROUP BY a.id
+         ORDER BY a.name",
+    )
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        error!("Sync pull accounts failed: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to pull accounts" })),
+        )
+    })?;
+
     Ok(Json(SyncPullResponse {
         categories,
         transactions,
+        accounts,
         server_time: Utc::now(),
     }))
 }
@@ -134,6 +157,10 @@ async fn apply_operation(
         ("category", "create") => apply_category_create(state, op).await,
         ("category", "update") => apply_category_update(state, op).await,
         ("category", "delete") => apply_category_delete(state, op).await,
+        ("account", "create") => apply_account_create(state, op).await,
+        ("account", "update") => apply_account_update(state, op).await,
+        ("account", "delete") => apply_account_delete(state, op).await,
+
         _ => Err((
             StatusCode::BAD_REQUEST,
             format!(
@@ -690,6 +717,236 @@ async fn apply_category_delete(
 
     if result.rows_affected() == 0 {
         // Idempotent — the category is already gone.
+        return Ok(Some(server_id));
+    }
+    Ok(Some(server_id))
+}
+
+/// Extracts the common account fields from a sync payload.
+fn account_fields_from_payload(
+    op: &SyncOperation,
+) -> (
+    String,
+    String,
+    Option<String>,
+    Option<Uuid>,
+    Option<i16>,
+    Option<i16>,
+    Option<rust_decimal::Decimal>,
+) {
+    let name = op
+        .payload
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Account")
+        .to_string();
+    let account_kind = op
+        .payload
+        .get("account_kind")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    // Mirror the /api/accounts create route: when a user-facing kind is
+    // provided, the accounting type is derived from it.
+    let mut acct_type = op
+        .payload
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("asset")
+        .to_string();
+    if let Some(kind) = &account_kind {
+        if let Some(t) = account_type_for_kind(kind) {
+            acct_type = t.to_string();
+        }
+    }
+    let parent_id = op
+        .payload
+        .get("parent_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let closing_day = op
+        .payload
+        .get("closing_day")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i16);
+    let due_day = op
+        .payload
+        .get("due_day")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i16);
+    let credit_limit = op
+        .payload
+        .get("credit_limit")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<rust_decimal::Decimal>().ok());
+
+    (
+        name,
+        acct_type,
+        account_kind,
+        parent_id,
+        closing_day,
+        due_day,
+        credit_limit,
+    )
+}
+
+async fn apply_account_create(
+    state: &AppState,
+    op: &SyncOperation,
+) -> Result<Option<Uuid>, (StatusCode, String)> {
+    let (name, acct_type, account_kind, parent_id, closing_day, due_day, credit_limit) =
+        account_fields_from_payload(op);
+
+    // Idempotency: the client UUID is the account id, so a retried push simply
+    // updates the same row.
+    let account_id = Uuid::parse_str(&op.client_id).unwrap_or_else(|_| Uuid::new_v4());
+    let account: Uuid = sqlx::query_scalar(
+        "INSERT INTO accounts (id, name, type, account_kind, parent_id, closing_day, due_day, credit_limit)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (id) DO UPDATE SET
+           name = excluded.name,
+           type = excluded.type,
+           account_kind = excluded.account_kind,
+           parent_id = excluded.parent_id,
+           closing_day = excluded.closing_day,
+           due_day = excluded.due_day,
+           credit_limit = excluded.credit_limit
+         RETURNING id",
+    )
+    .bind(account_id)
+    .bind(&name)
+    .bind(&acct_type)
+    .bind(account_kind.as_deref().unwrap_or(&acct_type))
+    .bind(parent_id)
+    .bind(closing_day)
+    .bind(due_day)
+    .bind(credit_limit)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Create account failed: {e}"),
+        )
+    })?;
+
+    Ok(Some(account))
+}
+
+async fn apply_account_update(
+    state: &AppState,
+    op: &SyncOperation,
+) -> Result<Option<Uuid>, (StatusCode, String)> {
+    let server_id = op.server_id.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "server_id required for update".to_string(),
+        )
+    })?;
+
+    let (name, acct_type, account_kind, parent_id, closing_day, due_day, credit_limit) =
+        account_fields_from_payload(op);
+
+    let result = sqlx::query(
+        "UPDATE accounts
+         SET name = $1, type = $2, account_kind = $3, parent_id = $4,
+             closing_day = $5, due_day = $6, credit_limit = $7
+         WHERE id = $8",
+    )
+    .bind(&name)
+    .bind(&acct_type)
+    .bind(account_kind.as_deref().unwrap_or(&acct_type))
+    .bind(parent_id)
+    .bind(closing_day)
+    .bind(due_day)
+    .bind(credit_limit)
+    .bind(server_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Update account failed: {e}"),
+        )
+    })?;
+
+    if result.rows_affected() == 0 {
+        return Err((StatusCode::NOT_FOUND, "Account not found".to_string()));
+    }
+    Ok(Some(server_id))
+}
+
+async fn apply_account_delete(
+    state: &AppState,
+    op: &SyncOperation,
+) -> Result<Option<Uuid>, (StatusCode, String)> {
+    let server_id = op.server_id.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "server_id required for delete".to_string(),
+        )
+    })?;
+
+    // Refuse to delete while ledger entries or sub-accounts reference it
+    // (mirrors the /api/accounts DELETE route).
+    let entry_count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM ledger_entries WHERE account_id = $1")
+            .bind(server_id)
+            .fetch_one(&state.pg_pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to check account usage: {e}"),
+                )
+            })?;
+
+    if entry_count.0 > 0 {
+        return Err((
+            StatusCode::CONFLICT,
+            format!(
+                "Account is used by {} ledger entr{}. Reassign or delete them first.",
+                entry_count.0,
+                if entry_count.0 == 1 { "y" } else { "ies" }
+            ),
+        ));
+    }
+
+    let child_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM accounts WHERE parent_id = $1")
+        .bind(server_id)
+        .fetch_one(&state.pg_pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to check sub-account references: {e}"),
+            )
+        })?;
+
+    if child_count.0 > 0 {
+        return Err((
+            StatusCode::CONFLICT,
+            format!(
+                "Account has {} sub-account{} that depend on it. Remove them first.",
+                child_count.0,
+                if child_count.0 == 1 { "" } else { "s" }
+            ),
+        ));
+    }
+
+    let result = sqlx::query("DELETE FROM accounts WHERE id = $1")
+        .bind(server_id)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Delete account failed: {e}"),
+            )
+        })?;
+
+    if result.rows_affected() == 0 {
+        // Idempotent — the account is already gone.
         return Ok(Some(server_id));
     }
     Ok(Some(server_id))

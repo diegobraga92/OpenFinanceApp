@@ -11,14 +11,18 @@ import {
   addPendingOperation,
   countPendingOperations,
   getLastSync,
-  getPendingOperations,
+  getLocalAccounts,
   getLocalCategories,
   getLocalTransactions,
+  getPendingOperations,
+  markAccountSynced,
   markTransactionSynced,
   removePendingOperation,
+  replaceLocalAccounts,
   replaceLocalCategories,
   replaceLocalTransactions,
   saveLastSync,
+  type LocalAccount,
   type LocalCategory,
   type LocalTransaction,
 } from './database';
@@ -124,6 +128,11 @@ async function pushPending(): Promise<number> {
         markTransactionSynced(op.local_id, serverId);
       }
       removePendingOperation(op.id);
+    } else if (result.status === 'ok' && op.entity_type === 'account') {
+      if (op.operation_type === 'create' && op.local_id && result.server_id) {
+        markAccountSynced(op.local_id, result.server_id);
+      }
+      removePendingOperation(op.id);
     } else if (result.status === 'ok' && op.entity_type === 'category') {
       removePendingOperation(op.id);
     } else if (result.status === 'error') {
@@ -142,6 +151,7 @@ async function pushPending(): Promise<number> {
 export async function pullChanges(): Promise<{
   transactions: LocalTransaction[];
   categories: LocalCategory[];
+  accounts: LocalAccount[];
 }> {
   const lastSync = getLastSync() ?? new Date(0).toISOString();
   const res = await syncPull(lastSync);
@@ -191,11 +201,45 @@ export async function pullChanges(): Promise<{
   }
   replaceLocalTransactions(Array.from(byId.values()));
 
+  // Accounts: merge pulled rows without clobbering unsynced local rows.
+  const localAccounts = getLocalAccounts();
+  const accountById = new Map<string, LocalAccount>();
+  for (const acc of localAccounts) {
+    if (acc.synced === 0) {
+      accountById.set(acc.id, acc); // keep local-only rows
+    } else if (acc.server_id) {
+      accountById.set(acc.server_id, acc);
+    } else {
+      accountById.set(acc.id, acc);
+    }
+  }
+  for (const a of res.accounts) {
+    const serverId = a.id;
+    accountById.set(serverId, {
+      id: serverId,
+      server_id: serverId,
+      name: a.name,
+      type: a.type,
+      account_kind: a.account_kind,
+      parent_id: a.parent_id ?? null,
+      closing_day: a.closing_day ?? null,
+      due_day: a.due_day ?? null,
+      credit_limit: a.credit_limit ?? null,
+      balance: a.balance,
+      transaction_count: a.transaction_count ?? 0,
+      created_at: a.created_at,
+      updated_at: a.created_at,
+      synced: 1,
+    });
+  }
+  replaceLocalAccounts(Array.from(accountById.values()));
+
   saveLastSync(res.server_time);
 
   return {
     transactions: getLocalTransactions(),
     categories: getLocalCategories(),
+    accounts: getLocalAccounts(),
   };
 }
 
@@ -205,7 +249,7 @@ export async function pullChanges(): Promise<{
  */
 export function queueLocalMutation(
   operationType: 'create' | 'update' | 'delete',
-  entityType: 'transaction' | 'category',
+  entityType: 'transaction' | 'category' | 'account',
   localId: string,
   serverId: string | null,
   payload: Record<string, unknown>,
@@ -219,7 +263,13 @@ export function queueLocalMutation(
   });
 }
 
-export { countPendingOperations, getLocalCategories, getLocalTransactions, isOnline };
+export {
+  countPendingOperations,
+  getLocalAccounts,
+  getLocalCategories,
+  getLocalTransactions,
+  isOnline,
+};
 
 /** Generates a UUID without a crypto dependency (fallback). */
 function cryptoUUID(): string {
