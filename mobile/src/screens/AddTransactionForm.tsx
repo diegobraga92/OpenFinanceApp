@@ -22,6 +22,8 @@ interface Props {
   categories: Category[];
   accounts: AccountWithBalance[];
   editing: Transaction | null;
+  /** Initial transaction type when opening the form (used by the home-screen widget deep link). */
+  initialType?: 'income' | 'expense';
   onSaved: () => Promise<void>;
   onCancel: () => void;
 }
@@ -41,12 +43,18 @@ function toIsoDate(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-export function AddTransactionForm({ categories, accounts, editing, onSaved, onCancel }: Props) {
+export function AddTransactionForm({ categories, accounts, editing, initialType, onSaved, onCancel }: Props) {
   const { t } = useI18n();
   const [description, setDescription] = useState(editing?.description ?? '');
   const [amount, setAmount] = useState(editing?.amount ?? '');
   const [type, setType] = useState<'income' | 'expense'>(
-    editing?.type === 'income' ? 'income' : 'expense',
+    editing
+      ? editing.type === 'income'
+        ? 'income'
+        : 'expense'
+      : initialType === 'income'
+        ? 'income'
+        : 'expense',
   );
   const [categoryId, setCategoryId] = useState(editing?.category_id ?? '');
   const [accountId, setAccountId] = useState(editing?.account_id ?? '');

@@ -144,6 +144,21 @@ private release keystore instead of the debug keystore:
 Enable *"Install unknown apps"* for the source app if your phone prompts you.
 
 
+### Mobile: Home-screen Quick Add widget (Android)
+
+The Android app ships a home-screen **Quick Add** widget (long-press the home
+screen → *Widgets* → *PudimFinance* → *Quick Add*):
+
+- Shows **Spent today** (sum of today's expense transactions).
+- **+ Expense** / **+ Income** buttons deep-link into the app's Add Transaction
+  form with the type pre-selected.
+
+The widget is a self-contained native `AppWidgetProvider`/`RemoteViews`
+implementation (the local `expo-android-widget` module); the app pushes fresh
+"spent today" values whenever transactions change. Android widgets can't accept
+text input, so amounts are entered in the app after the button tap.
+
+
 ### Mobile: Push Notification Capture
 
 PudimFinance can auto-capture transactions from bank/payment push notifications

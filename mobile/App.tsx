@@ -32,6 +32,12 @@ import { OnboardingGate } from './src/screens/OnboardingScreen';
 import { AuthGate, useAuthUser } from './src/auth/AuthGate';
 import { I18nProvider, useI18n } from './src/i18n';
 import { LanguageToggle } from './src/components/LanguageToggle';
+import * as Linking from 'expo-linking';
+import {
+  updateQuickAddWidget,
+  computeSpentToday,
+  formatWidgetMoney,
+} from './src/widgets';
 import type { TranslationKey } from '../shared/i18n';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
@@ -122,6 +128,8 @@ function AppContent() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  /** Transaction type requested by a home-screen widget deep link (e.g. `pudimfinance://add?type=expense`). */
+  const [pendingAddType, setPendingAddType] = useState<'income' | 'expense' | null>(null);
 
   // Toggle drawer
   useEffect(() => {
@@ -207,10 +215,47 @@ function AppContent() {
   const incomeCategories = categories.filter((c) => c.type === 'income');
 
   // Transaction form helpers (fields live inside AddTransactionForm)
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setEditing(null);
     setShowAddForm(false);
-  };
+  }, []);
+
+  // Open the Add Transaction form from a home-screen widget deep link
+  // (`pudimfinance://add` or `pudimfinance://add?type=income|expense`).
+  const handleWidgetUrl = useCallback(
+    (url: string | null) => {
+      if (!url) return;
+      // NOTE: avoid expo-linking's `parse()` here — it relies on `new URL()`,
+      // whose pathname/hostname getters are NOT implemented in RN 0.74's
+      // Hermes URL polyfill, so parse() returns the whole URL as `path`.
+      // The widget deep links have a fixed format we control, so parse manually.
+      const prefix = 'pudimfinance://';
+      if (!url.startsWith(prefix)) return;
+      const [pathPart, queryString] = url.slice(prefix.length).split('?');
+      if (pathPart.replace(/^\/+/, '') !== 'add') return;
+      const type = queryString
+        ?.split('&')
+        .map((pair) => pair.split('='))
+        .find(([key]) => key === 'type')?.[1];
+      setPendingAddType(type === 'income' ? 'income' : 'expense');
+      resetForm();
+      setShowAddForm(true);
+    },
+    [resetForm],
+  );
+
+  useEffect(() => {
+    Linking.getInitialURL().then(handleWidgetUrl);
+    const sub = Linking.addEventListener('url', ({ url }) => handleWidgetUrl(url));
+    return () => sub.remove();
+  }, [handleWidgetUrl]);
+
+  // Keep the home-screen Quick Add widget's "spent today" in sync with the
+  // loaded transactions (runs after load, add, edit and delete).
+  useEffect(() => {
+    const spentToday = computeSpentToday(transactions);
+    void updateQuickAddWidget(formatWidgetMoney(spentToday));
+  }, [transactions]);
 
   const handleDelete = (tx: Transaction) => {
     deleteTransaction(tx.id)
@@ -328,19 +373,22 @@ function AppContent() {
           {screen === 'reconciliation' && <ReconciliationScreen formatMoney={formatMoney} />}
           {showAddForm && (
             <AddTransactionForm
-              key={editing?.id ?? 'new'}
+              key={`${editing?.id ?? 'new'}-${pendingAddType ?? 'default'}`}
               categories={categories}
               accounts={accounts}
               editing={editing}
+              initialType={pendingAddType ?? undefined}
               onSaved={async () => {
                 setEditing(null);
                 setShowAddForm(false);
+                setPendingAddType(null);
                 setScreen('transactions');
                 await loadData();
               }}
               onCancel={() => {
                 setEditing(null);
                 setShowAddForm(false);
+                setPendingAddType(null);
               }}
             />
           )}
@@ -350,6 +398,7 @@ function AppContent() {
               style={styles.fab}
               onPress={() => {
                 resetForm();
+                setPendingAddType(null);
                 setShowAddForm(true);
               }}
               accessibilityLabel={t('transactions.add')}

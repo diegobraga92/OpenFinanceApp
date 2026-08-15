@@ -1,0 +1,7 @@
+{
+  "name": "expo-android-widget",
+  "version": "0.1.0",
+  "description": "Self-contained Android home-screen Quick Add widget (RemoteViews + AppWidgetProvider) for PudimFinance.",
+  "main": "index.ts",
+  "private": true
+}

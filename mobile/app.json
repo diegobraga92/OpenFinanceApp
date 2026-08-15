@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "scheme": "pudimfinance",
     "splash": {
       "backgroundColor": "#0f172a"
     },

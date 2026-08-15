@@ -36,18 +36,23 @@ export function BiometricLock({ children, lockOnMount }: Props) {
     if (prompting.current) return;
     prompting.current = true;
     try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: t('biometric.promptMessage'),
-        cancelLabel: t('common.cancel'),
-        disableDeviceFallback: false,
-      });
-      if (result.success) setLocked(false);
+      // Timeout so a hung OS biometric prompt can never leave the Unlock
+      // button permanently dead (prompting.current must always be released).
+      const result = await Promise.race([
+        LocalAuthentication.authenticateAsync({
+          promptMessage: t('biometric.promptMessage'),
+          cancelLabel: t('common.cancel'),
+          disableDeviceFallback: false,
+        }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 60_000)),
+      ]);
+      if (result?.success) setLocked(false);
     } catch {
       // Stay locked if the prompt fails for any reason.
     } finally {
       prompting.current = false;
     }
-  }, []);
+  }, [t]);
 
   // Check for biometric hardware/enrollment and decide the initial lock state.
   useEffect(() => {
@@ -90,8 +95,13 @@ export function BiometricLock({ children, lockOnMount }: Props) {
       const prev = prevAppState.current;
       prevAppState.current = next;
       if (next === 'background') {
+        // Any in-flight OS biometric dialog is gone now; clear the guard so a
+        // never-settling authenticateAsync promise can't wedge the button.
+        prompting.current = false;
         if (supported) setLocked(true);
       } else if (next === 'active' && prev === 'background') {
+        // Clear a possibly-stuck guard before re-prompting.
+        prompting.current = false;
         if (supported) {
           setLocked(true);
           void prompt();
