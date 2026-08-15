@@ -44,6 +44,7 @@ import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { AccountsScreen } from './src/screens/AccountsScreen';
 import { NotificationSettingsScreen } from './src/screens/NotificationSettingsScreen';
+import { PendingCapturesScreen } from './src/screens/PendingCapturesScreen';
 import { ServerScreen } from './src/screens/ServerScreen';
 import { ReceiptsScreen } from './src/screens/ReceiptsScreen';
 import { AuditScreen } from './src/screens/AuditScreen';
@@ -51,11 +52,11 @@ import { LedgerScreen } from './src/screens/LedgerScreen';
 import { BudgetsScreen } from './src/screens/BudgetsScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
-import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
+import { NotificationCaptureProvider, useNotificationCapture } from './src/notifications/NotificationCaptureProvider';
 import { OfflineBanner } from './src/components/OfflineBanner';
 import { subscribeSync, syncSilently } from './src/offline/sync-engine';
 
-type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
+type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'pending' | 'receipts' | 'audit' | 'server';
 
 type DrawerItem = {
   key: Screen;
@@ -78,6 +79,7 @@ const TOOLS_ITEMS: DrawerItem[] = [
   { key: 'receipts', icon: 'receipt-outline', labelKey: 'nav.receipts' },
   { key: 'audit', icon: 'list-outline', labelKey: 'nav.audit' },
   { key: 'notifications', icon: 'notifications-outline', labelKey: 'nav.notifications' },
+  { key: 'pending', icon: 'hourglass-outline', labelKey: 'nav.reviewCaptures' },
   { key: 'server', icon: 'server-outline', labelKey: 'nav.server' },
 ];
 
@@ -126,6 +128,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const { pendingCount } = useNotificationCapture();
   const [showAddForm, setShowAddForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   /** Transaction type requested by a home-screen widget deep link (e.g. `pudimfinance://add?type=expense`). */
@@ -377,6 +380,9 @@ function AppContent() {
           {screen === 'notifications' && (
             <NotificationSettingsScreen categories={categories} />
           )}
+          {screen === 'pending' && (
+            <PendingCapturesScreen categories={categories} formatMoney={formatMoney} />
+          )}
           {screen === 'receipts' && <ReceiptsScreen formatMoney={formatMoney} />}
           {screen === 'audit' && <AuditScreen />}
           {screen === 'ledger' && <LedgerScreen formatMoney={formatMoney} />}
@@ -483,6 +489,24 @@ function AppContent() {
                     <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>
                       {t(item.labelKey)}
                     </Text>
+                    {item.key === 'pending' && pendingCount > 0 && (
+                      <View
+                        style={{
+                          marginLeft: 'auto',
+                          backgroundColor: colors.danger,
+                          borderRadius: 10,
+                          minWidth: 20,
+                          height: 20,
+                          paddingHorizontal: 5,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ color: colors.primaryText, fontSize: 11, fontWeight: '700' }}>
+                          {pendingCount > 99 ? '99+' : pendingCount}
+                        </Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}

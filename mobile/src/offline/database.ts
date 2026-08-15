@@ -258,6 +258,23 @@ export function deleteLocalTransaction(id: string): void {
   getDb().runSync('DELETE FROM local_transactions WHERE id = ? OR server_id = ?', id, id);
 }
 
+/**
+ * Removes a transaction that was never pushed to the server: deletes the local
+ * row and drops any queued create/update op for it (used by "undo" after an
+ * auto-imported notification capture).
+ */
+export function cancelLocalTransaction(id: string): void {
+  const d = getDb();
+  d.withTransactionSync(() => {
+    d.runSync('DELETE FROM local_transactions WHERE id = ? OR server_id = ?', id, id);
+    d.runSync(
+      "DELETE FROM pending_operations WHERE entity_type = 'transaction' AND (local_id = ? OR server_id = ?)",
+      id,
+      id,
+    );
+  });
+}
+
 export function replaceLocalTransactions(transactions: LocalTransaction[]): void {
   const d = getDb();
   d.withTransactionSync(() => {

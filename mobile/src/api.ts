@@ -4,6 +4,7 @@ import { getApiBaseUrl } from './config/server';
 import { isOnline, isServerUnavailable, markServerUnavailable, uuid } from './offline/net';
 import {
   addPendingOperation,
+  cancelLocalTransaction,
   deleteLocalAccount,
   deleteLocalTransaction,
   getLocalAccounts,
@@ -519,6 +520,20 @@ export async function updateTransaction(
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+}
+
+/**
+ * Reverts a transaction created moments ago by the notification auto-import.
+ * If the transaction only exists locally (queued for push), it's cancelled
+ * without a server call; otherwise a delete is pushed (or queued) as usual.
+ */
+export async function undoTransaction(id: string): Promise<void> {
+  const local = getLocalTransactionById(id);
+  if (local && local.synced === 0) {
+    cancelLocalTransaction(id);
+    return;
+  }
+  await deleteTransaction(id);
 }
 
 export async function deleteTransaction(id: string): Promise<void> {

@@ -285,10 +285,130 @@ export function parseNotification(
 
 
 // ---------------------------------------------------------------------------
+// Pending review inbox (ask mode)
+// ---------------------------------------------------------------------------
+
+/** A captured, parsed transaction waiting for the user's confirmation. */
+export interface PendingCapture {
+  id: string;
+  description: string;
+  amount: string;
+  type: 'income' | 'expense';
+  categoryId: string | null;
+  date: string;
+  /** Android package name of the app that posted the notification. */
+  sourcePackage: string;
+  /** User-facing label (resolved from KNOWN_APPS, falls back to package). */
+  sourceLabel: string;
+  postTime: number;
+  /** Stable key used to merge/dedupe identical captures. */
+  dedupKey: string;
+}
+
+const PENDING_KEY = 'pudim_pending_captures';
+const MAX_PENDING = 200;
+
+/** Normalizes a description for dedup: lowercase, accents stripped, trimmed. */
+function normalizeForDedup(description: string): string {
+  return description
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Stable dedup key so the same transaction isn't queued/imported twice. */
+export function dedupKeyOf(parsed: ParsedTransaction): string {
+  return `${parsed.type}|${parsed.amount}|${normalizeForDedup(parsed.description)}|${parsed.date}`;
+}
+
+/** Resolves a package name to its user-facing label for grouping. */
+export function sourceLabelOf(packageName: string): string {
+  return KNOWN_APPS.find((app) => app.packageName === packageName)?.label ?? packageName;
+}
+
+/** Builds a PendingCapture from a parsed transaction + its source notification. */
+export function toPendingCapture(
+  parsed: ParsedTransaction,
+  packageName: string,
+  postTime: number,
+): PendingCapture {
+  return {
+    id: `pc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    description: parsed.description,
+    amount: parsed.amount,
+    type: parsed.type,
+    categoryId: parsed.categoryId,
+    date: parsed.date,
+    sourcePackage: packageName,
+    sourceLabel: sourceLabelOf(packageName),
+    postTime,
+    dedupKey: dedupKeyOf(parsed),
+  };
+}
+
+export async function getPendingCaptures(): Promise<PendingCapture[]> {
+  const raw = await AsyncStorage.getItem(PENDING_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as PendingCapture[];
+  } catch {
+    return [];
+  }
+}
+
+export async function savePendingCaptures(items: PendingCapture[]): Promise<void> {
+  await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(items.slice(0, MAX_PENDING)));
+}
+
+/**
+ * Adds a capture to the inbox, merging an existing entry with the same dedup
+ * key (so a re-delivered notification doesn't show up twice). Returns the next
+ * inbox contents.
+ */
+/** Serializes read-modify-write access to the inbox (AsyncStorage is async). */
+let inboxWriteChain: Promise<unknown> = Promise.resolve();
+function serializeInbox<T>(task: () => Promise<T>): Promise<T> {
+  const result = inboxWriteChain.then(task);
+  // Keep the chain alive even if this task rejects.
+  inboxWriteChain = result.catch(() => undefined);
+  return result;
+}
+
+export function addPendingCapture(item: PendingCapture): Promise<PendingCapture[]> {
+  return serializeInbox(async () => {
+    const items = await getPendingCaptures();
+    const existingIdx = items.findIndex((c) => c.dedupKey === item.dedupKey);
+    const next = [...items];
+    if (existingIdx >= 0) {
+      next[existingIdx] = {
+        ...next[existingIdx],
+        postTime: Math.max(next[existingIdx].postTime, item.postTime),
+      };
+    } else {
+      next.push(item);
+      if (next.length > MAX_PENDING) next.shift();
+    }
+    await savePendingCaptures(next);
+    return next;
+  });
+}
+
+export function removePendingCapture(id: string): Promise<PendingCapture[]> {
+  return serializeInbox(async () => {
+    const items = await getPendingCaptures();
+    const next = items.filter((c) => c.id !== id);
+    await savePendingCaptures(next);
+    return next;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Notification access + listening
 // ---------------------------------------------------------------------------
 
-export type NotificationListener = (parsed: ParsedTransaction) => void;
+export type NotificationListener = (parsed: ParsedTransaction, payload: NotificationPayload) => void;
 
 /**
  * Applies settings, monitored-app filtering and parsing to a single raw
@@ -323,7 +443,7 @@ export async function handleNotificationPayload(
     categories,
     settings.defaultCategoryId,
   );
-  if (parsed) listener(parsed);
+  if (parsed) listener(parsed, payload);
 }
 
 /**

@@ -1423,6 +1423,21 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  receiptActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  receiptActionButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  receiptActionText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   // --- Audit (AuditScreen) ---
   auditFilters: {
     flexDirection: 'row',
