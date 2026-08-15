@@ -7,8 +7,9 @@ import React, {
   type ReactNode,
 } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { fetchMe } from '../api';
-import { clearAuthSession, getAccessToken, type AuthUser } from '../auth';
+import { fetchMe, isNetworkError } from '../api';
+import { clearAuthSession, getAccessToken, getStoredUser, type AuthUser } from '../auth';
+import { isOnline } from '../offline/net';
 import { colors, spacing, typography } from '../theme/tokens';
 import { LoginScreen } from '../screens/LoginScreen';
 
@@ -51,17 +52,41 @@ export function AuthGate({ children }: { children: ReactNode }) {
         if (mounted) setReady(true);
         return;
       }
+      const cachedUser = await getStoredUser();
+      // Skip the network round-trip entirely when the server is unreachable:
+      // enter offline mode with the cached session instead of sitting on the
+      // loading spinner waiting for the request timeout.
+      if (cachedUser && !(await isOnline())) {
+        if (mounted) {
+          setRestored(true);
+          setUser(cachedUser);
+          setReady(true);
+        }
+        return;
+      }
       try {
         const me = await fetchMe(token);
         if (mounted) {
           setRestored(true);
           setUser(me);
         }
-      } catch {
-        // fetchMe already attempted a refresh; a hard failure cleared the session.
-        if (mounted) {
-          await clearAuthSession();
-          setUser(null);
+      } catch (err) {
+        // When the server can't be reached, keep the cached session and enter
+        // the app in offline mode instead of bouncing the user to the login
+        // screen. Only a genuine auth failure (bad/expired credentials) logs out.
+        const offline = isNetworkError(err) || !(await isOnline());
+        if (offline && cachedUser) {
+          if (mounted) {
+            setRestored(true);
+            setUser(cachedUser);
+          }
+        } else {
+          // fetchMe already attempted a refresh; a hard failure means the
+          // stored session is no longer valid.
+          if (mounted) {
+            await clearAuthSession();
+            setUser(null);
+          }
         }
       } finally {
         if (mounted) setReady(true);

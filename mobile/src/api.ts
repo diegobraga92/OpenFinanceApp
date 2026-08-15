@@ -1,7 +1,7 @@
 import type { components } from './api-types';
 import { clearAuthSession, getAccessToken, getRefreshToken, setAuthSession } from './auth';
 import { getApiBaseUrl } from './config/server';
-import { isOnline, uuid } from './offline/net';
+import { isOnline, isServerUnavailable, markServerUnavailable, uuid } from './offline/net';
 import {
   addPendingOperation,
   deleteLocalTransaction,
@@ -23,6 +23,7 @@ export type CreateTransactionRequest = components['schemas']['CreateTransactionR
 export type UpdateTransactionRequest = components['schemas']['UpdateTransactionRequest'];
 export type TransactionListResponse = components['schemas']['TransactionListResponse'];
 export type SummaryResponse = components['schemas']['SummaryResponse'];
+export type CategorySummary = components['schemas']['CategorySummary'];
 export type Budget = components['schemas']['Budget'];
 export type CreateBudgetRequest = components['schemas']['CreateBudgetRequest'];
 export type BudgetWithCategory = components['schemas']['BudgetWithCategory'];
@@ -75,6 +76,26 @@ export type SyncOperation = components['schemas']['SyncOperation'];
 export type SyncPushRequest = components['schemas']['SyncPushRequest'];
 export type SyncPushResponse = components['schemas']['SyncPushResponse'];
 
+/** How long a single HTTP request may take before it is aborted. */
+const REQUEST_TIMEOUT_MS = 10_000;
+
+/** Transport-level failure (offline, DNS, request timeout) — not an HTTP status error. */
+export class NetworkError extends Error {
+  constructor(message = 'Network request failed') {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+/** Returns true when `err` is a transport failure rather than an HTTP error. */
+export function isNetworkError(err: unknown): boolean {
+  return (
+    err instanceof NetworkError ||
+    // fetch() rejects with TypeError when there's no connectivity in React Native.
+    err instanceof TypeError
+  );
+}
+
 async function request<T>(path: string, options?: {
   method?: string;
   headers?: Record<string, string>;
@@ -83,20 +104,45 @@ async function request<T>(path: string, options?: {
   // Build the request ourselves so the session token always wins over any
   // caller-supplied Authorization header (stale tokens from callers would
   // otherwise defeat the automatic refresh below).
+  if (isServerUnavailable()) {
+    // Circuit breaker open (server recently unreachable) — fail immediately
+    // instead of waiting out the 10s request timeout on every call.
+    throw new NetworkError('Server unreachable');
+  }
   const doFetch = async () => {
     const base = await getApiBaseUrl();
     const token = await getAccessToken();
     const isFormData = options?.body instanceof FormData;
-    return fetch(`${base}${path}`, {
-      method: options?.method,
-      headers: {
-        // For multipart FormData the native client sets the boundary header itself.
-        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-        ...options?.headers,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: options?.body,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(`${base}${path}`, {
+        method: options?.method,
+        headers: {
+          // For multipart FormData the native client sets the boundary header itself.
+          ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+          ...options?.headers,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: options?.body,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      // Convert transport failures (no connectivity / timeout) into a typed
+      // error so callers can fall back to the local mirror instead of hanging
+      // on a spinner forever.
+      if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
+        markServerUnavailable();
+        throw new NetworkError('Request timed out');
+      }
+      if (err instanceof TypeError) {
+        markServerUnavailable();
+        throw new NetworkError('Network request failed');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   };
 
   let response = await doFetch();
@@ -108,12 +154,21 @@ async function request<T>(path: string, options?: {
   // the short-lived access token has expired.
   const NO_REFRESH_AUTH_PATHS = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
   if (response.status === 401 && !NO_REFRESH_AUTH_PATHS.includes(path)) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
-      response = await doFetch();
-    } else {
-      // Refresh failed (missing/expired refresh token): drop the session so
-      // the UI can show the login screen.
+    let refreshed = false;
+    try {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        response = await doFetch();
+        refreshed = true;
+      }
+    } catch {
+      // Transport failure while refreshing (offline / flaky link): keep the
+      // session so offline users aren't logged out. The caller still sees the
+      // original 401 and can fall back to local data.
+    }
+    if (!refreshed && response.status === 401) {
+      // Refresh failed for a non-network reason (missing/expired refresh
+      // token): drop the session so the UI can show the login screen.
       await clearAuthSession();
     }
   }
@@ -150,16 +205,34 @@ async function refreshAccessToken(): Promise<string | null> {
     refreshPromise = (async () => {
       try {
         const base = await getApiBaseUrl();
-        const response = await fetch(`${base}/api/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        let response: Response;
+        try {
+          response = await fetch(`${base}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
         if (!response.ok) return null;
         const data = await response.json();
         await setAuthSession(data.access_token, data.refresh_token, data.user);
         return data.access_token;
-      } catch {
+      } catch (err) {
+        // Transport failure — rethrow so `request()` distinguishes it from a
+        // genuine refresh rejection and keeps the session while offline.
+        if (err instanceof Error && err.name === 'AbortError') {
+          markServerUnavailable();
+          throw new NetworkError('Request timed out');
+        }
+        if (err instanceof TypeError) {
+          markServerUnavailable();
+          throw new NetworkError('Network request failed');
+        }
         return null;
       } finally {
         refreshPromise = null;
@@ -170,22 +243,29 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 export async function fetchCategories(type?: 'income' | 'expense'): Promise<Category[]> {
-  if (!(await isOnline())) {
-    // Offline fallback: serve categories from the local mirror.
-    const local = getLocalCategories();
-    return local.map((c) => ({
-      id: c.server_id ?? c.id,
-      name: c.name,
-      type: c.type,
-      parent_id: c.parent_id ?? null,
-      icon: c.icon ?? null,
-      color: c.color ?? null,
-      created_at: c.updated_at,
-      updated_at: c.updated_at,
-    }));
-  }
+  const fromLocal = (): Category[] =>
+    getLocalCategories()
+      .filter((c) => !type || c.type === type)
+      .map((c) => ({
+        id: c.server_id ?? c.id,
+        name: c.name,
+        type: c.type,
+        parent_id: c.parent_id ?? null,
+        icon: c.icon ?? null,
+        color: c.color ?? null,
+        created_at: c.updated_at,
+        updated_at: c.updated_at,
+      }));
+
+  if (!(await isOnline())) return fromLocal();
   const query = type ? `?type=${encodeURIComponent(type)}` : '';
-  return request<Category[]>(`/api/categories${query}`);
+  try {
+    return await request<Category[]>(`/api/categories${query}`);
+  } catch (err) {
+    // Server became unreachable mid-flight — serve the local mirror.
+    if (isNetworkError(err)) return fromLocal();
+    throw err;
+  }
 }
 
 export async function createCategory(payload: CreateCategoryRequest): Promise<Category> {
@@ -268,11 +348,23 @@ export async function fetchTransactions(params?: {
   end_date?: string;
   account_id?: string;
 }): Promise<TransactionListResponse> {
-  if (!(await isOnline())) {
-    // Offline fallback: serve transactions from the local mirror.
-    const local = getLocalTransactions();
+  const fromLocal = (): TransactionListResponse => {
+    // Offline fallback: serve transactions from the local mirror, applying the
+    // same filters the server would.
+    let local = getLocalTransactions();
+    if (params?.category_id) local = local.filter((t) => t.category_id === params.category_id);
+    if (params?.type) local = local.filter((t) => t.type === params.type);
+    if (params?.start_date) {
+      local = local.filter((t) => t.date.slice(0, 10) >= params.start_date!);
+    }
+    if (params?.end_date) {
+      local = local.filter((t) => t.date.slice(0, 10) <= params.end_date!);
+    }
+    if (params?.account_id) local = local.filter((t) => t.account_id === params.account_id);
+
     const items: Transaction[] = local.map((t) => ({
       id: t.server_id ?? t.id,
+      account_id: t.account_id ?? null,
       description: t.description,
       amount: t.amount,
       type: t.type,
@@ -283,13 +375,17 @@ export async function fetchTransactions(params?: {
       created_at: t.updated_at,
       updated_at: t.updated_at,
     }));
+    const page = params?.page ?? 0;
+    const pageSize = params?.page_size ?? items.length;
     return {
-      items,
-      page: params?.page ?? 0,
-      page_size: params?.page_size ?? items.length,
+      items: items.slice(page * pageSize, (page + 1) * pageSize),
+      page,
+      page_size: pageSize,
       total: items.length,
     };
-  }
+  };
+
+  if (!(await isOnline())) return fromLocal();
   const qs = new URLSearchParams();
   if (params?.page !== undefined) qs.set('page', String(params.page));
   if (params?.page_size !== undefined) qs.set('page_size', String(params.page_size));
@@ -300,7 +396,13 @@ export async function fetchTransactions(params?: {
   if (params?.account_id) qs.set('account_id', params.account_id);
 
   const query = qs.toString() ? `?${qs.toString()}` : '';
-  return request<TransactionListResponse>(`/api/transactions${query}`);
+  try {
+    return await request<TransactionListResponse>(`/api/transactions${query}`);
+  } catch (err) {
+    // Server became unreachable mid-flight — serve the local mirror.
+    if (isNetworkError(err)) return fromLocal();
+    throw err;
+  }
 }
 
 export async function createTransaction(
@@ -436,11 +538,75 @@ export async function fetchSummary(
   year?: number,
   month?: number,
 ): Promise<SummaryResponse> {
+  const fromLocal = () => computeLocalSummary(year, month);
+
+  if (!(await isOnline())) return fromLocal();
   const qs = new URLSearchParams();
   if (year !== undefined) qs.set('year', String(year));
   if (month !== undefined) qs.set('month', String(month));
   const query = qs.toString() ? `?${qs.toString()}` : '';
-  return request<SummaryResponse>(`/api/summary${query}`);
+  try {
+    return await request<SummaryResponse>(`/api/summary${query}`);
+  } catch (err) {
+    // Server became unreachable mid-flight — compute the summary locally.
+    if (isNetworkError(err)) return fromLocal();
+    throw err;
+  }
+}
+
+/**
+ * Computes a monthly summary from the local mirror, mirroring the backend's
+ * `/api/summary` semantics: income/expense totals are positive, balance is
+ * income − expense, and the per-category breakdown is grouped by
+ * (category_id, type) ordered by total descending.
+ */
+function computeLocalSummary(year?: number, month?: number): SummaryResponse {
+  const now = new Date();
+  const targetYear = year ?? now.getFullYear();
+  const targetMonth = month ?? now.getMonth() + 1; // 1-12
+
+  const categories = getLocalCategories();
+  const categoryById = new Map(categories.map((c) => [c.server_id ?? c.id, c]));
+
+  let incomeTotal = 0;
+  let expenseTotal = 0;
+  const grouped = new Map<string, CategorySummary>();
+
+  for (const t of getLocalTransactions()) {
+    const parts = t.date.slice(0, 10).split('-').map(Number);
+    if (parts.length < 2 || parts[0] !== targetYear || parts[1] !== targetMonth) continue;
+
+    const amount = Number(t.amount) || 0;
+    const type = t.type === 'income' ? 'income' : 'expense';
+    if (type === 'income') incomeTotal += amount;
+    else expenseTotal += amount;
+
+    const key = `${t.category_id ?? 'none'}|${type}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.total = String((Number(existing.total) || 0) + amount);
+    } else {
+      const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
+      grouped.set(key, {
+        category_id: t.category_id,
+        category_name: cat?.name ?? null,
+        color: cat?.color ?? null,
+        icon: cat?.icon ?? null,
+        total: String(amount),
+      });
+    }
+  }
+
+  return {
+    income_total: String(incomeTotal),
+    expense_total: String(expenseTotal),
+    balance: String(incomeTotal - expenseTotal),
+    by_category: Array.from(grouped.values()).sort(
+      (a, b) => (Number(b.total) || 0) - (Number(a.total) || 0),
+    ),
+    year: targetYear,
+    month: targetMonth,
+  };
 }
 
 export async function createBudget(payload: CreateBudgetRequest): Promise<BudgetWithCategory> {
@@ -533,6 +699,8 @@ export async function fetchTrends(months?: number): Promise<TrendsResponse> {
 }
 
 export async function fetchAccountsWithBalance(): Promise<AccountWithBalance[]> {
+  // Accounts are not mirrored locally — fail fast to an empty list offline.
+  if (!(await isOnline())) return [];
   return request<AccountWithBalance[]>('/api/accounts');
 }
 

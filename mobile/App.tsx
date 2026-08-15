@@ -53,7 +53,7 @@ import { ReportsScreen } from './src/screens/ReportsScreen';
 import { ReconciliationScreen } from './src/screens/ReconciliationScreen';
 import { NotificationCaptureProvider } from './src/notifications/NotificationCaptureProvider';
 import { OfflineBanner } from './src/components/OfflineBanner';
-import { syncAll } from './src/offline/sync-engine';
+import { subscribeSync, syncSilently } from './src/offline/sync-engine';
 
 type Screen = 'dashboard' | 'transactions' | 'accounts' | 'ledger' | 'budgets' | 'reports' | 'reconciliation' | 'categories' | 'notifications' | 'receipts' | 'audit' | 'server';
 
@@ -150,7 +150,9 @@ function AppContent() {
     setError(null);
     try {
       // Try to sync first so the local mirror + server agree before rendering.
-      await syncAll().catch(() => null);
+      // Uses the silent variant: loadData already refreshes the UI itself, so
+      // syncing here must not re-trigger this loader via sync listeners.
+      await syncSilently().catch(() => null);
       const [cats, summ, txns, accnts] = await Promise.all([
         fetchCategories(),
         fetchSummary(),
@@ -180,6 +182,15 @@ function AppContent() {
       }
     });
     return () => sub.remove();
+  }, [loadData]);
+
+  // After any externally-triggered sync (OfflineBanner auto-sync on reconnect,
+  // manual "tap to sync"), reload the view so pushed/pulled changes appear
+  // immediately without requiring a manual refresh.
+  useEffect(() => {
+    return subscribeSync(() => {
+      void loadData();
+    });
   }, [loadData]);
 
   // Fade screen content in on every navigation.

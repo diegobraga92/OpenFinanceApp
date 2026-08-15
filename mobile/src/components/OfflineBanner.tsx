@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { colors } from '../theme/tokens';
 import { useI18n } from '../i18n';
 import { countPendingOperations, isOnline, syncAll } from '../offline/sync-engine';
+import { clearServerProbeCache } from '../offline/net';
 
 type Status = 'online' | 'syncing' | 'offline';
 
@@ -18,6 +19,16 @@ export function OfflineBanner() {
   const { t } = useI18n();
   const [status, setStatus] = useState<Status>('online');
   const [pending, setPending] = useState(0);
+  // Tracks the last known online state so we can auto-sync when the server
+  // becomes reachable again (either the link came back or the server recovered).
+  const wasOnline = useRef(true);
+
+  const handleSync = useCallback(async () => {
+    setStatus('syncing');
+    const result = await syncAll();
+    setStatus(result.ok ? 'online' : 'offline');
+    setPending(countPendingOperations());
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -27,14 +38,23 @@ export function OfflineBanner() {
       if (!mounted) return;
       setStatus(online ? 'online' : 'offline');
       setPending(countPendingOperations());
+      if (online && !wasOnline.current) {
+        wasOnline.current = true;
+        // The server became reachable again — push queued changes right away.
+        void handleSync();
+      } else {
+        wasOnline.current = online;
+      }
     };
 
-    // Listen to connectivity changes.
+    // NetInfo fires on device connectivity changes. We still re-evaluate with
+    // the server probe so "internet up but server unreachable" reads as offline.
     const unsub = NetInfo.addEventListener((state) => {
-      const online = state.isConnected === true && state.isInternetReachable !== false;
-      if (!mounted) return;
-      setStatus(online ? 'online' : 'offline');
-      setPending(countPendingOperations());
+      if (state.isConnected === true) {
+        // The link is back — reset the circuit breaker so we probe immediately.
+        clearServerProbeCache();
+      }
+      void refresh();
     });
 
     void refresh();
@@ -45,14 +65,7 @@ export function OfflineBanner() {
       unsub();
       clearInterval(interval);
     };
-  }, []);
-
-  const handleSync = useCallback(async () => {
-    setStatus('syncing');
-    await syncAll();
-    setStatus('online');
-    setPending(countPendingOperations());
-  }, []);
+  }, [handleSync]);
   if (status === 'online' && pending === 0) {
     return null;
   }

@@ -6,7 +6,6 @@
  * local SQLite mirror (`src/offline/database.ts`) for storage.
  */
 
-import NetInfo from '@react-native-community/netinfo';
 import { syncPull, syncPush, type SyncPushOperation } from '../api';
 import {
   addPendingOperation,
@@ -23,6 +22,7 @@ import {
   type LocalCategory,
   type LocalTransaction,
 } from './database';
+import { isOnline } from './net';
 
 export interface SyncResult {
   pushed: number;
@@ -32,14 +32,34 @@ export interface SyncResult {
   error?: string;
 }
 
-/** Returns whether the device currently has network connectivity. */
-export async function isOnline(): Promise<boolean> {
-  const state = await NetInfo.fetch();
-  return state.isConnected === true && state.isInternetReachable !== false;
+/** Deduplicates concurrent syncs so a single pass is shared by all callers. */
+let syncInFlight: Promise<SyncResult> | null = null;
+
+type SyncListener = (result: SyncResult) => void;
+const syncListeners = new Set<SyncListener>();
+
+/**
+ * Registers a callback fired after every completed sync (push + pull).
+ * Returns an unsubscribe function.
+ */
+export function subscribeSync(cb: SyncListener): () => void {
+  syncListeners.add(cb);
+  return () => {
+    syncListeners.delete(cb);
+  };
 }
 
-/** Pushes pending operations and pulls remote changes. */
-export async function syncAll(): Promise<SyncResult> {
+function notifySyncListeners(result: SyncResult): void {
+  for (const cb of syncListeners) {
+    try {
+      cb(result);
+    } catch {
+      // Listener errors must never break the sync pipeline.
+    }
+  }
+}
+
+async function performSync(): Promise<SyncResult> {
   const online = await isOnline();
   if (!online) {
     return { pushed: 0, pulledTransactions: 0, pulledCategories: 0, ok: false, error: 'offline' };
@@ -53,6 +73,27 @@ export async function syncAll(): Promise<SyncResult> {
     pulledCategories: pulled.categories.length,
     ok: true,
   };
+}
+
+function performSyncWithLock(): Promise<SyncResult> {
+  if (!syncInFlight) {
+    syncInFlight = performSync().finally(() => {
+      syncInFlight = null;
+    });
+  }
+  return syncInFlight;
+}
+
+/** Pushes pending operations and pulls remote changes, then notifies subscribers. */
+export async function syncAll(): Promise<SyncResult> {
+  const result = await performSyncWithLock();
+  notifySyncListeners(result);
+  return result;
+}
+
+/** Syncs without notifying subscribers (used by loaders that refresh themselves). */
+export async function syncSilently(): Promise<SyncResult> {
+  return performSyncWithLock();
 }
 
 /**
@@ -178,7 +219,7 @@ export function queueLocalMutation(
   });
 }
 
-export { countPendingOperations, getLocalCategories, getLocalTransactions };
+export { countPendingOperations, getLocalCategories, getLocalTransactions, isOnline };
 
 /** Generates a UUID without a crypto dependency (fallback). */
 function cryptoUUID(): string {
