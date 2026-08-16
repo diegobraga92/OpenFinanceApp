@@ -4,14 +4,14 @@
 //! [`PluginHandle`]; everywhere else they return desktop-safe defaults so the
 //! shared UI can render the "Android only" messaging.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime};
 
 #[cfg(mobile)]
 use tauri::plugin::PluginHandle;
 
 /// A bank notification captured by the Android `NotificationListenerService`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct CapturedNotification {
     /// Android application id of the app that posted the notification.
@@ -29,6 +29,8 @@ pub struct CapturedNotification {
 pub struct CaptureHandle<R: Runtime> {
     #[cfg(mobile)]
     plugin: Option<PluginHandle<R>>,
+    #[cfg(not(mobile))]
+    marker: std::marker::PhantomData<R>,
 }
 
 impl<R: Runtime> CaptureHandle<R> {
@@ -37,6 +39,8 @@ impl<R: Runtime> CaptureHandle<R> {
         Self {
             #[cfg(mobile)]
             plugin: None,
+            #[cfg(not(mobile))]
+            marker: std::marker::PhantomData,
         }
     }
 
@@ -139,6 +143,7 @@ pub fn secure_get<R: Runtime>(app: AppHandle<R>, key: String) -> Result<Option<S
     #[cfg(not(mobile))]
     {
         let _ = &state;
+        let _ = &key;
         Ok(None)
     }
 }
@@ -161,6 +166,7 @@ pub fn secure_set<R: Runtime>(app: AppHandle<R>, key: String, value: String) -> 
     #[cfg(not(mobile))]
     {
         let _ = &state;
+        let _ = (&key, &value);
         Ok(())
     }
 }
@@ -180,12 +186,11 @@ pub fn secure_delete<R: Runtime>(app: AppHandle<R>, key: String) -> Result<(), S
     #[cfg(not(mobile))]
     {
         let _ = &state;
+        let _ = &key;
         Ok(())
     }
 }
 
-/// Convenience used by the app crate's `auth_store_*` commands on mobile.
-#[cfg(mobile)]
 // ---------------------------------------------------------------------------
 // Biometric lock + home-screen Quick Add widget (Android). On desktop these
 // commands degrade to defaults so the shared UI never hard-fails.
@@ -243,6 +248,7 @@ pub fn set_widget_spent_today<R: Runtime>(app: AppHandle<R>, value: String) -> R
     #[cfg(not(mobile))]
     {
         let _ = &state;
+        let _ = &value;
         Ok(())
     }
 }
@@ -265,6 +271,8 @@ pub fn take_deep_link<R: Runtime>(app: AppHandle<R>) -> Result<Option<String>, S
         Ok(None)
     }
 }
+/// Convenience used by the app crate's `auth_store_*` commands on mobile.
+#[cfg(mobile)]
 pub fn mobile_secure_get<R: Runtime>(
     app: &AppHandle<R>,
     key: String,

@@ -17,6 +17,9 @@ mod mobile;
 
 pub use commands::{CaptureHandle, CapturedNotification};
 
+#[cfg(mobile)]
+pub use commands::{mobile_secure_delete, mobile_secure_get, mobile_secure_set};
+
 /// Registers the `pudim-native` plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("pudim-native")
