@@ -1,0 +1,17 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Default permissions for the PudimFinance native plugin (capture, secure storage, biometric, widget)"
+permissions = [
+  "allow-is-supported",
+  "allow-access-granted",
+  "allow-open-settings",
+  "allow-drain-pending",
+  "allow-secure-get",
+  "allow-secure-set",
+  "allow-secure-delete",
+  "allow-biometric-available",
+  "allow-biometric-authenticate",
+  "allow-set-widget-spent-today",
+  "allow-take-deep-link",
+]

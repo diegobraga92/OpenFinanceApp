@@ -3,5 +3,18 @@
   "identifier": "default",
   "description": "Default capability for the main window",
   "windows": ["main"],
-  "permissions": ["core:default", "pudim-native:default"]
+  "permissions": [
+    "core:default",
+    "pudim-android-native:allow-is-supported",
+    "pudim-android-native:allow-access-granted",
+    "pudim-android-native:allow-open-settings",
+    "pudim-android-native:allow-drain-pending",
+    "pudim-android-native:allow-secure-get",
+    "pudim-android-native:allow-secure-set",
+    "pudim-android-native:allow-secure-delete",
+    "pudim-android-native:allow-biometric-available",
+    "pudim-android-native:allow-biometric-authenticate",
+    "pudim-android-native:allow-set-widget-spent-today",
+    "pudim-android-native:allow-take-deep-link"
+  ]
 }
