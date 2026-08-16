@@ -30,7 +30,7 @@ pub struct CaptureHandle<R: Runtime> {
     #[cfg(mobile)]
     plugin: Option<PluginHandle<R>>,
     #[cfg(not(mobile))]
-    marker: std::marker::PhantomData<R>,
+    marker: std::marker::PhantomData<fn() -> R>,
 }
 
 impl<R: Runtime> CaptureHandle<R> {
