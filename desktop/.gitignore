@@ -1,0 +1,15 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
+# Rust (src-tauri)
+src-tauri/target
+src-tauri/gen/schemas
+
+# Editor / OS
+.DS_Store
+*.local
+.vite

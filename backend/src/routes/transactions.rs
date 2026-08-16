@@ -752,6 +752,20 @@ pub async fn delete_transaction(
     // Remove the transaction's ledger entries first (they are the audit trail).
     transaction_ledger::delete_entries(&mut *db, id, old_ledger_id).await;
 
+    // Also drop any installment-plan scheduling rows referencing this
+    // transaction; otherwise the FK below blocks the DELETE (500).
+    sqlx::query("DELETE FROM installment_transactions WHERE transaction_id = $1")
+        .bind(id)
+        .execute(&mut *db)
+        .await
+        .map_err(|e| {
+            error!("Failed to unlink installment schedule for {}: {}", id, e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to delete transaction" })),
+            )
+        })?;
+
     let result = sqlx::query("DELETE FROM transactions WHERE id = $1")
         .bind(id)
         .execute(&mut *db)

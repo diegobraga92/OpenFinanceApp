@@ -1,0 +1,153 @@
+name: desktop-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'api/openapi/openapi.json'
+      - '.github/workflows/desktop-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'api/openapi/openapi.json'
+      - '.github/workflows/desktop-ci.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: '22'
+
+jobs:
+  desktop:
+    name: Desktop (typecheck, lint, tauri build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Rust crates
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: desktop-cargo-${{ runner.os }}-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: desktop/node_modules
+          key: desktop-npm-${{ runner.os }}-${{ hashFiles('desktop/package-lock.json') }}
+
+      - name: Install Linux system dependencies (Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            javascriptcoregtk-4.1-dev \
+            patchelf
+
+      - name: Install Node dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Typecheck (frontend)
+        working-directory: desktop
+        run: npm run typecheck
+
+      - name: Build frontend
+        working-directory: desktop
+        run: npm run build
+
+      - name: Rustfmt check
+        working-directory: desktop/src-tauri
+        run: cargo fmt --check
+
+      - name: Clippy (Rust core)
+        working-directory: desktop/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rustfmt check (Android capture plugin)
+        working-directory: desktop/src-tauri/plugins/pudim-android-native
+        run: cargo fmt --check
+
+      - name: Clippy (Android capture plugin)
+        working-directory: desktop/src-tauri/plugins/pudim-android-native
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build Tauri app
+        working-directory: desktop
+        run: npm run tauri build
+
+  android:
+    name: Android (tauri android build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Rust crates
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: android-cargo-${{ runner.os }}-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: desktop/node_modules
+          key: android-npm-${{ runner.os }}-${{ hashFiles('desktop/package-lock.json') }}
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up JDK 17 (Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Rust Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install Node dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Typecheck (frontend)
+        working-directory: desktop
+        run: npm run typecheck
+
+      - name: Build frontend
+        working-directory: desktop
+        run: npm run build
+
+      # GitHub-hosted runners ship the Android SDK + NDK (ANDROID_HOME set);
+      # tauri-cli resolves the NDK under $ANDROID_HOME/ndk automatically.
+      - name: Initialize Android project
+        working-directory: desktop
+        run: npm run tauri android init
+
+      - name: Build Android app (aarch64)
+        working-directory: desktop
+        run: npm run tauri android build -- --target aarch64

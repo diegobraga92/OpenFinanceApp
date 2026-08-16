@@ -45,11 +45,16 @@ pub async fn resolve_posting_account(
 ) -> Result<Uuid> {
     if let Some(cid) = category_id {
         // 1. Explicit category link.
-        let linked: Option<Uuid> =
-            sqlx::query_scalar("SELECT ledger_account_id FROM categories WHERE id = $1")
-                .bind(cid)
-                .fetch_optional(pool)
-                .await?;
+        // NB: `ledger_account_id` is nullable. `fetch_optional` already wraps
+        // the scalar in `Option<T>`, so the scalar type must be `Option<Uuid>`
+        // here — otherwise a NULL column fails to decode ("unexpected null").
+        let linked: Option<Uuid> = sqlx::query_scalar::<_, Option<Uuid>>(
+            "SELECT ledger_account_id FROM categories WHERE id = $1",
+        )
+        .bind(cid)
+        .fetch_optional(pool)
+        .await?
+        .flatten();
         if let Some(id) = linked {
             return Ok(id);
         }

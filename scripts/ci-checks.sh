@@ -60,18 +60,18 @@ check_backend() {
 }
 
 # ──────────────────────────────────────────────
-# Web checks (npm available locally)
+# Desktop client checks (npm available locally)
 # ──────────────────────────────────────────────
-check_web() {
-    step "Web: npm install (if needed)"
-    cd "$ROOT_DIR/web"
+check_desktop() {
+    step "Desktop: npm install (if needed)"
+    cd "$ROOT_DIR/desktop"
     if [ ! -d node_modules ]; then
         npm install --silent && ok "Dependencies installed" || fail "npm install failed"
     else
         ok "node_modules exists, skipping install"
     fi
 
-    step "Web: lint"
+    step "Desktop: lint"
     if npm run lint > /dev/null 2>&1; then
         ok "Lint passed"
     else
@@ -80,36 +80,7 @@ check_web() {
         fail "Lint found errors"
     fi
 
-    step "Web: typecheck"
-    if npm run typecheck > /dev/null 2>&1; then
-        ok "Typecheck passed"
-    else
-        fail "Typecheck failed"
-    fi
-}
-
-# ──────────────────────────────────────────────
-# Mobile checks (npm available locally)
-# ──────────────────────────────────────────────
-check_mobile() {
-    step "Mobile: npm install (if needed)"
-    cd "$ROOT_DIR/mobile"
-    if [ ! -d node_modules ]; then
-        npm install --silent && ok "Dependencies installed" || fail "npm install failed"
-    else
-        ok "node_modules exists, skipping install"
-    fi
-
-    step "Mobile: lint"
-    if npm run lint > /dev/null 2>&1; then
-        ok "Lint passed"
-    else
-        echo ""
-        npm run lint 2>&1 | grep -E "(error|Warning)"
-        fail "Lint found errors"
-    fi
-
-    step "Mobile: typecheck"
+    step "Desktop: typecheck"
     if npm run typecheck > /dev/null 2>&1; then
         ok "Typecheck passed"
     else
@@ -137,11 +108,10 @@ usage() {
     echo "Usage: $(basename "$0") <command>"
     echo ""
     echo "Commands:"
-    echo "  check           Run all CI checks (backend + openapi + web + mobile)"
-    echo "  check-backend   Backend only: fmt, clippy, audit, build"
-    echo "  check-openapi   OpenAPI spec only: validation"
-    echo "  check-web       Web only: lint, typecheck"
-    echo "  check-mobile    Mobile only: lint, typecheck"
+    echo "  check             Run all CI checks (backend + openapi + desktop)"
+    echo "  check-backend     Backend only: fmt, clippy, audit, build"
+    echo "  check-openapi     OpenAPI spec only: validation"
+    echo "  check-desktop     Desktop client only: lint, typecheck"
     echo ""
     echo "Examples:"
     echo "  ./scripts/ci-checks check-backend   # Check backend before push"
@@ -152,8 +122,7 @@ case "${1:-help}" in
     check)
         check_backend
         check_openapi
-        check_web
-        check_mobile
+        check_desktop
         echo -e "\n${GREEN}═════════════════════════════════════${NC}"
         echo -e "${GREEN}  ✅ All checks passed!${NC}"
         echo -e "${GREEN}═════════════════════════════════════${NC}"
@@ -166,13 +135,9 @@ case "${1:-help}" in
         check_openapi
         echo -e "\n${GREEN}✅ OpenAPI checks passed${NC}"
         ;;
-    check-web)
-        check_web
-        echo -e "\n${GREEN}✅ Web checks passed${NC}"
-        ;;
-    check-mobile)
-        check_mobile
-        echo -e "\n${GREEN}✅ Mobile checks passed${NC}"
+    check-desktop)
+        check_desktop
+        echo -e "\n${GREEN}✅ Desktop checks passed${NC}"
         ;;
     help|--help|-h)
         usage

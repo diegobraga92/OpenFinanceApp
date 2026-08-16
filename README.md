@@ -1,9 +1,9 @@
 # 🏦 PudimFinance
 
-> Personal finance application: Rust (Tokio + Axum) backend, React (Vite) web, React Native (Expo) mobile, PostgreSQL.
+> Personal finance application: Rust (Tokio + Axum) backend, Tauri 2 desktop + Android client, PostgreSQL.
 > Built incrementally — a working transaction tracker first, with double-entry ledger, event sourcing, and RabbitMQ added in later layers.
 
-**Tech Stack:** Rust (Tokio + Axum) backend · React (Vite) web · React Native (Expo) mobile · PostgreSQL
+**Tech Stack:** Rust (Tokio + Axum) backend · Tauri 2 (React/Vite) desktop + Android client · PostgreSQL
 
 ---
 
@@ -15,12 +15,14 @@ PudimFinance/
 │   ├── src/routes/    # Categories, transactions, summary handlers
 │   ├── src/models.rs  # SQLx/utoipa data models
 │   └── migrations/    # PostgreSQL migrations (sqlx)
-├── web/               # React + TypeScript + Vite frontend
-├── mobile/            # React Native + Expo mobile app
+├── desktop/           # Tauri 2 client — one codebase for desktop + Android
+│   ├── src/           # React + TypeScript + Vite frontend (design system, offline layer)
+│   └── src-tauri/     # Rust core + pudim-android-native plugin (Android native)
 ├── api/
 │   └── openapi/       # Generated OpenAPI 3.1 spec (from Rust utoipa annotations)
+├── shared/            # i18n dictionaries + category icons shared with the client
 ├── infra/             # Terraform infrastructure-as-code (AWS)
-├── docker-compose.yml # Local development environment (Postgres + Backend + Web)
+├── docker-compose.yml # Local development environment (Postgres + Backend)
 └── docs/
     ├── adr/           # Architecture Decision Records
     ├── DEV_PLAN.md    # Full development plan (all layers)
@@ -34,26 +36,26 @@ PudimFinance/
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
-- [Rust](https://rustup.rs/) (1.78+) for local backend development
-- [Node.js](https://nodejs.org/) (20+) for web/mobile
-- [Expo CLI](https://docs.expo.dev/get-started/installation/) for mobile
+- [Rust](https://rustup.rs/) (1.78+) for the backend
+- [Node.js](https://nodejs.org/) (20+) for the client
+- [Tauri prerequisites](https://tauri.app/start/prerequisites/) for desktop builds
+- Android SDK + NDK + JDK 17 for Android builds (CI runs these for you)
 
 ### Local Development (Docker)
 
 ```bash
-# Start all services (PostgreSQL, backend, web)
+# Start the backend stack (PostgreSQL, backend API)
 docker compose up --build
 
 # Services:
 #   Backend API:  http://localhost:3000/health
 #   Swagger UI:   http://localhost:3000/swagger-ui
-#   Web UI:       http://localhost:5173
 ```
 
 > **Auth:** the API requires a JWT on every `/api/*` route except `/api/auth/*`.
-> On first launch the web UI shows a registration form — create an account
-> there and subsequent visits keep you signed in (tokens live in `localStorage`,
-> auto-refreshed for 7 days).
+> On first launch the client shows a registration form — create an account
+> there and subsequent visits keep you signed in (tokens live in the OS
+> keyring / Android Keystore, auto-refreshed for 7 days).
 
 Running on a shared LAN server where Docker ports may conflict? See
 [LAN Server Deployment](#lan-server-deployment).
@@ -66,111 +68,58 @@ cp ../.env.example .env
 cargo run
 ```
 
-### Web (local, without Docker)
+### Desktop client (local)
+
+See [`desktop/README.md`](desktop/README.md) for the full development and
+verification guide.
 
 ```bash
-cd web
+cd desktop
 npm install
-npm run dev
+npm run tauri dev      # Tauri window + HMR
 ```
 
-### Mobile (local)
+> Linux desktop builds need the webkit2gtk dev libraries (see the desktop
+> README); CI installs them automatically.
 
-```bash
-cd mobile
-npm install
-npx expo start
-```
+### Configuring the backend server (in-app)
 
-### Mobile: Configuring the backend server (in-app)
+The client's backend address is **configured at runtime** — not baked into the
+bundle — so you can point the app at any PudimFinance server without rebuilding:
 
-The mobile app's backend address is **configured on the device** — not baked
-into the APK — so you can point the app at any PudimFinance server without
-rebuilding:
-
-- **First launch / sign-in screen**: there is a "Server" field at the top of
-  the login form. Enter your server's LAN address (e.g. `http://192.168.1.100:3000`)
-  before signing in — it is saved automatically.
-- **Already signed in**: open the drawer → **Server** to view, change, test
+- **Login screen**: there is a "Server" field above the sign-in form. Enter
+  your server's LAN address (e.g. `http://192.168.1.100:3000`) before signing
+  in — it is saved automatically.
+- **Already signed in**: open **Settings → Server** to view, change, test
   (`/health` ping) and save the address. Changes take effect immediately.
-- If no address is configured, the app falls back to `EXPO_PUBLIC_API_BASE_URL`
-  (if baked in at build time) and finally `http://localhost:3000`.
+- If no address is configured, the app falls back to `http://localhost:3000`.
 
-> Android: the APK is built with `usesCleartextTraffic` enabled
-> (`expo-build-properties` plugin), so plain `http://` LAN addresses work.
+### Installing the Android app (CI-built APK)
 
+The **Android** job in `.github/workflows/desktop-ci.yml` builds the app on
+`main` pushes (or manually via **Run workflow**). The APK is uploaded as a
+workflow artifact:
 
-### Installing on an Android phone (CI-built APK)
+1. Open the **Actions** tab → select the **Android (tauri android build)** run.
+2. Download the **Artifacts** and transfer the APK to your phone to install.
 
-Every push to `main` touching `mobile/**` triggers the **Mobile APK Build**
-workflow (`.github/workflows/mobile-apk.yml`), which produces an installable
-**release** APK (embedded JS bundle, sideloadable without a Play Store):
+**Google Play Protect**: because the app is sideloaded, Play Protect may warn
+or block the install. If it does, tap **"More details"** → **"Install
+anyway"** (and re-enable Play Protect afterwards).
 
-1. Open the **Actions** tab on GitHub → select **Mobile APK Build**.
-2. Pick the latest run (green check) → **Artifacts** → download
-   `pudimfinance-release`.
-3. Unzip → transfer `app-release.apk` to your phone (USB, Drive, or direct
-   download) and tap it to install.
+### Android: Push Notification Capture
 
-You can also trigger a build anytime by opening the workflow and clicking
-**Run workflow** (the `workflow_dispatch` trigger) — no push required.
+The Android app can auto-capture transactions from bank/payment push
+notifications (Nubank, Itaú, Banco do Brasil, PicPay, PIX, …):
 
-**Google Play Protect**: because the app is sideloaded (not from the Play
-Store), Play Protect may show a warning or block the install. If it does,
-tap **"More details"** → **"Install anyway"**. If it hard-blocks, temporarily
-disable Play Protect scanning (Play Store → profile → *Play Protect* → Settings
-→ *Scan apps with Play Protect* → off), install, then re-enable it.
-
-To avoid the stricter *"signed with a test key"* block, sign the APK with a
-private release keystore instead of the debug keystore:
-
-1. Generate a keystore once and keep it safe (never commit it):
-   ```bash
-   keytool -genkeypair -v -storetype PKCS12 \
-     -keystore pudim-release.keystore -alias pudim \
-     -keyalg RSA -keysize 2048 -validity 10000 \
-     -dname "CN=PudimFinance, OU=Mobile, O=PudimFinance, L=Sao Paulo, ST=SP, C=BR" \
-     -storepass "STRONG-PASSWORD" -keypass "STRONG-PASSWORD" -noprompt
-   ```
-2. Add these **GitHub secrets** (repo → Settings → Secrets and variables →
-   Actions):
-   - `RELEASE_KEYSTORE_BASE64` — `base64 -w0 pudim-release.keystore`
-   - `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS` (`pudim`),
-     `RELEASE_KEY_PASSWORD`
-3. The next CI build signs the APK with that keystore. If the secrets aren't
-   set, the workflow still builds but falls back to the debug keystore (a
-   `::warning::` appears in the run log).
-
-Enable *"Install unknown apps"* for the source app if your phone prompts you.
-
-
-### Mobile: Home-screen Quick Add widget (Android)
-
-The Android app ships a home-screen **Quick Add** widget (long-press the home
-screen → *Widgets* → *PudimFinance* → *Quick Add*):
-
-- Shows **Spent today** (sum of today's expense transactions).
-- **+ Expense** / **+ Income** buttons deep-link into the app's Add Transaction
-  form with the type pre-selected.
-
-The widget is a self-contained native `AppWidgetProvider`/`RemoteViews`
-implementation (the local `expo-android-widget` module); the app pushes fresh
-"spent today" values whenever transactions change. Android widgets can't accept
-text input, so amounts are entered in the app after the button tap.
-
-
-### Mobile: Push Notification Capture
-
-PudimFinance can auto-capture transactions from bank/payment push notifications
-(Nubank, Itaú, Banco do Brasil, PicPay, PIX, …):
-
-1. Open **Notification Capture** from the drawer menu.
-2. Toggle **Auto-capture transactions** on and grant notification access.
+1. Open **Settings → Notification Capture**.
+2. Toggle **Auto-capture transactions** on and grant notification access
+   (Settings → Special app access → Notification access).
 3. Pick the apps to monitor (or leave empty to watch all) and choose a capture
    mode:
-   - **Ask before creating** — a confirmation dialog appears with the parsed
-     amount/description before anything is saved.
-   - **Auto-create** — transactions are saved immediately (Snackbar confirms).
+   - **Ask before creating** — captured transactions go to **Pending review**
+     for you to confirm or edit.
+   - **Auto-create** — transactions are saved immediately (toast confirms).
 4. Optionally pick a **default category** used when the merchant can't be
    matched to an existing category.
 
@@ -184,12 +133,12 @@ Boleto pago R$ 85,75                     → expense 85.75
 ```
 
 > **Android only.** Capture works by reading other apps' notifications through a
-> native `NotificationListenerService` (the local `expo-notification-listener`
-> module). The user must grant **Notification access** (Settings → Special app
-> access → Notification access). It works while the app is backgrounded or
-> killed. On iOS, reading other apps' notifications is blocked by the sandbox,
-> so the feature is disabled there.
+> native `NotificationListenerService` (the `pudim-android-native` Tauri
+> plugin). It works while the app is backgrounded or killed (captured
+> notifications are drained on the next launch). Desktop platforms have no
+> equivalent OS API, so the feature shows an "Android only" notice there.
 
+---
 
 ### Credit Cards, Faturas & Antecipação
 
@@ -217,131 +166,39 @@ land on the right card and become anticipatable.
 
 ## LAN Server Deployment
 
-Running PudimFinance on a LAN server that already hosts other web services in Docker
+Running PudimFinance on a LAN server that already hosts other services in Docker
 requires two things:
 
-1. **No port conflicts** — the default host ports (`3000`, `5173`, `5432`, `5672`,
+1. **No port conflicts** — the default host ports (`3000`, `5432`, `5672`,
    `15672`, `9090`, `3001`) may already be taken by other containers.
-2. **A backend URL that works from other devices** — the web app defaults to same-origin
-   URLs, so it must be able to reach the backend from LAN clients (not from `localhost`
-   on the server itself).
+2. **A backend URL that works from other devices** — clients must reach the
+   backend from the LAN (not from `localhost` on the server itself).
 
-All host ports and the web → backend URL are configurable via environment variables,
-so you never need to edit `docker-compose.yml`.
-
-### 1. Check for port conflicts
-
-```bash
-ss -tlnp | grep -E ':(3000|5173|5432|5672|15672|9090|3001)\b'
-```
-
-Anything listed is already in use — override it with a free port in step 2.
-
-### 2. Configure the deployment
-
-A ready-made template is committed at [`.env.docker`](.env.docker). Use it with
-`--env-file` so it does **not** overwrite the root `.env` used by `scripts/run.sh`:
+All host ports are configurable via environment variables, so you never need to
+edit `docker-compose.yml`:
 
 ```bash
 cp .env.docker .env.docker.local
 $EDITOR .env.docker.local
 ```
 
-Set `PUBLIC_HOST` to this server's LAN IP/hostname as seen by other devices:
-
-```bash
-hostname -I        # e.g. 192.168.1.100
-```
-
-Then change any ports that collided in step 1:
-
 ```dotenv
-PUBLIC_HOST=192.168.1.100
-BACKEND_PORT=3100   # 3000 was taken by another container
-WEB_PORT=4200       # 5173 was taken by another container
+PUBLIC_HOST=192.168.1.100   # this server's LAN IP (hostname -I)
+BACKEND_PORT=3100           # if 3000 is taken
 ```
 
-### 3. Choose how the web app reaches the backend
-
-`VITE_API_BASE_URL` is **baked into the web bundle at build time**. Two supported
-strategies:
-
-#### Option A — direct backend URL (simplest)
-
-Uncomment and set `VITE_API_BASE_URL` to the backend's LAN address:
-
-```dotenv
-VITE_API_BASE_URL=http://192.168.1.100:3100
-```
-
-Then build and start:
+Then start and point each client at the backend:
 
 ```bash
 docker compose --env-file .env.docker.local up --build -d
+# Clients: Settings → Server → http://192.168.1.100:3100
 ```
 
-Browsers call `http://192.168.1.100:3100` directly (the backend is already
-CORS-permissive and binds `0.0.0.0`).
-
-**Trade-off:** the URL is baked in — if the server IP or port changes, edit
-`.env.docker.local` and rebuild the `web` container:
+If a firewall is enabled, allow the backend port:
 
 ```bash
-docker compose --env-file .env.docker.local build web
-docker compose --env-file .env.docker.local up -d web
+sudo ufw allow 3100/tcp
 ```
-
-#### Option B — same-origin nginx proxy (recommended, no rebuild on IP change)
-
-Leave `VITE_API_BASE_URL` **empty** (the default):
-
-```dotenv
-VITE_API_BASE_URL=
-```
-
-The web container's nginx proxies `/api/`, `/health`, `/metrics`, `/swagger-ui`, and
-`/api-docs/` to the backend over the internal Docker network, so the app uses relative
-URLs and works from any device, at any server IP/port, with no rebuild:
-
-```bash
-docker compose --env-file .env.docker.local up --build -d
-```
-
-**Trade-off:** all API traffic is funneled through the web container, and the backend
-is not directly reachable via HTTP from the LAN.
-
-> **Note:** with either option, if you run `docker compose up` *without* `--env-file`,
-> Compose falls back to the root `.env`, which sets `VITE_API_BASE_URL=http://localhost:3000`
-> (fine for the dev quickstart, broken for LAN clients).
-
-### 4. Open the firewall (if enabled)
-
-```bash
-sudo ufw allow 4200/tcp   # web UI — required for both options
-sudo ufw allow 3100/tcp   # backend — only needed for Option A
-```
-
-### 5. Verify
-
-From the server itself:
-
-```bash
-curl -s http://localhost:4200/health
-# {"status":"ok","database":"connected",...}
-```
-
-From another machine on the same LAN (replace with your server's IP):
-
-```bash
-curl -s http://192.168.1.100:4200/health
-curl -s http://192.168.1.100:4200/api/categories
-```
-
-Then open `http://192.168.1.100:4200` in a browser on the LAN device.
-
-The app now requires authentication: the first browser session shows a
-**Create account** form (the backend auto-creates the `users` table on startup).
-Any subsequent device just signs in with the same credentials.
 
 ### Configuration reference
 
@@ -353,17 +210,15 @@ Any subsequent device just signs in with the same credentials.
 | `RABBIT_PORT` | `5672` | RabbitMQ AMQP |
 | `RABBIT_MGMT_PORT` | `15672` | RabbitMQ management UI |
 | `BACKEND_PORT` | `3000` | Rust backend API |
-| `WEB_PORT` | `5173` | Web UI (nginx) |
 | `PROMETHEUS_PORT` | `9090` | Prometheus |
 | `GRAFANA_PORT` | `3001` | Grafana |
-| `VITE_API_BASE_URL` | *(empty)* | Web → backend URL (baked at build time) |
 
 Internal container-to-container communication (`postgres:5432`, `backend:3000`,
 `prometheus:9090`, ...) is unaffected — only host-facing ports are configurable.
 
 ---
 
-## API Endpoints (Layer 1)
+## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -396,10 +251,31 @@ Internal container-to-container communication (`postgres:5432`, `backend:3000`,
 | `GET` | `/api/receipts` | List saved receipts (includes items + normalized product ids) |
 | `POST` | `/api/receipts` | Save a parsed receipt |
 | `POST` | `/api/receipts/scan` | Parse an NFC-e QR code into receipt data |
+| `POST` | `/api/receipts/ocr` | Parse raw receipt text (OCR helper) |
 | `GET` | `/api/receipts/price-history` | Price history for a normalized product |
 | `POST` | `/api/receipts/product/merge` | Merge duplicate normalized products |
 | `POST` | `/api/reconciliation` | Upload bank statement CSV for reconciliation |
+| `POST` | `/api/reconciliation/upload` | Upload a bank statement file |
+| `GET` | `/api/reconciliation/history` | List previous reconciliation runs |
 | `GET` | `/api/audit/events` | List immutable audit events (admin-only) |
+| `GET` | `/api/budgets` | List budgets for the current month |
+| `POST` | `/api/budgets` | Create budget |
+| `DELETE` | `/api/budgets/{id}` | Delete budget |
+| `GET` | `/api/budgets/summary` | Budget spend vs limit for a month |
+| `GET` | `/api/budgets/alerts` | List budget alerts (threshold crossings) |
+| `POST` | `/api/budgets/alerts/{id}/acknowledge` | Acknowledge a single alert |
+| `POST` | `/api/budgets/alerts/acknowledge-all` | Acknowledge all alerts |
+| `GET` | `/api/reports/monthly` | Monthly income/expense report over a range |
+| `GET` | `/api/reports/category-breakdown` | Category breakdown over a date range |
+| `GET` | `/api/reports/trends` | Income/expense trend over N months |
+| `POST` | `/api/sync/pull` | Pull changed rows for offline sync |
+| `POST` | `/api/sync/push` | Push queued mutations for offline sync |
+| `GET` | `/api/installments` | List installment plans with progress |
+| `POST` | `/api/installments` | Create an installment plan |
+| `GET` | `/api/installments/{id}` | Get plan detail (installments) |
+| `POST` | `/api/installments/{id}/generate` | Lazily generate the plan's transactions |
+| `POST` | `/api/installments/{id}/installment/{number}/pay` | Pay a single installment |
+| `DELETE` | `/api/installments/{id}` | Delete an installment plan |
 
 The full OpenAPI 3.1 spec is available at `http://localhost:3000/api-docs/openapi.json` and served via Swagger UI at `http://localhost:3000/swagger-ui`.
 
@@ -407,8 +283,7 @@ To regenerate the committed spec from Rust annotations:
 
 ```bash
 cd backend && cargo run --bin gen-openapi > ../api/openapi/openapi.json
-cd web && npm run generate-types   # regenerate TypeScript types
-cd mobile && npm run generate-types
+cd desktop && npm run generate-types   # regenerate TypeScript types
 ```
 
 ---
@@ -419,9 +294,10 @@ cd mobile && npm run generate-types
 |-------|-------|--------|
 | **Phase 0** | Project skeleton, health endpoint, CI/CD, ADRs | ✅ **Complete** |
 | **Layer 1** | Simple income/expense tracking (categories + transactions) | ✅ **Complete** |
-| **Layer 2** | Budgets, monthly reports, charts on web and mobile | 📋 Planned |
-| **Layer 3** | Double-entry ledger, event sourcing, RabbitMQ, reconciliation | 📋 Planned |
-| **Layer 4** | Observability deep-dive, security, DR, receipt scanner, docs | 📋 Planned |
+| **Layer 2** | Budgets, monthly reports, charts | ✅ **Complete** |
+| **Layer 3** | Double-entry ledger, event sourcing, reconciliation | ✅ **Complete** |
+| **Layer 4** | Observability, security, receipt scanner, docs | ✅ **Complete** |
+| **Tauri** | Unified desktop + Android client (replaces web/ + mobile/) | ✅ **Complete** |
 
 See [DEV_PLAN.md](docs/DEV_PLAN.md) for the complete roadmap.
 
@@ -466,7 +342,7 @@ Structured JSON logs with OpenTelemetry trace IDs:
 ### CI Checks
 
 ```bash
-./scripts/ci-checks.sh check   # Full suite (backend fmt/clippy/audit/build, OpenAPI, web, mobile)
+./scripts/ci-checks.sh check   # Full suite (backend fmt/clippy/audit/build, OpenAPI, desktop client)
 ```
 
 ---

@@ -2,8 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WEB_DIR="$ROOT_DIR/web"
 BACKEND_DIR="$ROOT_DIR/backend"
 
 # ─── Colors ────────────────────────────────────────────────────────────────
@@ -23,12 +21,14 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Start the PudimFinance development environment.
-Launches Docker services, backend, and web frontend.
+Start the PudimFinance development environment (PostgreSQL + backend).
+
+The desktop client (Tauri) is started separately:
+
+    cd desktop && npm install && npm run tauri dev
 
 Options:
   --no-db    Skip starting Docker services (postgres)
-  --no-web   Skip starting the web frontend (useful for mobile dev)
   --clean    Remove Docker volumes and node_modules before starting
   --help     Show this help message and exit
 EOF
@@ -40,7 +40,7 @@ cleanup() {
     echo ""
     log_info "Shutting down..."
 
-    # Kill background processe
+    # Kill background processes
     if [ -n "${BACKEND_PID:-}" ]; then
         log_info "Stopping backend (PID $BACKEND_PID)..."
         kill "$BACKEND_PID" 2>/dev/null || true
@@ -51,14 +51,6 @@ cleanup() {
 
     # Broad fallback: catch any cargo process that escaped
     pkill -9 -f "cargo run.*backend" 2>/dev/null || true
-
-    if [ -n "${FRONTEND_PID:-}" ]; then
-        log_info "Stopping frontend (PID $FRONTEND_PID)..."
-        kill "$FRONTEND_PID" 2>/dev/null || true
-        sleep 2
-        kill -9 "$FRONTEND_PID" 2>/dev/null || true
-        wait "$FRONTEND_PID" 2>/dev/null || true
-    fi
 
     # Stop Docker services if we started them
     if [ "${DOCKER_STARTED:-}" = "true" ]; then
@@ -74,12 +66,10 @@ trap cleanup SIGINT SIGTERM
 
 # ─── Parse arguments ───────────────────────────────────────────────────────
 SKIP_DOCKER=false
-SKIP_WEB=false
 CLEAN=false
 for arg in "$@"; do
     case "$arg" in
         --no-db)  SKIP_DOCKER=true ;;
-        --no-web) SKIP_WEB=true ;;
         --clean)  CLEAN=true ;;
         --help)   usage ;;
         *) log_warn "Unknown argument: $arg"; usage ;;
@@ -96,25 +86,16 @@ if [ "$CLEAN" = true ]; then
         docker compose -f "$ROOT_DIR/docker-compose.yml" down -v
     fi
 
-    # Remove node_modules
-    if [ -d "$WEB_DIR/node_modules" ]; then
-        log_info "Removing node_modules..."
-        rm -rf "$WEB_DIR/node_modules"
+    # Remove desktop node_modules
+    if [ -d "$ROOT_DIR/desktop/node_modules" ]; then
+        log_info "Removing desktop/node_modules..."
+        rm -rf "$ROOT_DIR/desktop/node_modules"
     fi
 
     log_ok "Clean complete."
 fi
 
-# ─── 1. Install frontend dependencies if needed ────────────────────────────
-if [ ! -d "$WEB_DIR/node_modules" ]; then
-    log_info "node_modules not found. Running npm install..."
-    (cd "$WEB_DIR" && npm install)
-    log_ok "npm install completed."
-else
-    log_ok "node_modules found, skipping npm install."
-fi
-
-# ─── 2. Start Docker services ──────────────────────────────────────────────
+# ─── 1. Start Docker services ──────────────────────────────────────────────
 if [ "$SKIP_DOCKER" = false ]; then
     log_info "Starting Docker services (postgres)..."
     docker compose -f "$ROOT_DIR/docker-compose.yml" up -d postgres
@@ -130,7 +111,7 @@ else
     log_info "Skipping Docker services (--no-db)."
 fi
 
-# ─── 3. Export .env variables ──────────────────────────────────────────────
+# ─── 2. Export .env variables ──────────────────────────────────────────────
 if [ -f "$ROOT_DIR/.env" ]; then
     set -a
     source "$ROOT_DIR/.env"
@@ -140,7 +121,7 @@ else
     log_warn ".env file not found at $ROOT_DIR/.env — using defaults."
 fi
 
-# ─── 4. Start backend (cargo run) ──────────────────────────────────────────
+# ─── 3. Start backend (cargo run) ──────────────────────────────────────────
 log_info "Starting backend (cargo run)..."
 (cd "$BACKEND_DIR" && cargo run) &
 BACKEND_PID=$!
@@ -149,23 +130,15 @@ log_ok "Backend started (PID $BACKEND_PID)."
 # Give the backend a moment to start
 sleep 2
 
-# ─── 5. Start frontend (unless --no-web) ────────────────────────────────────
-if [ "$SKIP_WEB" = false ]; then
-    log_info "Starting web frontend (npm run dev)..."
-    (cd "$WEB_DIR" && npm run dev) &
-    FRONTEND_PID=$!
-    log_ok "Web frontend started (PID $FRONTEND_PID)."
-else
-    log_info "Skipping web frontend (--no-web)."
-fi
-
-# ─── 6. Print summary ──────────────────────────────────────────────────────
+# ─── 4. Print summary ──────────────────────────────────────────────────────
 echo ""
 log_ok "═══════════════════════════════════════════════════════════"
 log_ok "  PudimFinance is running!"
 log_ok ""
 log_ok "  Backend API:  http://localhost:3000/health"
-log_ok "  Web UI:       http://localhost:5173"
+log_ok ""
+log_ok "  Desktop client (separate terminal):"
+log_ok "    cd desktop && npm install && npm run tauri dev"
 log_ok ""
 log_ok "  Press Ctrl+C to stop all services."
 log_ok "═══════════════════════════════════════════════════════════"

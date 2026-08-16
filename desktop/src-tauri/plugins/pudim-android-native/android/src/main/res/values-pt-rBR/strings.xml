@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_quickadd_label">PudimFinance</string>
+    <string name="widget_quickadd_title">PudimFinance</string>
+    <string name="widget_quickadd_spent_prefix">Gastos hoje:</string>
+    <string name="widget_quickadd_description">Adicione despesas/receitas e veja o total do dia</string>
+    <string name="widget_quickadd_default_spent">Gastos hoje: R$ 0,00</string>
+    <string name="widget_quickadd_add_expense">− Despesa</string>
+    <string name="widget_quickadd_add_income">+ Receita</string>
+    <string name="biometric_title">Desbloquear PudimFinance</string>
+    <string name="biometric_subtitle">Use sua impressão digital ou rosto para continuar</string>
+</resources>

@@ -1,7 +1,0 @@
-{
-  "name": "expo-notification-listener",
-  "version": "0.1.0",
-  "description": "Android NotificationListenerService bridge — observes notifications posted by other apps and forwards them to PudimFinance.",
-  "main": "index.ts",
-  "private": true
-}

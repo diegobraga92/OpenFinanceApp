@@ -1,17 +1,15 @@
+# Node
+node_modules/
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/plugins/*/target/
+*.tsbuildinfo
+
 # Rust
 backend/target/
 backend/**/*.rs.bk
-
-# Node
-node_modules/
-web/node_modules/
-mobile/node_modules/
-web/dist/
-mobile/.expo/
-mobile/dist/
-mobile/android/
-mobile/ios/
-*.tsbuildinfo
 
 # Docker
 *.env
